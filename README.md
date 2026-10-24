@@ -22,6 +22,7 @@ Esta versão é uma implementação inicial funcional para piloto assistido. O e
 ### Limites explícitos
 
 - Interface desta entrega usa **Blade + CSS/JS**, sem Vue/Inertia ou WebSockets. Atualização operacional é manual. Isso simplifica a fundação; não implementa ainda a interface em tempo real prevista no escopo.
+- O módulo é ativado por empresa nesta entrega; seleção granular de lojas, múltiplos usuários com permissões por loja, bloqueios locais de entregador e tabelas de regras editáveis ainda precisam ser desenvolvidos.
 - Painel web do motoboy serve ao piloto e exige renovar presença. **Aplicativo Android, localização contínua e push ainda não estão implementados**; não lançar operação autônoma com celular bloqueado usando esse painel.
 - **WABA ainda é solicitação pendente**, sem Embedded Signup ou envio oficial. A conexão QR possui testes com HTTP simulado, mas exige homologação na versão do servidor Evolution. Verificação automática do número efetivamente pareado, desconexão/migração e mensagens transacionais/campanhas estão pendentes.
 - Pagamento é presencial/manual. Não há integração real com gateway, Pix dinâmico, estorno ou repasse ao freelancer.

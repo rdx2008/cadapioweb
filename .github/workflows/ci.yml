@@ -1,0 +1,48 @@
+name: Application CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: testing
+          POSTGRES_USER: testing
+          POSTGRES_PASSWORD: testing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, pdo_sqlite, pdo_pgsql, zip
+          coverage: none
+      - run: composer install --prefer-dist --no-interaction --no-progress
+      - run: cp .env.example .env && php artisan key:generate
+      - run: php artisan test --compact
+      - name: Test with PostgreSQL
+        run: php artisan test --compact
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: testing
+          DB_USERNAME: testing
+          DB_PASSWORD: testing
+      - run: php artisan view:cache && php artisan route:cache
+      - run: composer audit
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --env-file .env.coolify.example config --quiet
+      - run: docker build -t cadapioweb:ci .
