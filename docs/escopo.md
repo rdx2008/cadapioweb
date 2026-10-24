@@ -1,6 +1,6 @@
 # Escopo de produto — Plataforma de restaurantes em Laravel
 
-Versão 1.3 · 23 de outubro de 2026 · Decisões operacionais para logística, continuidade e homologação
+Versão 1.4 · 24 de outubro de 2026 · Prioridade para operação web; Android adiado
 
 ## 1. Objetivo e decisões de partida
 
@@ -593,7 +593,11 @@ Esta seção define a configuração inicial recomendada para implementação e 
 
 ### 17.1. Aplicativo do entregador
 
-Adotar aplicativo Android em Flutter para o lançamento do módulo freelancer, com arquitetura preparada para iOS em etapa posterior. O backend continua em Laravel e a implantação no Coolify; aplicativo móvel é um cliente da API, não um serviço executado no servidor. Portal web atende cadastro, documentos e consulta de ganhos. A PWA não será a base do rastreamento contínuo ou do despacho em segundo plano.
+Decisão atual: concluir primeiro o funcionamento web de todos os painéis e fluxos prioritários. O aplicativo Android fica adiado para uma fase posterior e deixa de ser requisito da primeira entrega web. As referências a Android, localização contínua em segundo plano e push nativo nesta seção descrevem a evolução futura, não funcionalidades já existentes.
+
+No lançamento web do módulo freelancer, oferecer painel responsivo para cadastro, aprovação, check-in, posição na fila, ofertas, aceite, coleta, conclusão e acertos. Atualizar presença e localização automaticamente enquanto a página estiver aberta e ativa, com aviso de permissão negada, localização imprecisa, perda de conexão e presença expirada. O servidor continua decidindo elegibilidade e aceite único. Sem presença válida, suspender novas ofertas; não cancelar automaticamente corridas atribuídas. Não prometer rastreamento contínuo ou recebimento garantido de oferta com navegador fechado/celular bloqueado. Disputas, ausência de entregador e falhas devem ter tratamento no painel da loja.
+
+O fluxo web deve funcionar integralmente sem exigir instalação de app. Para uma etapa posterior, prever aplicativo Android em Flutter, com arquitetura preparada para iOS. O backend continua em Laravel e a implantação no Coolify; aplicativo móvel será um cliente da API. A operação web não deve depender de componentes exclusivos desse aplicativo.
 
 O aplicativo implementa serviço de localização em primeiro plano durante disponibilidade e corrida, respeitando permissões do sistema, indicação de uso e requisitos da distribuição. Push sinaliza ofertas, mas a lista de ofertas válidas vem do servidor; abrir a notificação não equivale a aceitar. Sem permissão ou sinal recente suficiente, o entregador fica indisponível para novas ofertas automáticas. A perda de localização durante corrida já atribuída gera alerta e último horário conhecido, sem cancelar automaticamente a corrida.
 
@@ -648,6 +652,6 @@ Testes automatizados tentam acesso cruzado em endpoints, arquivos, filas, export
 
 Estados do módulo por tenant: desativado, ativo e em encerramento. Ativação exige loja configurada, tabela de remuneração, cobertura e responsável por acertos. Encerramento impede novas corridas, revoga ofertas sem aceite e preserva tratamento das atribuídas e valores pendentes. Nenhuma suspensão comercial deve apagar dados ou impedir o registro necessário de uma ocorrência em andamento.
 
-Antes de liberar o módulo freelancer em produção, demonstrar em dispositivos reais: oferta com tela bloqueada, localização durante disponibilidade, perda de conexão, retorno de rede, aceites simultâneos, recuperação após reinício, conclusão e acerto financeiro. Executar piloto com duas empresas e pelo menos três entregadores.
+Antes de liberar o módulo freelancer web em produção, demonstrar em navegadores reais de computador e celular: localização e ofertas com a página ativa, aviso de suspensão/inatividade, perda e retorno de conexão, aceites simultâneos, recuperação após reinício, conclusão e acerto financeiro. Executar piloto com duas empresas e pelo menos três entregadores. Testes de localização contínua e ofertas com tela bloqueada pertencem à futura entrega Android e não bloqueiam a versão web, que deve informar seus limites operacionais.
 
 O início da operação integrada exige prova técnica de Evolution nos modos contratados, impressão e gateway. Dependência ainda não homologada fica explicitamente desabilitada, sem comprometer módulos já aprovados. Estas validações são entregas obrigatórias da fase 0 e critérios de liberação, não tarefas adiadas para depois do lançamento.

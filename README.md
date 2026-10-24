@@ -6,6 +6,8 @@ Plataforma de restaurantes em **Laravel 13 / PHP 8.4**, com múltiplas empresas 
 
 Esta versão é uma implementação inicial funcional para piloto assistido. O escopo completo está em `docs/escopo.md`; os recursos descritos no escopo não devem ser confundidos com recursos já implementados.
 
+**Prioridade definida em 24/10/2026:** concluir os fluxos web primeiro. Android foi adiado e não é dependência da primeira entrega web. O backlog e o estado por módulo estão em `docs/status-web.md`.
+
 ### Implementado
 
 - Login, logout, limitação de tentativas e perfis de superadmin, proprietário e freelancer.
@@ -74,6 +76,6 @@ Para restaurar: criar ambiente isolado com a mesma versão, restaurar PostgreSQL
 
 1. Homologar imagem Coolify, concorrência real no PostgreSQL e instalação limpa.
 2. Evoluir fluxo de ocorrências, segurança/comprovação de entrega, tabela de tarifas editável e configuração de despacho.
-3. Implementar Android, localização/push e fluxo de acerto validado em duas lojas e três entregadores.
+3. Completar o painel web do entregador, atualização de presença com página ativa, ofertas e acertos validados em duas lojas e três entregadores. Android/localização em segundo plano ficam para depois.
 4. Homologar Evolution QR e implementar onboarding WABA e outbox de mensagens.
 5. Implementar gateway, fiscal conforme cenário e os módulos operacionais restantes em fases.
