@@ -67,9 +67,10 @@ php artisan route:cache
 ## Instalação no Coolify
 
 1. Criar recurso a partir do repositório Git e selecionar Docker Compose (`compose.yaml`).
-2. Configurar `APP_URL`, `APP_KEY`, `DB_PASSWORD`, `REDIS_PASSWORD` e os IPs/CIDRs reais do proxy em `TRUSTED_PROXIES`. Use `.env.coolify.example` como referência; substitua todos os placeholders.
-3. Gerar uma chave com `php artisan key:generate --show` em ambiente seguro e preservá-la. Não regenerar a chave a cada deploy: ela protege sessões/segredos da Evolution.
+2. Carregar o Compose no Coolify. Ele gera e persiste `SERVICE_REALBASE64_APPKEY`, `SERVICE_PASSWORD_POSTGRES` e `SERVICE_PASSWORD_REDIS`; o Compose distribui os mesmos valores entre web, worker, scheduler e banco/Redis. Os dados fixos de banco, usuário e hosts já estão definidos. Configurar os IPs/CIDRs reais do proxy em `TRUSTED_PROXIES` conforme a rede utilizada.
+3. A chave Laravel é `base64:` mais os 32 bytes codificados em Base64 de `SERVICE_REALBASE64_APPKEY`. Não usar `SERVICE_BASE64_64` para isso: esse gerador tem outro formato/tamanho. Em instalação existente, preservar `APP_KEY`, `DB_PASSWORD` e `REDIS_PASSWORD` originais nas variáveis do recurso; esses overrides têm precedência e não devem ser apagados ao atualizar. Não gerar nova chave a cada deploy.
 4. Associar domínio HTTPS ao serviço `web`, porta interna **8080**. Banco e Redis ficam sem portas públicas.
+   `APP_URL` usa automaticamente `SERVICE_URL_WEB_8080`, que acompanha a configuração de domínio no Coolify. Um `APP_URL` configurado manualmente continua tendo precedência: atualizar/remover apenas esse override se desejar acompanhar o domínio automaticamente. É necessário configurar DNS/HTTPS ou o wildcard do servidor para ter uma URL utilizável; o Compose não cria seu domínio externo.
 5. Após a primeira subida, executar no terminal do serviço web: `php artisan migrate --force`, depois `php artisan app:admin seu@email.com`. Registrar a migração como etapa de implantação única nas atualizações, sem executá-la em todos os containers.
 6. Executar `php artisan optimize` quando o ambiente estiver configurado. Reiniciar workers e scheduler em atualizações de código.
 7. Confirmar `/up`, acesso, criação de loja, checkout e execução de `dispatch:tick`. A rota `/up` confirma o processo web; monitoramento de banco, scheduler e filas deve ser adicional.

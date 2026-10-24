@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: "8.4"
           extensions: mbstring, intl, pdo_sqlite, pdo_pgsql, zip
           coverage: none
       - run: composer install --prefer-dist --no-interaction --no-progress
@@ -44,7 +44,34 @@ jobs:
       - run: composer audit
   image:
     runs-on: ubuntu-latest
+    env:
+      APP_URL: https://example.test
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_PASSWORD: ci-configuration-only
+      REDIS_PASSWORD: ci-configuration-only
     steps:
       - uses: actions/checkout@v4
       - run: docker compose --env-file .env.coolify.example config --quiet
+      - name: Validate generated Coolify values and shared credentials
+        run: |
+          env -u APP_URL -u APP_KEY -u DB_PASSWORD -u REDIS_PASSWORD \
+            SERVICE_URL_WEB_8080=https://example.test \
+            SERVICE_REALBASE64_APPKEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+            SERVICE_PASSWORD_POSTGRES=generated-postgres-test-only \
+            SERVICE_PASSWORD_REDIS=generated-redis-test-only \
+            docker compose --env-file .env.coolify.example config --format json > /tmp/cadapioweb-compose.json
+          python3 - <<'PY'
+          import base64, json
+          with open('/tmp/cadapioweb-compose.json') as source:
+              services = json.load(source)['services']
+          web = services['web']['environment']
+          assert web['APP_URL'] == 'https://example.test'
+          assert web['APP_KEY'].startswith('base64:')
+          assert len(base64.b64decode(web['APP_KEY'][7:], validate=True)) == 32
+          for name in ['web', 'worker', 'scheduler']:
+              environment = services[name]['environment']
+              assert environment['APP_KEY'] == web['APP_KEY']
+              assert environment['DB_PASSWORD'] == services['postgres']['environment']['POSTGRES_PASSWORD'] == 'generated-postgres-test-only'
+              assert environment['REDIS_PASSWORD'] == services['redis']['environment']['REDIS_PASSWORD'] == 'generated-redis-test-only'
+          PY
       - run: docker build -t cadapioweb:ci .

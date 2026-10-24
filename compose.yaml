@@ -1,81 +1,107 @@
 name: cadapioweb
 x-app: &app
-  build: .
-  restart: unless-stopped
-  environment: &environment
-    APP_NAME: CadapioWeb
-    APP_ENV: production
-    APP_DEBUG: "false"
-    APP_KEY: ${APP_KEY:?Defina uma chave base64 persistente}
-    APP_URL: ${APP_URL:?Defina a URL HTTPS}
-    APP_LOCALE: pt_BR
-    TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
-    DB_CONNECTION: pgsql
-    DB_HOST: postgres
-    DB_PORT: 5432
-    DB_DATABASE: cadapioweb
-    DB_USERNAME: cadapioweb
-    DB_PASSWORD: ${DB_PASSWORD:?Defina a senha do banco}
-    REDIS_HOST: redis
-    REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina a senha Redis}
-    QUEUE_CONNECTION: database
-    CACHE_STORE: database
-    SESSION_DRIVER: database
-    SESSION_SECURE_COOKIE: "true"
-    LOG_CHANNEL: stderr
-  volumes:
-    - app_storage:/var/www/html/storage
-  depends_on:
-    postgres:
-      condition: service_healthy
-    redis:
-      condition: service_healthy
+    build: .
+    restart: unless-stopped
+    environment: &environment
+        APP_NAME: CadapioWeb
+        APP_ENV: production
+        APP_DEBUG: "false"
+        APP_KEY: ${APP_KEY:-base64:${SERVICE_REALBASE64_APPKEY}}
+        APP_URL: ${APP_URL:-${SERVICE_URL_WEB_8080}}
+        APP_LOCALE: pt_BR
+        TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+        DB_CONNECTION: pgsql
+        DB_HOST: postgres
+        DB_PORT: 5432
+        DB_DATABASE: cadapioweb
+        DB_USERNAME: cadapioweb
+        DB_PASSWORD: ${DB_PASSWORD:-${SERVICE_PASSWORD_POSTGRES}}
+        REDIS_HOST: redis
+        REDIS_PASSWORD: ${REDIS_PASSWORD:-${SERVICE_PASSWORD_REDIS}}
+        QUEUE_CONNECTION: database
+        CACHE_STORE: database
+        SESSION_DRIVER: database
+        SESSION_SECURE_COOKIE: "true"
+        LOG_CHANNEL: stderr
+    volumes:
+        - app_storage:/var/www/html/storage
+    depends_on:
+        postgres:
+            condition: service_healthy
+        redis:
+            condition: service_healthy
 services:
-  web:
-    <<: *app
-    expose:
-      - "8080"
-    healthcheck:
-      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://localhost:8080/up') === false ? 1 : 0);"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-  worker:
-    <<: *app
-    command: ["php", "artisan", "queue:work", "--sleep=2", "--tries=3", "--timeout=60"]
-    stop_grace_period: 90s
-  scheduler:
-    <<: *app
-    command: ["php", "artisan", "schedule:work"]
-    stop_grace_period: 20s
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: cadapioweb
-      POSTGRES_USER: cadapioweb
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina a senha do banco}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cadapioweb -d cadapioweb"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-  redis:
-    image: redis:7.4-alpine
-    restart: unless-stopped
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina a senha Redis}
-    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+    web:
+        <<: *app
+        environment:
+            <<: *environment
+            SERVICE_URL_WEB_8080: /
+        expose:
+            - "8080"
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "php",
+                    "-r",
+                    "exit(@file_get_contents('http://localhost:8080/up') === false ? 1 : 0);",
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+    worker:
+        <<: *app
+        command:
+            [
+                "php",
+                "artisan",
+                "queue:work",
+                "--sleep=2",
+                "--tries=3",
+                "--timeout=60",
+            ]
+        stop_grace_period: 90s
+    scheduler:
+        <<: *app
+        command: ["php", "artisan", "schedule:work"]
+        stop_grace_period: 20s
+    postgres:
+        image: postgres:17-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: cadapioweb
+            POSTGRES_USER: cadapioweb
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-${SERVICE_PASSWORD_POSTGRES}}
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U cadapioweb -d cadapioweb"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+    redis:
+        image: redis:7.4-alpine
+        restart: unless-stopped
+        environment:
+            REDIS_PASSWORD: ${REDIS_PASSWORD:-${SERVICE_PASSWORD_REDIS}}
+        command:
+            [
+                "sh",
+                "-c",
+                'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"',
+            ]
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG',
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 10
 volumes:
-  app_storage:
-  postgres_data:
-  redis_data:
+    app_storage:
+    postgres_data:
+    redis_data:
