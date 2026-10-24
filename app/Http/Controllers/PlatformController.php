@@ -97,7 +97,13 @@ class PlatformController extends Controller
 
     public function dashboard(Request $request)
     {
-        return view('dashboard', ['tenant' => DB::table('tenants')->find($this->tid()), 'stores' => DB::table('stores')->where('tenant_id', $this->tid())->get(), 'orders' => DB::table('orders')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'products' => DB::table('products')->where('tenant_id', $this->tid())->get(), 'rides' => DB::table('rides')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'connections' => DB::table('whatsapp_connections')->where('tenant_id', $this->tid())->get()] + app(OrderBoardController::class)->data($request));
+        $setupStores = DB::table('stores')->where('tenant_id', $this->tid())
+            ->select('stores.*')
+            ->selectSub(DB::table('products')->selectRaw('count(*)')->whereColumn('store_id', 'stores.id')->where('tenant_id', $this->tid())->where('available', true), 'available_products')
+            ->selectSub(DB::table('delivery_zones')->selectRaw('count(*)')->whereColumn('store_id', 'stores.id')->where('enabled', true), 'active_zones')
+            ->get();
+
+        return view('dashboard', ['setupStores' => $setupStores, 'tenant' => DB::table('tenants')->find($this->tid()), 'stores' => DB::table('stores')->where('tenant_id', $this->tid())->get(), 'orders' => DB::table('orders')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'products' => DB::table('products')->where('tenant_id', $this->tid())->get(), 'rides' => DB::table('rides')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'connections' => DB::table('whatsapp_connections')->where('tenant_id', $this->tid())->get()] + app(OrderBoardController::class)->data($request));
     }
 
     public function createStore(Request $r)
