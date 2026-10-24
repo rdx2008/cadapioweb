@@ -1,6 +1,6 @@
 # Escopo de produto — Plataforma de restaurantes em Laravel
 
-Versão 1.4 · 24 de outubro de 2026 · Prioridade para operação web; Android adiado
+Versão 1.5 · 24 de outubro de 2026 · Operação web e integração iFood por etapas; Android adiado
 
 ## 1. Objetivo e decisões de partida
 
@@ -586,6 +586,26 @@ Prazo e orçamento devem ser calculados após protótipos e provas técnicas da 
 ## 16. Resultado esperado
 
 Uma plataforma que começa vendendo e operando bem em uma loja, preserva consistência entre pedidos e dinheiro e evolui para uma solução comercial de restaurantes e redes. O núcleo é próprio em Laravel; a instalação é reproduzível no Coolify; recursos externos entram por contratos claros, sem comprometer a base do produto.
+
+## 16.1. Integração iFood incluída no escopo
+
+Decisão aprovada em 24/10/2026: antecipar o conector iFood para restaurantes, antes dos demais marketplaces. É um módulo próprio e incremental; a primeira configuração não equivale à integração operacional nem à homologação. A pausa do cardápio próprio não deve pausar silenciosamente a loja iFood.
+
+1. **Conexão e identificação de lojas.** Aplicativo centralizado administrado pelo superadmin, segredo e token criptografados, renovação de token, vínculo explícito entre tenant, loja local e Merchant ID, consulta de situação e auditoria. O tenant consulta somente seus vínculos. O acesso global do aplicativo a uma loja não prova que ela pertence ao tenant solicitante; o vínculo é responsabilidade expressa do superadmin. Começar com credenciais e loja de teste. O ambiente é declarado a partir do aplicativo/loja, pois a URL da API é compartilhada; não prometer detecção automática de credenciais de produção.
+2. **Pedidos e eventos.** Implementar Merchant, Order e Events conforme os contratos oficiais vigentes. Receber eventos no servidor, persistir antes de confirmar leitura, deduplicar pelo ID externo e vincular cada pedido ao Merchant ID e tenant corretos. Exibir origem iFood no painel; aceitar, preparar, informar pronto e despachar pelos endpoints aplicáveis, conciliando o resultado por evento. Tratar cancelamentos, negociações, agendados, troco, taxas e meios de pagamento. Retentativas e falhas devem ficar visíveis; um timeout não autoriza inventar confirmação. A operação não depende de manter o painel do usuário aberto.
+3. **Catálogo.** Mapear IDs externos e códigos do PDV, categorias, produtos, grupos e adicionais. Definir origem de cada alteração e preço específico do canal iFood, preservando o preço do canal próprio. Implementar criação, leitura, alteração, disponibilidade, acompanhamento de lotes, conflitos e retentativas. Expandir o catálogo local antes de prometer pizzas, combos, modificadores aninhados ou múltiplos contextos. Importação inicial exige prévia e validação de correspondências para não substituir um cardápio existente indevidamente.
+4. **Homologação e piloto.** Cadastro profissional elegível no portal iFood, aplicativo funcional, credenciais e loja de teste; homologar os módulos aplicáveis e obter autorização das lojas de produção. O superadmin libera produção somente após evidências de aprovação e piloto assistido. Módulo financeiro e contratação de entrega iFood são expansões separadas, com seus próprios requisitos.
+
+Regras obrigatórias: separar pedido pago online, valores devidos à loja e dinheiro sob responsabilidade do entregador; não lançar todo pedido iFood como recebimento manual da loja. Entrega operada pelo iFood não deve abrir automaticamente corrida freelancer. Credenciais, tokens e corpos brutos de erro não podem aparecer em telas, flash de formulários ou auditoria. Rotação de credenciais invalida verificações anteriores. Revogar vínculo local não equivale a revogar autorização no portal iFood.
+
+Critérios de aceite: dois tenants com Merchants diferentes; tentativas de acesso cruzado; repetição e inversão de eventos; reinício durante processamento; falha/expiração de token; indisponibilidade e limites da API; cancelamento externo; discrepância de pagamento; confirmação de catálogo sem duplicação. Testes simulados são necessários, mas não substituem testes reais e homologação.
+
+Referências oficiais consultadas em 24/10/2026:
+- [Autenticação centralizada](https://developer.ifood.com.br/en-US/docs/food/guides/modules/authentication/centralized)
+- [Merchant: endpoints](https://developer.ifood.com.br/en-US/docs/food/guides/modules/merchant/endpoints)
+- [Pedidos: fluxo](https://developer.ifood.com.br/en-US/docs/food/guides/modules/order/workflow)
+- [Catálogo](https://developer.ifood.com.br/en-US/docs/food/guides/modules/catalog/introduction)
+- [Política de homologação](https://developer.ifood.com.br/en-US/docs/getting-started/homologation/categories)
 
 ## 17. Soluções adotadas para operação confiável
 

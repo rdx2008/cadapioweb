@@ -11,4 +11,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $m->alias(['access' => Access::class]);
         $m->preventRequestForgery(except: ['webhooks/evolution/*']);
     })
-    ->withExceptions(function (Exceptions $e): void {})->create();
+    ->withExceptions(function (Exceptions $e): void {
+        $e->dontFlash(['client_secret']);
+    })->create();

@@ -218,8 +218,8 @@ if (workspaceOverview) {
         workspaceOverview.hidden = Boolean(selectedPanel);
         panels.forEach((panel) => { panel.hidden = panel !== selectedPanel; });
         links.forEach((link) => {
-            const destination = new URL(link.href).hash.slice(1);
-            const active = destination === hash || (!destination && !hash);
+            const destination = new URL(link.href);
+            const active = destination.pathname === window.location.pathname && destination.hash.slice(1) === hash;
             link.classList.toggle('is-active', active);
             if (active) { link.setAttribute('aria-current', 'page'); }
             else { link.removeAttribute('aria-current'); }

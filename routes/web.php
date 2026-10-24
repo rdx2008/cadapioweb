@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CourierController;
+use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderBoardController;
 use App\Http\Controllers\PlatformController;
@@ -28,6 +29,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::middleware('access:admin')->group(function () {
+        Route::get('/admin/ifood', [IfoodController::class, 'admin'])->name('ifood.admin');
+        Route::post('/admin/ifood/configure', [IfoodController::class, 'configure'])->name('ifood.configure');
+        Route::post('/admin/ifood/test', [IfoodController::class, 'test'])->middleware('throttle:6,1')->name('ifood.test');
+        Route::post('/admin/ifood/connect', [IfoodController::class, 'connect'])->middleware('throttle:6,1')->name('ifood.connect');
+        Route::post('/admin/ifood/{id}/check', [IfoodController::class, 'check'])->middleware('throttle:6,1')->name('ifood.admin.check');
+        Route::post('/admin/ifood/{id}/disconnect', [IfoodController::class, 'disconnect'])->name('ifood.disconnect');
         Route::get('/admin', [PlatformController::class, 'admin']);
         Route::post('/admin/tenants', [PlatformController::class, 'createTenant']);
         Route::post('/admin/tenants/{id}/module', [PlatformController::class, 'module']);
@@ -35,6 +42,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/integrations/ifood', [IfoodController::class, 'owner'])->name('ifood.owner');
+        Route::post('/integrations/ifood/{id}/check', [IfoodController::class, 'check'])->middleware('throttle:6,1')->name('ifood.owner.check');
         Route::get('/dashboard', [PlatformController::class, 'dashboard']);
         Route::get('/orders/live', [OrderBoardController::class, 'live'])->middleware('throttle:60,1');
         Route::get('/orders/{id}', [OrderBoardController::class, 'show']);

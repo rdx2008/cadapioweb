@@ -1,6 +1,16 @@
 # Estado e prioridades da versão web
 
-Atualizado em 24/10/2026 após a segunda entrega web, branch `feat/platform-foundation`.
+Atualizado em 24/10/2026 após o novo painel e o início do conector iFood, branch `feat/platform-foundation`.
+
+## Atualização: painel e iFood
+
+Painéis de tenant e superadmin redesenhados com base na prévia aprovada, navegação responsiva, busca de empresas, cópia do link do cardápio, pausa rápida e indicadores completos do período. Conferência local no Chrome em desktop e celular, com fixtures isoladas. O usuário confirmou acesso de administrador e cadastro de tenants no Coolify; isso não substitui o piloto de todos os fluxos em produção.
+
+Integração iFood adicionada ao escopo na seção 16.1, antecipada em relação aos demais marketplaces. Primeira etapa implementada: configuração central de aplicativo de teste, credenciais e cache de token criptografados, autenticação, vínculo exclusivo de Merchant ID à loja por superadmin, consulta manual de situação e leitura segregada por tenant. Rotação de credenciais exige nova verificação. As telas identificam teste e a data da última consulta; situação consultada não é monitoramento nem habilitação para receber pedidos.
+
+Validação atual do iFood: testes HTTP simulados. Ainda é necessário cadastrar credenciais e Merchant ID de teste no painel e validar com a API real. Recepção de eventos, ações de pedidos, catálogo, produção e homologação permanecem pendentes. O próximo bloco é Order/Events com persistência, deduplicação, confirmação de leitura e tratamento das diferenças entre pedidos próprios e iFood.
+
+Operação: após publicar esta versão, a inicialização do Compose executa as migrations. Em **Superadmin → Integração iFood**, informar Client ID e Client Secret do aplicativo centralizado de teste, testar autenticação, selecionar empresa/loja e informar Merchant ID da loja de teste. Nunca enviar a chave pelo chat. O tenant acompanha em **Integração iFood**; não recebe credenciais globais nem pode reivindicar Merchant ID de outra empresa. O ambiente de teste é declarado por credenciais/loja, não detectado pela URL compartilhada da API.
 
 ## Onde parou
 

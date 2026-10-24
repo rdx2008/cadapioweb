@@ -4,13 +4,15 @@ Plataforma de restaurantes em **Laravel 13 / PHP 8.4**, com múltiplas empresas 
 
 ## Estado desta entrega
 
-Esta versão contém a fundação e a segunda entrega de venda/produção web, ainda para piloto assistido. O escopo completo está em `docs/escopo.md`; os recursos descritos no escopo não devem ser confundidos com recursos já implementados.
+Esta versão contém a fundação, o fluxo inicial de venda/produção web, o novo painel e a primeira etapa do conector iFood, ainda para piloto assistido. O escopo completo está em `docs/escopo.md`; os recursos descritos no escopo não devem ser confundidos com recursos já implementados.
 
 **Prioridade definida em 24/10/2026:** concluir os fluxos web primeiro. Android foi adiado e não é dependência da primeira entrega web. O backlog e o estado por módulo estão em `docs/status-web.md`.
 
 ### Implementado
 
 - Login, logout, limitação de tentativas e perfis de superadmin, proprietário e freelancer.
+- Novo visual responsivo de tenant/superadmin, indicadores completos do período, pausa rápida, busca de empresas e link compartilhável do cardápio.
+- iFood: aplicativo centralizado de teste, segredo/token criptografados, vínculo exclusivo por loja feito pelo superadmin, consulta manual de situação e acompanhamento segregado pelo tenant. Testes com HTTP simulado.
 - Criação de empresas e usuários, lojas, produtos, disponibilidade e cardápio público.
 - Checkout com preços calculados no servidor, snapshots dos itens e idempotência por loja.
 - Pedidos, etapas de preparo, acompanhamento por link e registro manual auditado de recebimento.
@@ -29,6 +31,7 @@ Esta versão contém a fundação e a segunda entrega de venda/produção web, a
 ### Limites explícitos
 
 - Interface usa **Blade + CSS/JS** e consulta periódica de atualizações, sem Vue/Inertia ou WebSockets. Som precisa de interação do operador para ativação; abas suspensas pelo navegador não garantem recebimento de alertas.
+- iFood ainda não recebe pedidos, envia ações, sincroniza catálogo ou opera restaurantes reais. Credenciais e loja de teste, validação externa e homologação permanecem necessárias. Configurar em **Superadmin → Integração iFood**; informar a chave somente no painel. O rótulo teste é declarado pelo aplicativo/loja fornecidos, não comprovado automaticamente pelo domínio da API.
 - O módulo é ativado por empresa nesta entrega; seleção granular de lojas, múltiplos usuários com permissões por loja, bloqueios locais de entregador e tabelas de regras editáveis ainda precisam ser desenvolvidos.
 - Painel web do motoboy serve ao piloto e exige renovar presença. **Aplicativo Android, localização contínua e push ainda não estão implementados**; não lançar operação autônoma com celular bloqueado usando esse painel.
 - **WABA ainda é solicitação pendente**, sem Embedded Signup ou envio oficial. A conexão QR possui testes com HTTP simulado, mas exige homologação na versão do servidor Evolution. Verificação automática do número efetivamente pareado, desconexão/migração e mensagens transacionais/campanhas estão pendentes.
@@ -87,6 +90,7 @@ Para restaurar: criar ambiente isolado com a mesma versão, restaurar PostgreSQL
 ## Próximos marcos
 
 1. Homologar imagem Coolify, concorrência real no PostgreSQL e instalação limpa.
+   Prioridade adicionada: validar conexão com loja iFood de teste e implementar Order/Events com persistência e deduplicação, antes de catálogo e produção. Sequência e aceite em `docs/escopo.md`, seção 16.1.
 2. Evoluir fluxo de ocorrências, segurança/comprovação de entrega, tabela de tarifas editável e configuração de despacho.
 3. Completar o painel web do entregador, atualização de presença com página ativa, ofertas e acertos validados em duas lojas e três entregadores. Android/localização em segundo plano ficam para depois.
 4. Homologar Evolution QR e implementar onboarding WABA e outbox de mensagens.
