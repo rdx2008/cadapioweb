@@ -1,0 +1,162 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Support\Audit;
+use App\Support\MoneyInput;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class CatalogController extends Controller
+{
+    private function store(int $id): object
+    {
+        return DB::table('stores')->where('tenant_id', auth()->user()->tenant_id)->where('id', $id)->firstOrFail();
+    }
+
+    private function product(int $id): object
+    {
+        return DB::table('products')->where('tenant_id', auth()->user()->tenant_id)->where('id', $id)->firstOrFail();
+    }
+
+    public function editStore(int $id): View
+    {
+        $store = $this->store($id);
+
+        return view('catalog.store', ['store' => $store, 'hours' => json_decode($store->weekly_hours ?? 'null', true), 'zones' => DB::table('delivery_zones')->where('store_id', $id)->orderBy('id')->get()]);
+    }
+
+    public function updateStore(Request $request, int $id): RedirectResponse
+    {
+        $store = $this->store($id);
+        MoneyInput::normalize($request, ['minimum_order' => 'minimum_order_cents', 'base_fare' => 'base_cents', 'per_km_fare' => 'per_km_cents', 'minimum_fare' => 'minimum_cents']);
+        $data = $request->validate([
+            'name' => 'required|string|max:100', 'slug' => ['required', 'alpha_dash:ascii', 'max:100', Rule::unique('stores')->ignore($id)],
+            'address' => 'required|string|max:240', 'latitude' => 'required|numeric|between:-90,90', 'longitude' => 'required|numeric|between:-180,180',
+            'open' => 'required|boolean', 'timezone' => ['required', Rule::in(timezone_identifiers_list())], 'minimum_order_cents' => 'required|integer|min:0|max:1000000',
+            'use_hours' => 'required|boolean', 'hours' => 'required|array:0,1,2,3,4,5,6|size:7', 'hours.*.enabled' => 'required|boolean',
+            'hours.*.opens_at' => 'required|date_format:H:i', 'hours.*.closes_at' => 'required|date_format:H:i',
+            'rate_mode' => 'required|in:fixed,per_km,per_ride', 'base_cents' => 'required|integer|min:0|max:100000',
+            'per_km_cents' => 'required|integer|min:0|max:100000', 'minimum_cents' => 'required|integer|min:0|max:100000',
+        ]);
+        ksort($data['hours']);
+        $data['weekly_hours'] = $data['use_hours'] ? json_encode(array_values($data['hours']), JSON_THROW_ON_ERROR) : null;
+        unset($data['hours'], $data['use_hours']);
+        DB::transaction(function () use ($store, $data) {
+            DB::table('stores')->where('id', $store->id)->lockForUpdate()->first();
+            DB::table('stores')->where('id', $store->id)->update($data + ['updated_at' => now()]);
+            Audit::record('store.updated', ['store_id' => $store->id], $store->tenant_id);
+        });
+
+        return back()->with('success', 'Loja e horários atualizados.');
+    }
+
+    public function zone(Request $request, int $storeId): RedirectResponse
+    {
+        $store = $this->store($storeId);
+        MoneyInput::normalize($request, ['fee' => 'fee_cents']);
+        $data = $request->validate(['zone_id' => 'nullable|integer', 'name' => 'required|string|max:120', 'fee_cents' => 'required|integer|min:0|max:100000', 'enabled' => 'required|boolean']);
+        DB::transaction(function () use ($store, $data) {
+            DB::table('stores')->where('id', $store->id)->lockForUpdate()->first();
+            $zoneId = $data['zone_id'] ?? null;
+            unset($data['zone_id']);
+            if ($zoneId) {
+                DB::table('delivery_zones')->where('store_id', $store->id)->where('id', $zoneId)->firstOrFail();
+                DB::table('delivery_zones')->where('id', $zoneId)->update($data + ['updated_at' => now()]);
+            } else {
+                DB::table('delivery_zones')->insert($data + ['store_id' => $store->id, 'created_at' => now(), 'updated_at' => now()]);
+            }
+        });
+
+        return back()->with('success', 'Região de entrega salva.');
+    }
+
+    public function editProduct(int $id): View
+    {
+        $product = $this->product($id);
+        $groups = DB::table('option_groups')->where('product_id', $id)->orderBy('id')->get();
+        $options = DB::table('product_options')->whereIn('option_group_id', $groups->pluck('id'))->orderBy('id')->get()->groupBy('option_group_id');
+
+        return view('catalog.product', compact('product', 'groups', 'options'));
+    }
+
+    public function updateProduct(Request $request, int $id): RedirectResponse
+    {
+        $product = $this->product($id);
+        MoneyInput::normalize($request, ['price' => 'price_cents']);
+        $data = $request->validate(['name' => 'required|string|max:120', 'category' => 'required|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
+        unset($data['photo']);
+        $path = null;
+        if ($request->hasFile('photo')) {
+            $path = $request->file('photo')->store('tenants/'.$product->tenant_id.'/products', 'local');
+            $data['photo_path'] = $path;
+        }
+        try {
+            DB::transaction(function () use ($product, $data) {
+                DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->first();
+                DB::table('products')->where('id', $product->id)->update($data + ['updated_at' => now()]);
+                Audit::record('product.updated', ['product_id' => $product->id], $product->tenant_id);
+            });
+        } catch (\Throwable $exception) {
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
+            throw $exception;
+        }
+
+        return back()->with('success', 'Produto atualizado. Os pedidos anteriores mantêm seus valores.');
+    }
+
+    public function photo(int $id): StreamedResponse
+    {
+        $product = DB::table('products')->where('id', $id)->firstOrFail();
+        abort_unless($product->photo_path && Storage::disk('local')->exists($product->photo_path), 404);
+
+        return Storage::disk('local')->response($product->photo_path, null, ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'public, max-age=300']);
+    }
+
+    public function group(Request $request, int $id): RedirectResponse
+    {
+        $product = $this->product($id);
+        $data = $request->validate(['group_id' => 'nullable|integer', 'name' => 'required|string|max:100', 'minimum' => 'required|integer|min:0|max:20', 'maximum' => 'required|integer|min:1|max:20|gte:minimum']);
+        DB::transaction(function () use ($product, $data) {
+            DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->first();
+            $groupId = $data['group_id'] ?? null;
+            unset($data['group_id']);
+            if ($groupId) {
+                DB::table('option_groups')->where('product_id', $product->id)->where('id', $groupId)->firstOrFail();
+                DB::table('option_groups')->where('id', $groupId)->update($data + ['updated_at' => now()]);
+            } else {
+                DB::table('option_groups')->insert($data + ['product_id' => $product->id, 'created_at' => now(), 'updated_at' => now()]);
+            }
+        });
+
+        return back()->with('success', 'Grupo salvo. Cadastre opções suficientes para atender ao mínimo.');
+    }
+
+    public function option(Request $request, int $id): RedirectResponse
+    {
+        $product = $this->product($id);
+        MoneyInput::normalize($request, ['price' => 'price_cents']);
+        $data = $request->validate(['option_group_id' => 'required|integer', 'option_id' => 'nullable|integer', 'name' => 'required|string|max:120', 'price_cents' => 'required|integer|min:0|max:100000', 'available' => 'required|boolean']);
+        DB::transaction(function () use ($product, $data) {
+            DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->first();
+            DB::table('option_groups')->where('product_id', $product->id)->where('id', $data['option_group_id'])->firstOrFail();
+            $optionId = $data['option_id'] ?? null;
+            unset($data['option_id']);
+            if ($optionId) {
+                DB::table('product_options')->where('option_group_id', $data['option_group_id'])->where('id', $optionId)->firstOrFail();
+                DB::table('product_options')->where('id', $optionId)->update($data + ['updated_at' => now()]);
+            } else {
+                DB::table('product_options')->insert($data + ['created_at' => now(), 'updated_at' => now()]);
+            }
+        });
+
+        return back()->with('success', 'Adicional salvo.');
+    }
+}

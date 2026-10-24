@@ -4,7 +4,7 @@ Plataforma de restaurantes em **Laravel 13 / PHP 8.4**, com múltiplas empresas 
 
 ## Estado desta entrega
 
-Esta versão é uma implementação inicial funcional para piloto assistido. O escopo completo está em `docs/escopo.md`; os recursos descritos no escopo não devem ser confundidos com recursos já implementados.
+Esta versão contém a fundação e a segunda entrega de venda/produção web, ainda para piloto assistido. O escopo completo está em `docs/escopo.md`; os recursos descritos no escopo não devem ser confundidos com recursos já implementados.
 
 **Prioridade definida em 24/10/2026:** concluir os fluxos web primeiro. Android foi adiado e não é dependência da primeira entrega web. O backlog e o estado por módulo estão em `docs/status-web.md`.
 
@@ -20,17 +20,23 @@ Esta versão é uma implementação inicial funcional para piloto assistido. O e
 - Cálculo por corrida, km ou taxa fixa; valores em centavos; extrato e confirmação de acerto externo.
 - Configuração central da Evolution criptografada, instâncias segregadas, solicitação de QR e webhook protegido por segredo por conexão.
 - Dockerfile, Compose com PostgreSQL, Redis, web, worker e scheduler, além de testes automatizados e CI.
+- Edição de lojas e produtos, fotos locais com validação, pausa manual, horários semanais com virada de dia e fuso por loja.
+- Grupos de adicionais obrigatórios/opcionais com limites, preços por unidade e preservação das escolhas na venda.
+- Regiões de entrega com frete, pedido mínimo e revisão do total no servidor antes de confirmar; alterações de preço exigem nova revisão.
+- Painel de pedidos com filtros, paginação, detalhes privados, cancelamento com motivo e atualização automática a cada 5 segundos com a página ativa. Som de novo pedido ativável pelo operador.
+- Acompanhamento público com atualização automática e valores de cadastro informados em reais, sem cálculo financeiro em ponto flutuante no servidor.
 
 ### Limites explícitos
 
-- Interface desta entrega usa **Blade + CSS/JS**, sem Vue/Inertia ou WebSockets. Atualização operacional é manual. Isso simplifica a fundação; não implementa ainda a interface em tempo real prevista no escopo.
+- Interface usa **Blade + CSS/JS** e consulta periódica de atualizações, sem Vue/Inertia ou WebSockets. Som precisa de interação do operador para ativação; abas suspensas pelo navegador não garantem recebimento de alertas.
 - O módulo é ativado por empresa nesta entrega; seleção granular de lojas, múltiplos usuários com permissões por loja, bloqueios locais de entregador e tabelas de regras editáveis ainda precisam ser desenvolvidos.
 - Painel web do motoboy serve ao piloto e exige renovar presença. **Aplicativo Android, localização contínua e push ainda não estão implementados**; não lançar operação autônoma com celular bloqueado usando esse painel.
 - **WABA ainda é solicitação pendente**, sem Embedded Signup ou envio oficial. A conexão QR possui testes com HTTP simulado, mas exige homologação na versão do servidor Evolution. Verificação automática do número efetivamente pareado, desconexão/migração e mensagens transacionais/campanhas estão pendentes.
 - Pagamento é presencial/manual. Não há integração real com gateway, Pix dinâmico, estorno ou repasse ao freelancer.
 - Quilometragem de rota e cotação por corrida são informadas pela loja; ainda não há provedor de rotas. Não usamos distância em linha reta para calcular remuneração.
-- Não há ainda zonas de cobertura do checkout: loja deve confirmar atendimento antes do aceite. Busca de motoboy usa raio geográfico de 3 km, ampliável a 5 km; check-in usa 150 m.
-- Mesas/comandas, adicionais/combos, estoque/ficha técnica, caixa completo, fiscal, marketplaces, CRM/fidelidade, IA, impressão e cobrança SaaS permanecem no backlog.
+- Cobertura do checkout usa regiões/bairros selecionados pelo cliente, sem conferir geograficamente o endereço. A loja deve conferir endereço e região antes do aceite. Busca de motoboy usa raio geográfico de 3 km, ampliável a 5 km; check-in usa 150 m.
+- Horários admitem um intervalo por dia, inclusive virada de meia-noite; feriados e múltiplos intervalos ficam pendentes. Produtos iguais no mesmo carrinho compartilham as mesmas escolhas de adicionais; variações, linhas independentes e combos ficam pendentes.
+- Mesas/comandas, estoque/ficha técnica, caixa completo, fiscal, marketplaces, CRM/fidelidade, IA, impressão e cobrança SaaS permanecem no backlog.
 - Ocorrências após coleta, compensações de cancelamento e prova de entrega por código precisam de módulo próprio antes do uso comercial amplo. Nesta versão, entregador confirma conclusão e recebimento manualmente; não há autenticação do cliente na entrega.
 - CI inclui testes e build de imagem; build Docker/Coolify e concorrência em PostgreSQL precisam ser confirmados no ambiente de CI/homologação. Teste sequencial de dois aceites não substitui teste concorrente com múltiplos processos.
 
@@ -47,12 +53,13 @@ php artisan app:admin admin@suaempresa.com
 php artisan serve
 ```
 
-O comando solicita uma senha com pelo menos 12 caracteres. Não existem senhas padrão de produção. Crie tenants no painel `/admin`, entre como proprietário, cadastre a loja e publique produtos. Cadastro freelancer: `/entregadores/cadastro`.
+O comando solicita uma senha com pelo menos 12 caracteres. Não existem senhas padrão de produção. Crie tenants no painel `/admin`, entre como proprietário, cadastre a loja e publique produtos. Em **Configurar loja**, cadastre regiões e fretes: sem região ativa, o cardápio oferece somente retirada. Edite produtos para adicionar fotos e grupos/opções. Cadastro freelancer: `/entregadores/cadastro`.
 
 Em outro terminal, executar `php artisan schedule:work` para processar expirações e avançar o despacho a cada dez segundos. Sem scheduler, a oferta vence, mas o próximo despacho não avança sozinho.
 
 ```sh
 php artisan test --compact
+node --test tests/browser/web-sales.test.cjs
 php artisan view:cache
 php artisan route:cache
 ```
@@ -71,6 +78,8 @@ php artisan route:cache
 Web, worker e scheduler compartilham código e banco. Redis está disponível para evolução, mas esta versão usa drivers de sessão/cache/fila em banco, explicitamente configurados no Compose. Evolution pode ser servidor externo ou outro recurso Coolify; sua instalação não está embutida neste Compose. Cadastrar URL HTTPS e chave no superadmin.
 
 Para restaurar: criar ambiente isolado com a mesma versão, restaurar PostgreSQL e arquivos, fornecer a **mesma APP_KEY**, conferir conexões externas com envios desativados e só depois direcionar o domínio. Voltar uma imagem não desfaz migrações automaticamente.
+
+**Atualização da entrega web:** executar `php artisan migrate --force`. A migração acrescenta configurações, adicionais e snapshots sem apagar pedidos existentes. Lojas existentes precisam cadastrar regiões para reabilitar entrega no cardápio; retirada permanece disponível. Revisões do checkout expiram em 15 minutos e ficam na sessão do navegador. Fotos são servidas por rota pública própria a partir do storage, sem exigir `storage:link`.
 
 ## Próximos marcos
 

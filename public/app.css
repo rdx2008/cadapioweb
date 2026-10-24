@@ -535,3 +535,74 @@ code {
         grid-template-columns: repeat(4, 250px);
     }
 }
+
+/* Web sales */
+.product-photo {
+    width: 100%;
+    max-width: 360px;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 16px;
+}
+.option-group {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+}
+.option-group legend {
+    font-weight: 650;
+    font-size: 12px;
+}
+.option-group legend small {
+    font-weight: 400;
+    color: var(--muted);
+}
+.option-choice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.option-choice input {
+    width: auto;
+    flex-shrink: 0;
+}
+.option-edit {
+    border-top: 1px solid var(--line);
+    margin-top: 12px;
+    padding-top: 12px;
+}
+.cart-summary {
+    display: grid;
+    gap: 6px;
+    margin: 20px 0;
+    padding: 18px;
+    background: #edf4ef;
+    border-radius: 10px;
+}
+.review-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    margin: 14px 0;
+}
+.review-line span {
+    white-space: nowrap;
+}
+.board-toolbar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: end;
+    margin-bottom: 16px;
+}
+.board-toolbar label {
+    flex: 1;
+    min-width: 140px;
+}
+.live-status {
+    font-size: 12px;
+    color: var(--green);
+}

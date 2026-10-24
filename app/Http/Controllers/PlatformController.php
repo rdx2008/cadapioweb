@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\DispatchService;
 use App\Services\FareCalculator;
 use App\Support\Audit;
+use App\Support\MoneyInput;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -94,13 +95,14 @@ class PlatformController extends Controller
         return back()->with('success', 'Servidor salvo. A chave não será exibida.');
     }
 
-    public function dashboard()
+    public function dashboard(Request $request)
     {
-        return view('dashboard', ['tenant' => DB::table('tenants')->find($this->tid()), 'stores' => DB::table('stores')->where('tenant_id', $this->tid())->get(), 'orders' => DB::table('orders')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'products' => DB::table('products')->where('tenant_id', $this->tid())->get(), 'rides' => DB::table('rides')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'connections' => DB::table('whatsapp_connections')->where('tenant_id', $this->tid())->get()]);
+        return view('dashboard', ['tenant' => DB::table('tenants')->find($this->tid()), 'stores' => DB::table('stores')->where('tenant_id', $this->tid())->get(), 'orders' => DB::table('orders')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'products' => DB::table('products')->where('tenant_id', $this->tid())->get(), 'rides' => DB::table('rides')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'connections' => DB::table('whatsapp_connections')->where('tenant_id', $this->tid())->get()] + app(OrderBoardController::class)->data($request));
     }
 
     public function createStore(Request $r)
     {
+        MoneyInput::normalize($r, ['base_fare' => 'base_cents', 'per_km_fare' => 'per_km_cents', 'minimum_fare' => 'minimum_cents', 'customer_fee' => 'customer_fee_cents']);
         $d = $r->validate(['name' => 'required|string|max:100', 'slug' => 'required|alpha_dash|max:100|unique:stores', 'address' => 'required|string|max:240', 'latitude' => 'required|numeric|between:-90,90', 'longitude' => 'required|numeric|between:-180,180', 'rate_mode' => 'required|in:fixed,per_km,per_ride', 'base_cents' => 'required|integer|min:0|max:100000', 'per_km_cents' => 'required|integer|min:0|max:100000', 'minimum_cents' => 'required|integer|min:0|max:100000', 'customer_fee_cents' => 'required|integer|min:0|max:100000']);
         DB::table('stores')->insert($d + ['tenant_id' => $this->tid(), 'created_at' => now(), 'updated_at' => now()]);
 
@@ -109,6 +111,7 @@ class PlatformController extends Controller
 
     public function createProduct(Request $r)
     {
+        MoneyInput::normalize($r, ['price' => 'price_cents']);
         $d = $r->validate(['store_id' => 'required|integer', 'name' => 'required|string|max:120', 'category' => 'required|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000']);
         $this->store($d['store_id']);
         DB::table('products')->insert($d + ['tenant_id' => $this->tid(), 'created_at' => now(), 'updated_at' => now()]);
@@ -119,21 +122,25 @@ class PlatformController extends Controller
     public function toggleProduct(int $id)
     {
         $p = DB::table('products')->where('tenant_id', $this->tid())->where('id', $id)->firstOrFail();
-        DB::table('products')->where('id', $p->id)->update(['available' => ! $p->available]);
+        DB::transaction(function () use ($p) {
+            DB::table('stores')->where('id', $p->store_id)->lockForUpdate()->first();
+            $current = DB::table('products')->where('id', $p->id)->lockForUpdate()->first();
+            DB::table('products')->where('id', $p->id)->update(['available' => ! $current->available, 'updated_at' => now()]);
+        });
 
         return back();
     }
 
     public function orderStatus(Request $r, int $id)
     {
-        $r->validate(['status' => 'required|in:accepted,preparing,ready,completed,cancelled']);
+        $r->validate(['status' => 'required|in:accepted,preparing,ready,completed,cancelled', 'cancellation_reason' => 'required_if:status,cancelled|nullable|string|max:500']);
         DB::transaction(function () use ($r, $id) {
             DB::table('tenants')->where('id', $this->tid())->lockForUpdate()->firstOrFail();
             $o = DB::table('orders')->where('tenant_id', $this->tid())->where('id', $id)->lockForUpdate()->firstOrFail();
             $allowed = ['pending' => ['accepted', 'cancelled'], 'accepted' => ['preparing', 'cancelled'], 'preparing' => ['ready', 'cancelled'], 'ready' => ['completed', 'cancelled']];
             abort_unless(in_array($r->status, $allowed[$o->status] ?? []), 409, 'Transição inválida.');
             abort_if(DB::table('rides')->where('order_id', $id)->whereIn('status', ['assigned', 'collected'])->exists(), 409, 'Trate a corrida atribuída antes de alterar o pedido.');
-            DB::table('orders')->where('id', $id)->update(['status' => $r->status, 'updated_at' => now()]);
+            DB::table('orders')->where('id', $id)->update(['status' => $r->status, 'cancellation_reason' => $r->status === 'cancelled' ? $r->cancellation_reason : null, 'updated_at' => now()]);
             if (in_array($r->status, ['cancelled', 'completed'])) {
                 $ride = DB::table('rides')->where('order_id', $id)->first();
                 if ($ride) {
@@ -141,7 +148,7 @@ class PlatformController extends Controller
                     DB::table('offers')->where('ride_id', $ride->id)->where('status', 'open')->update(['status' => 'revoked']);
                     DB::table('driver_claims')->where('ride_id', $ride->id)->delete();
                 }
-            }Audit::record('order.status', ['id' => $id, 'from' => $o->status, 'to' => $r->status], $this->tid());
+            }Audit::record('order.status', ['id' => $id, 'from' => $o->status, 'to' => $r->status, 'reason' => $r->status === 'cancelled' ? $r->cancellation_reason : null], $this->tid());
         });
 
         return back()->with('success', 'Pedido atualizado.');
@@ -163,6 +170,7 @@ class PlatformController extends Controller
 
     public function dispatch(Request $r, int $id, FareCalculator $calculator, DispatchService $service)
     {
+        MoneyInput::normalize($r, ['fare' => 'fare_cents']);
         $d = $r->validate(['route_meters' => 'nullable|integer|min:1|max:200000', 'fare_cents' => 'nullable|integer|min:1|max:100000']);
         $rideId = DB::transaction(function () use ($id, $d, $calculator) {
             $tenant = DB::table('tenants')->where('id', $this->tid())->lockForUpdate()->first();

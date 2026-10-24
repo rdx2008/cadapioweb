@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CourierController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\OrderBoardController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\WhatsappController;
 use Illuminate\Support\Facades\Route;
@@ -15,8 +17,12 @@ Route::middleware('guest')->group(function () {
     Route::post('/entregadores/cadastro', [AuthController::class, 'register'])->middleware('throttle:5,1');
 });
 Route::get('/cardapio/{slug}', [MenuController::class, 'menu']);
+Route::post('/cardapio/{slug}/review', [MenuController::class, 'review'])->middleware('throttle:30,1');
+Route::get('/cardapio/{slug}/review/{draftId}', [MenuController::class, 'reviewPage']);
 Route::post('/cardapio/{slug}', [MenuController::class, 'checkout'])->middleware('throttle:20,1');
 Route::get('/pedido/{id}', [MenuController::class, 'tracking']);
+Route::get('/pedido/{id}/status', [MenuController::class, 'status'])->middleware('throttle:60,1');
+Route::get('/media/products/{id}', [CatalogController::class, 'photo']);
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
@@ -30,6 +36,15 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('access:owner')->group(function () {
         Route::get('/dashboard', [PlatformController::class, 'dashboard']);
+        Route::get('/orders/live', [OrderBoardController::class, 'live'])->middleware('throttle:60,1');
+        Route::get('/orders/{id}', [OrderBoardController::class, 'show']);
+        Route::get('/stores/{id}/edit', [CatalogController::class, 'editStore']);
+        Route::post('/stores/{id}/edit', [CatalogController::class, 'updateStore']);
+        Route::post('/stores/{storeId}/zones', [CatalogController::class, 'zone']);
+        Route::get('/products/{id}/edit', [CatalogController::class, 'editProduct']);
+        Route::post('/products/{id}/edit', [CatalogController::class, 'updateProduct']);
+        Route::post('/products/{id}/groups', [CatalogController::class, 'group']);
+        Route::post('/products/{id}/options', [CatalogController::class, 'option']);
         Route::post('/stores', [PlatformController::class, 'createStore']);
         Route::post('/products', [PlatformController::class, 'createProduct']);
         Route::post('/products/{id}/toggle', [PlatformController::class, 'toggleProduct']);

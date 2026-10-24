@@ -29,6 +29,8 @@ jobs:
       - run: composer install --prefer-dist --no-interaction --no-progress
       - run: cp .env.example .env && php artisan key:generate
       - run: php artisan test --compact
+      - name: Test web interactions without browser dependencies
+        run: node --test tests/browser/web-sales.test.cjs
       - name: Test with PostgreSQL
         run: php artisan test --compact
         env:

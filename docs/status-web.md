@@ -1,6 +1,6 @@
 # Estado e prioridades da versão web
 
-Atualizado em 24/10/2026. Base auditada: commit `ce3a2b2`, branch `feat/platform-foundation`.
+Atualizado em 24/10/2026 após a segunda entrega web, branch `feat/platform-foundation`.
 
 ## Onde parou
 
@@ -9,9 +9,9 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 | Área | Estado confirmado |
 |---|---|
 | Empresas e acesso | Login, perfis e isolamento das operações existentes; faltam usuários/permissões por loja e recuperação de senha |
-| Lojas e catálogo | Cadastro, produtos simples, disponibilidade e cardápio; faltam edição completa, fotos, horários, variações, adicionais e combos |
-| Checkout | Preços no servidor e proteção contra repetição; faltam resumo final, cobertura, pedido mínimo, agendamento e pagamento online |
-| Pedidos e cozinha | Aceite, preparo, pronto e conclusão básicos; faltam atualização automática, alertas, filtros, estações e ocorrências completas |
+| Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; faltam variações, combos, feriados e múltiplos intervalos diários |
+| Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; faltam validação geográfica do endereço, agendamento e pagamento online |
+| Pedidos e cozinha | Aceite, preparo, pronto, conclusão, filtros, paginação, detalhes privados, atualização automática e som ativável; faltam estações e ocorrências completas |
 | Freelancers | Cadastro global, aprovação, check-in, FIFO, oferta regional, aceite, coleta e conclusão; faltam presença web automática, posição da fila visível, alertas, regras editáveis e ocorrências |
 | Tarifação e acerto | Três modos de cálculo e registro manual; distância de rota ainda é informada pela loja, sem mapas ou repasse automático |
 | Evolution | Servidor central, chave criptografada, provisionamento QR e webhook; testes simulados. Falta homologação real, validar número conectado, reconectar/desconectar e envio confiável |
@@ -23,7 +23,9 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 
 ### 1. Tornar utilizável o fluxo de venda e produção
 
-Completar edição de loja/produto, fotos, horários e pausas; categorias e adicionais; checkout com resumo, cobertura e frete; busca/filtros de pedidos, detalhes privados e atualização automática com alertas. Corrigir lacunas identificadas durante um fluxo inteiro: cadastrar loja → publicar cardápio → fazer pedido → aceitar → preparar → liberar → concluir/cancelar.
+**Implementado nesta entrega:** edição de loja/produto, fotos, um horário por dia e pausas; categorias e grupos de adicionais; checkout com revisão, regiões e frete; filtros, detalhes privados e atualização automática com som ativável. Cancelamento exige motivo e os valores das vendas ficam preservados.
+
+**Ainda pendente neste bloco:** validação visual completa em navegadores reais, geocodificação do endereço, agendamento, variações/combos e homologação Coolify/PostgreSQL. A cobertura atual é por região declarada pelo cliente, sem prova de que o endereço está naquela região. Os testes JavaScript usam DOM simulado e não substituem teste em navegador real.
 
 Aceite: operação completa em navegador de computador e celular, com testes de isolamento, valores e falhas; não depender de atualização manual para receber novos pedidos.
 
@@ -47,7 +49,7 @@ CRM, cupons, fidelidade, campanhas, marketplaces, multimarcas, relatórios conso
 
 ## Homologação transversal
 
-Coolify, PostgreSQL, backups restauráveis, segurança e validação em navegador acompanham as entregas. Existem 18 testes locais com 72 asserções registrados na entrega inicial; isso não comprova build Docker, homologação externa ou todos os fluxos do escopo.
+Coolify, PostgreSQL, backups restauráveis, segurança e validação em navegador acompanham as entregas. A suíte foi ampliada com testes de revisão do checkout, adicionais, horários, regiões, fotos, isolamento e JavaScript. Passar testes locais não comprova build Docker, homologação externa ou todos os fluxos do escopo.
 
 ## Android adiado
 

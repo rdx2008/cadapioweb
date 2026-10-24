@@ -31,9 +31,12 @@ class ImplementationTest extends TestCase
         $t = $this->tenant();
         $s = $this->store($t);
         $p = DB::table('products')->insertGetId(['tenant_id' => $t, 'store_id' => $s, 'name' => 'Burger', 'category' => 'Lanches', 'price_cents' => 2990]);
-        $body = ['customer_name' => 'Ana', 'phone' => '11999999999', 'mode' => 'delivery', 'address' => 'Rua A, 10', 'items' => [$p => 2], 'idempotency_key' => (string) Str::uuid(), 'total_cents' => 1];
-        $first = $this->post('/cardapio/loja', $body)->assertRedirect();
-        $second = $this->post('/cardapio/loja', $body)->assertRedirect();
+        $zone = DB::table('delivery_zones')->insertGetId(['store_id' => $s, 'name' => 'Centro', 'fee_cents' => 500]);
+        $body = ['customer_name' => 'Ana', 'phone' => '11999999999', 'mode' => 'delivery', 'address' => 'Rua A, 10', 'delivery_zone_id' => $zone, 'items' => [$p => 2], 'idempotency_key' => (string) Str::uuid(), 'total_cents' => 1];
+        $this->post('/cardapio/loja/review', $body)->assertRedirect();
+        $this->assertDatabaseCount('orders', 0);
+        $first = $this->post('/cardapio/loja', ['draft_id' => $body['idempotency_key']])->assertRedirect();
+        $second = $this->post('/cardapio/loja', ['draft_id' => $body['idempotency_key']])->assertRedirect();
         $this->assertSame($first->headers->get('Location'), $second->headers->get('Location'));
         $this->assertDatabaseCount('orders', 1);
         $this->assertDatabaseHas('orders', ['subtotal_cents' => 5980, 'total_cents' => 6480]);
@@ -48,7 +51,7 @@ class ImplementationTest extends TestCase
         $this->store($a, 'a');
         $s = $this->store($b, 'b');
         $p = DB::table('products')->insertGetId(['tenant_id' => $b, 'store_id' => $s, 'name' => 'Outro', 'category' => 'X', 'price_cents' => 100]);
-        $this->post('/cardapio/a', ['customer_name' => 'A', 'phone' => '123', 'mode' => 'pickup', 'items' => [$p => 1], 'idempotency_key' => (string) Str::uuid()])->assertUnprocessable();
+        $this->postJson('/cardapio/a/review', ['customer_name' => 'A', 'phone' => '11999999999', 'mode' => 'pickup', 'items' => [$p => 1], 'idempotency_key' => (string) Str::uuid()])->assertUnprocessable();
         $this->assertDatabaseCount('orders', 0);
     }
 
