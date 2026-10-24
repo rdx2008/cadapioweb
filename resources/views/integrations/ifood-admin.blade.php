@@ -2,7 +2,8 @@
 @section('page-label','Integração iFood')
 @section('content')
 <div class="page-heading"><div><h1>Integração iFood</h1><p>Configure o aplicativo e vincule cada loja ao restaurante correto.</p></div><span class="badge pending">Ambiente de teste</span></div>
-<div class="notice">Primeira etapa: autenticação e consulta de lojas. Recebimento de pedidos e sincronização de catálogo ainda não estão ativos. Produção depende de implementação e homologação.</div>
+<div class="notice">Recepção de pedidos de teste disponível mediante ativação por loja. O sistema guarda e confirma a leitura dos eventos, mas ainda não aceita pedidos nem envia ações operacionais. Catálogo e produção permanecem pendentes.</div>
+@if($application)<p class="compact muted">Última busca de eventos: {{ $application->last_polled_at?Illuminate\Support\Carbon::parse($application->last_polled_at)->timezone('America/Sao_Paulo')->format('d/m/Y H:i:s'):'Ainda não executada' }}</p>@if($application->last_poll_error)<p class="notice error" role="alert">{{ $application->last_poll_error }}</p>@endif @endif
 <div class="two">
     <section class="card"><h2>Aplicativo de teste</h2><p class="muted">Use as credenciais do aplicativo centralizado de teste criado no portal iFood Developer. Somente o superadmin administra essas chaves.</p>
         <form action="{{ route('ifood.configure') }}" method="post" class="stack-form">@csrf
@@ -24,4 +25,5 @@
     </section>
 </div>
 <section><h2>Lojas vinculadas</h2><div class="grid">@forelse($connections as $connection)@include('integrations.ifood-connection',['isAdmin'=>true])@empty<div class="empty full">Nenhuma loja vinculada. Configure o aplicativo e informe uma loja de teste.</div>@endforelse</div></section>
+<section class="card"><h2>Pendências de recebimento</h2><p class="muted">Eventos armazenados aguardam processamento ou nova tentativa. Formatos ainda não suportados exigem revisão antes da liberação operacional.</p>@forelse($events as $event)<p class="compact"><strong>{{ $event->code }} · {{ $event->external_order_id??$event->external_id }}</strong><br>{{ $event->last_error??($event->status==='ignored'?'Tipo de evento preservado, sem ação nesta versão':'Aguardando processamento') }} · {{ $event->attempts }} tentativa(s)@if($event->retry_at)<br>Próxima tentativa: {{ Illuminate\Support\Carbon::parse($event->retry_at)->timezone('America/Sao_Paulo')->format('d/m H:i:s') }}@endif</p>@empty<p class="muted">Nenhuma pendência entre os eventos armazenados.</p>@endforelse</section>
 @endsection

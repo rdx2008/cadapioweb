@@ -178,6 +178,32 @@ document.querySelectorAll("[data-order-board]").forEach((board) => {
     timer = setTimeout(refresh, 5000);
 });
 
+document.querySelectorAll('[data-ifood-feed]').forEach((feed) => {
+    const message = document.querySelector('[data-ifood-connection]');
+    let running = false, signature = '';
+    const refresh = async () => {
+        if (running || document.hidden) {
+            setTimeout(refresh, 5000);
+            return;
+        }
+        running = true;
+        try {
+            const data = await readLiveJson(feed.dataset.url);
+            if (signature !== data.signature && !feed.contains(document.activeElement)) {
+                feed.innerHTML = data.html;
+                signature = data.signature;
+            }
+            message.textContent = 'Lista atualizada às ' + new Date().toLocaleTimeString('pt-BR');
+        } catch {
+            message.textContent = 'Lista indisponível no momento. Tentaremos novamente.';
+        } finally {
+            running = false;
+            setTimeout(refresh, 5000);
+        }
+    };
+    setTimeout(refresh, 5000);
+});
+
 document.querySelectorAll('[data-copy-link]').forEach((button) => {
     button.addEventListener('click', async () => {
         const card = button.closest('.share-card');
@@ -231,11 +257,14 @@ if (workspaceOverview) {
     window.addEventListener('hashchange', showWorkspace);
     showWorkspace();
 } else {
-    document.querySelectorAll('[data-nav-link]').forEach((link) => {
-        if (new URL(link.href).pathname === window.location.pathname && new URL(link.href).hash === window.location.hash) {
-            link.classList.add('is-active');
-        }
-    });
+    const matches = Array.from(document.querySelectorAll('[data-nav-link]')).filter((link) => {
+        const destination = new URL(link.href);
+        return !destination.hash && (destination.pathname === window.location.pathname || window.location.pathname.startsWith(destination.pathname + '/'));
+    }).sort((a, b) => new URL(b.href).pathname.length - new URL(a.href).pathname.length);
+    if (matches[0]) {
+        matches[0].classList.add('is-active');
+        matches[0].setAttribute('aria-current', 'page');
+    }
 }
 document.querySelectorAll("[data-tracking-url]").forEach((panel) => {
     const labels = {

@@ -83,9 +83,56 @@ class IfoodClient
 
     private function read(object $app, string $path): Response
     {
+        return $this->request($app, 'GET', $path);
+    }
+
+    public function poll(object $app, array $merchants): array
+    {
+        if ($merchants === [] || count($merchants) > 100 || collect($merchants)->contains(fn ($id) => ! is_string($id) || ! Str::isUuid($id))) {
+            $this->fail('Selecione de 1 a 100 lojas válidas para o recebimento de teste.');
+        }
+        $response = $this->request($app, 'GET', '/events/v1.0/events:polling', ['categories' => 'FOOD'], ['x-polling-merchants' => implode(',', $merchants)]);
+        if ($response->status() === 204) {
+            return [];
+        }
+        $events = $response->json();
+        if (! is_array($events) || ! array_is_list($events) || count($events) > 2000) {
+            $this->fail('O iFood retornou uma lista de eventos inválida.');
+        }
+
+        return $events;
+    }
+
+    public function acknowledge(object $app, array $ids): void
+    {
+        if ($ids === [] || count($ids) > 2000 || collect($ids)->contains(fn ($id) => ! is_string($id) || ! Str::isUuid($id))) {
+            $this->fail('Lista de confirmação de eventos inválida.');
+        }
+        $response = $this->request($app, 'POST', '/events/v1.0/events/acknowledgment', array_map(fn ($id) => ['id' => $id], array_values(array_unique($ids))));
+        if ($response->status() !== 202) {
+            $this->fail('O iFood não confirmou o recebimento da leitura dos eventos.');
+        }
+    }
+
+    public function order(object $app, string $id): array
+    {
+        if (! Str::isUuid($id)) {
+            $this->fail('Identificador de pedido iFood inválido.');
+        }
+        $order = $this->read($app, '/order/v1.0/orders/'.$id)->json();
+        if (! is_array($order) || array_is_list($order)) {
+            $this->fail('O iFood retornou detalhes de pedido inválidos.');
+        }
+
+        return $order;
+    }
+
+    private function request(object $app, string $method, string $path, array $data = [], array $headers = []): Response
+    {
         for ($attempt = 0; $attempt < 2; $attempt++) {
             try {
-                $response = Http::withToken($this->token($app))->acceptJson()->connectTimeout(5)->timeout(10)->withoutRedirecting()->get(self::BASE.$path);
+                $request = Http::withToken($this->token($app))->acceptJson()->withHeaders($headers)->connectTimeout(5)->timeout(10)->withoutRedirecting();
+                $response = $method === 'GET' ? $request->get(self::BASE.$path, $data) : $request->post(self::BASE.$path, $data);
             } catch (ConnectionException) {
                 $this->fail('Não foi possível conectar ao iFood. Tente novamente.');
             }

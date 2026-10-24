@@ -119,3 +119,25 @@ test('hidden page pauses requests and customer tracking writes messages as text'
     assert.equal(fields['[data-cancel-reason]'].textContent, '<script>texto</script>');
     assert.equal(fields['[data-cancel-reason]'].innerHTML, undefined);
 });
+
+test('ifood list pauses in hidden pages and preserves the last view on network failure', async () => {
+    const message = {};
+    const feed = {dataset: {url: '/integrations/ifood/orders/live'}, contains: () => false, innerHTML: 'Initial'};
+    let calls = 0;
+    let failed = false;
+    const runtime = environment({'[data-ifood-feed]': [feed]}, {'[data-ifood-connection]': message}, async () => {
+        calls++;
+        if (failed) { throw new Error('Offline'); }
+        return jsonResponse({html: 'Imported test orders', signature: 'one'});
+    });
+    await runtime.tick();
+    assert.equal(feed.innerHTML, 'Imported test orders');
+    runtime.document.hidden = true;
+    await runtime.tick();
+    assert.equal(calls, 1);
+    runtime.document.hidden = false;
+    failed = true;
+    await runtime.tick();
+    assert.equal(feed.innerHTML, 'Imported test orders');
+    assert.match(message.textContent, /indisponível/);
+});

@@ -1,6 +1,20 @@
 # Estado e prioridades da versão web
 
-Atualizado em 24/10/2026 após o novo painel e o início do conector iFood, branch `feat/platform-foundation`.
+Atualizado em 24/10/2026 após o novo painel e a recepção inicial de pedidos iFood de teste, branch `feat/platform-foundation`.
+
+## iFood: recepção de pedidos de teste
+
+Implementada a segunda etapa inicial do conector: busca de eventos no endpoint oficial Events, filtro obrigatório de Merchants vinculados, persistência criptografada antes do ACK, deduplicação por aplicativo/ID do evento e importação exclusiva por aplicativo/ID do pedido. O ACK confirma armazenamento/leitura; não aceita o pedido. Eventos repetidos podem receber novo ACK sem recriar a venda. Eventos de Merchant desconhecido e conflitos de identidade não são confirmados.
+
+O comando `php artisan ifood:sync` é agendado a cada 30 segundos em segundo plano para não bloquear o despacho freelancer. Um bloqueio compartilhado impede sincronizações simultâneas; uma reserva no banco garante intervalo mínimo de 30 segundos por aplicativo. Reinícios deixam eventos persistidos para novas tentativas; após encerramento abrupto, o bloqueio pode levar até dez minutos para expirar. O scheduler precisa estar ativo. Novos recebimentos vêm desligados e exigem ativação explícita do superadmin em uma loja de teste verificada. Trocar credenciais desliga os recebimentos e invalida a verificação.
+
+Pedidos recebidos aparecem na área **Integração iFood** do tenant, com lista atualizada pelo navegador e detalhes privados. Ainda não entram no quadro principal, nos indicadores financeiros ou nas corridas freelancer. Valores de itens, benefícios, taxas, total, pago online e pendente são preservados como informações do iFood, sem criar recebimento manual nem presumir repasse. O resumo armazenado do pedido omite CPF e segmentação do cliente. Eventos e resumo detalhado ficam criptografados.
+
+Cobertura desta etapa: pedidos de teste explicitamente identificados (`isTest` ou `test`), categoria FOOD, entrega/retirada, imediatos/agendados, quantidades fracionárias e adicionais aninhados dentro dos limites. Campos obrigatórios ausentes, valores monetários inválidos, Merchants divergentes ou pedidos reais geram pendência visível, sem venda fictícia. Códigos PLC, CFM, SPS, RTP, DSP, CON e CAN atualizam o status; eventos antigos não reabrem pedidos cancelados/concluídos. Tipos não suportados são preservados sem ação, com diagnóstico no superadmin; não implementamos ainda negociações nem atualizações de composição por eventos específicos.
+
+Falhas na busca de detalhes ou no ACK são retomadas, com atraso progressivo de até uma hora para processamento. Desligar novos recebimentos não interrompe eventos já armazenados. Vínculos com pendências ou pedidos ativos não podem ser removidos, e um Merchant com histórico não pode ser transferido silenciosamente para outra loja. O piloto limita recebimento a 100 lojas por aplicativo e processamento a cinco eventos por ciclo; dimensionamento, limites e concorrência precisam de validação real antes de produção.
+
+Validação local: API simulada, testes de repetição, isolamento, eventos fora de ordem, ACK após persistência, recuperação após erro, pedidos reais bloqueados e atualização web com perda de rede. Ainda não há teste com credenciais reais nem homologação. Próxima etapa: comandos operacionais com outbox, retorno por eventos, cancelamentos/negociações, informação de pagamento e modalidade logística completas. O aplicativo iFood deve pertencer à empresa dona deste SaaS; restaurantes clientes autorizam o acesso após homologação. A loja de um amigo pode servir como piloto posterior, sem substituir o cadastro de desenvolvedor da plataforma.
 
 ## Atualização: painel e iFood
 
@@ -8,7 +22,7 @@ Painéis de tenant e superadmin redesenhados com base na prévia aprovada, naveg
 
 Integração iFood adicionada ao escopo na seção 16.1, antecipada em relação aos demais marketplaces. Primeira etapa implementada: configuração central de aplicativo de teste, credenciais e cache de token criptografados, autenticação, vínculo exclusivo de Merchant ID à loja por superadmin, consulta manual de situação e leitura segregada por tenant. Rotação de credenciais exige nova verificação. As telas identificam teste e a data da última consulta; situação consultada não é monitoramento nem habilitação para receber pedidos.
 
-Validação atual do iFood: testes HTTP simulados. Ainda é necessário cadastrar credenciais e Merchant ID de teste no painel e validar com a API real. Recepção de eventos, ações de pedidos, catálogo, produção e homologação permanecem pendentes. O próximo bloco é Order/Events com persistência, deduplicação, confirmação de leitura e tratamento das diferenças entre pedidos próprios e iFood.
+Validação atual do iFood: testes HTTP simulados. Ainda é necessário cadastrar credenciais e Merchant ID de teste no painel e validar com a API real. A recepção inicial de eventos está descrita acima; ações operacionais, catálogo, produção e homologação permanecem pendentes.
 
 Operação: após publicar esta versão, a inicialização do Compose executa as migrations. Em **Superadmin → Integração iFood**, informar Client ID e Client Secret do aplicativo centralizado de teste, testar autenticação, selecionar empresa/loja e informar Merchant ID da loja de teste. Nunca enviar a chave pelo chat. O tenant acompanha em **Integração iFood**; não recebe credenciais globais nem pode reivindicar Merchant ID de outra empresa. O ambiente de teste é declarado por credenciais/loja, não detectado pela URL compartilhada da API.
 
