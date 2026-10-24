@@ -4,7 +4,7 @@ Plataforma de restaurantes em **Laravel 13 / PHP 8.4**, com múltiplas empresas 
 
 ## Estado desta entrega
 
-Esta versão contém a fundação, o fluxo inicial de venda/produção web, o novo painel e a primeira etapa do conector iFood, ainda para piloto assistido. O escopo completo está em `docs/escopo.md`; os recursos descritos no escopo não devem ser confundidos com recursos já implementados.
+Esta versão contém a fundação, o fluxo inicial de venda/produção web, o novo painel e recepção/ações iFood de teste, ainda para piloto assistido. O escopo completo está em `docs/escopo.md`; os recursos descritos no escopo não devem ser confundidos com recursos já implementados.
 
 **Prioridade definida em 24/10/2026:** concluir os fluxos web primeiro. Android foi adiado e não é dependência da primeira entrega web. O backlog e o estado por módulo estão em `docs/status-web.md`.
 
@@ -14,6 +14,7 @@ Esta versão contém a fundação, o fluxo inicial de venda/produção web, o no
 - Novo visual responsivo de tenant/superadmin, indicadores completos do período, pausa rápida, busca de empresas e link compartilhável do cardápio.
 - iFood: aplicativo centralizado de teste, segredo/token criptografados, vínculo exclusivo por loja feito pelo superadmin, consulta manual de situação e acompanhamento segregado pelo tenant. Testes com HTTP simulado.
 - Recepção iFood de teste: eventos armazenados antes do ACK, deduplicação, importação segregada, recuperação de falhas e lista/detalhes no painel do tenant. O comando `ifood:sync` roda pelo scheduler a cada 30 segundos; novos recebimentos exigem ativação explícita por loja no superadmin e vêm desligados.
+- Ações iFood de teste: solicitações persistidas de aceite, preparo, pronto, despacho próprio e cancelamento com motivos da API. Envios exigem ativação separada pelo superadmin, usam o comando `ifood:send-commands` e só são confirmados pelos eventos de retorno. Resultado ambíguo não dispara reenvio automático. Botão Sair fica no cabeçalho, independente da altura do menu lateral.
 - Criação de empresas e usuários, lojas, produtos, disponibilidade e cardápio público.
 - Checkout com preços calculados no servidor, snapshots dos itens e idempotência por loja.
 - Pedidos, etapas de preparo, acompanhamento por link e registro manual auditado de recebimento.
@@ -32,7 +33,7 @@ Esta versão contém a fundação, o fluxo inicial de venda/produção web, o no
 ### Limites explícitos
 
 - Interface usa **Blade + CSS/JS** e consulta periódica de atualizações, sem Vue/Inertia ou WebSockets. Som precisa de interação do operador para ativação; abas suspensas pelo navegador não garantem recebimento de alertas.
-- iFood recebe apenas pedidos explicitamente marcados como teste, em uma área separada. Não envia aceite/preparo/cancelamento/despacho, não sincroniza catálogo nem opera restaurantes reais. Credenciais e loja de teste, validação externa e homologação permanecem necessárias. Configurar em **Superadmin → Integração iFood**; informar a chave somente no painel. O rótulo teste da conexão é declarado pelo aplicativo/loja fornecidos; a importação também exige identificação de teste no pedido. ACK é confirmação de leitura, não de aceite. O piloto processa cinco eventos por ciclo e admite até 100 lojas por aplicativo; formatos ainda não suportados ficam preservados para revisão. Não habilitar recebimento de lojas reais enquanto o fluxo operacional estiver incompleto.
+- iFood recebe apenas pedidos explicitamente marcados como teste, em uma área separada. Aceite/preparo/pronto/despacho próprio/cancelamento estão implementados para teste e dependem de validação real; catálogo e operação de restaurantes reais não estão liberados. Configurar em **Superadmin → Integração iFood**; informar a chave somente no painel. Recebimento e ações têm ativações separadas. ACK é confirmação de leitura, não de aceite; `202` de comando também não confirma alteração de estado. Timeout, erro `5xx`, reinício durante envio e ausência de evento deixam resultado não confirmado e bloqueiam novas ações do pedido. Negociação, alteração de pedido/endereço, códigos de coleta/entrega e resolução assistida de comandos ambíguos ainda precisam ser concluídos antes da homologação. O piloto processa cinco eventos por ciclo e admite até 100 lojas por aplicativo. Pedidos de teste continuam fora do financeiro e das corridas freelancer.
 - O módulo é ativado por empresa nesta entrega; seleção granular de lojas, múltiplos usuários com permissões por loja, bloqueios locais de entregador e tabelas de regras editáveis ainda precisam ser desenvolvidos.
 - Painel web do motoboy serve ao piloto e exige renovar presença. **Aplicativo Android, localização contínua e push ainda não estão implementados**; não lançar operação autônoma com celular bloqueado usando esse painel.
 - **WABA ainda é solicitação pendente**, sem Embedded Signup ou envio oficial. A conexão QR possui testes com HTTP simulado, mas exige homologação na versão do servidor Evolution. Verificação automática do número efetivamente pareado, desconexão/migração e mensagens transacionais/campanhas estão pendentes.
@@ -91,7 +92,7 @@ Para restaurar: criar ambiente isolado com a mesma versão, restaurar PostgreSQL
 ## Próximos marcos
 
 1. Homologar imagem Coolify, concorrência real no PostgreSQL e instalação limpa.
-   Prioridade adicionada: validar a recepção com loja iFood de teste e implementar envio confiável das ações operacionais, antes de catálogo e produção. Persistência/deduplicação iniciais concluídas; sequência e aceite em `docs/escopo.md`, seção 16.1.
+   Prioridade adicionada: validar recepção e ações com loja iFood de teste, completar negociações, coleta/entrega e tratamento assistido de incertezas, antes de catálogo e produção. Sequência e aceite em `docs/escopo.md`, seção 16.1.
 2. Evoluir fluxo de ocorrências, segurança/comprovação de entrega, tabela de tarifas editável e configuração de despacho.
 3. Completar o painel web do entregador, atualização de presença com página ativa, ofertas e acertos validados em duas lojas e três entregadores. Android/localização em segundo plano ficam para depois.
 4. Homologar Evolution QR e implementar onboarding WABA e outbox de mensagens.

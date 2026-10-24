@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/ifood/{id}/check', [IfoodController::class, 'check'])->middleware('throttle:6,1')->name('ifood.admin.check');
         Route::post('/admin/ifood/{id}/disconnect', [IfoodController::class, 'disconnect'])->name('ifood.disconnect');
         Route::post('/admin/ifood/{id}/receiving', [IfoodController::class, 'receiving'])->name('ifood.receiving');
+        Route::post('/admin/ifood/{id}/actions', [IfoodController::class, 'enableActions'])->name('ifood.actions.enable');
         Route::get('/admin', [PlatformController::class, 'admin']);
         Route::post('/admin/tenants', [PlatformController::class, 'createTenant']);
         Route::post('/admin/tenants/{id}/module', [PlatformController::class, 'module']);
@@ -46,6 +47,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/integrations/ifood', [IfoodController::class, 'owner'])->name('ifood.owner');
         Route::get('/integrations/ifood/orders/live', [IfoodController::class, 'ordersLive'])->middleware('throttle:60,1')->name('ifood.orders.live');
         Route::get('/integrations/ifood/orders/{id}', [IfoodController::class, 'showOrder'])->name('ifood.orders.show');
+        Route::get('/integrations/ifood/orders/{id}/live', [IfoodController::class, 'orderLive'])->middleware('throttle:60,1')->name('ifood.order.live');
+        Route::post('/integrations/ifood/orders/{id}/actions', [IfoodController::class, 'action'])->middleware('throttle:20,1')->name('ifood.order.action');
+        Route::post('/integrations/ifood/orders/{id}/reasons', [IfoodController::class, 'reasons'])->middleware('throttle:6,1')->name('ifood.order.reasons');
         Route::post('/integrations/ifood/{id}/check', [IfoodController::class, 'check'])->middleware('throttle:6,1')->name('ifood.owner.check');
         Route::get('/dashboard', [PlatformController::class, 'dashboard']);
         Route::get('/orders/live', [OrderBoardController::class, 'live'])->middleware('throttle:60,1');

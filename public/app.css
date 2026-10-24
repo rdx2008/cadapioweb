@@ -761,3 +761,19 @@ footer { padding:15px 32px 25px; font-size:10px; }
 @media(max-width:1250px) { .sidebar { width:218px; }.content { padding:24px; }.topbar { padding:0 24px; }.dashboard-columns { grid-template-columns:minmax(0,1fr) 265px; gap:16px; }.metric { gap:10px; padding:16px 12px; }.metric-icon { width:32px; height:32px; }.metric-icon .icon { width:19px; height:19px; }.metric .value { font-size:22px; }.metric-label { font-size:10px; }.card { padding:18px; }.page-heading h1 { font-size:26px; } }
 @media(max-width:1100px) { .metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.dashboard-columns { grid-template-columns:1fr; }.dashboard-aside { display:grid; grid-template-columns:1fr 1fr; gap:16px; }.aside-note { grid-column:1/-1; }.metric .value { font-size:26px; }.metric-label { font-size:12px; }.metric-icon { width:40px; height:40px; }.page-heading .date-label { display:none; } }
 @media(max-width:720px) { .sidebar { width:100%; padding:17px 16px 12px; height:auto; position:static; }.brand { font-size:25px; padding:0; }.workspace-card { display:none; }.sidebar nav { margin-top:15px; gap:6px; padding-bottom:3px; }.sidebar nav a { font-size:11px; padding:9px 10px; gap:6px; }.sidebar nav .icon { width:16px; height:16px; }.sidebar nav a.is-active:before { top:auto; bottom:0; left:10px; right:10px; width:auto; height:2px; }.sidebar-bottom { display:block; border:0; margin:0; padding:0; position:absolute; top:14px; right:17px; }.sidebar-bottom .account { display:none; }.sidebar-bottom .ghost { padding:7px; }.nav-count { height:18px; min-width:18px; font-size:9px; }.topbar { height:57px; padding:0 16px; gap:10px; }.breadcrumb { gap:7px; font-size:10px; }.topbar-actions { gap:7px; }.topbar-actions .button { font-size:10px; padding:7px 8px; }.topbar-actions .button .icon { display:none; }.store-status { font-size:10px; padding:5px 8px; }.content { padding:22px 15px; }.page-heading h1 { font-size:25px; letter-spacing:-.8px; }.page-heading p { font-size:12px; line-height:1.6; }.page-heading > .button { font-size:10px; padding:8px; white-space:nowrap; }.stats { gap:10px; }.metric { padding:14px 11px; gap:9px; }.metric-icon { width:30px; height:30px; }.metric-label { font-size:10px; }.metric .value { font-size:22px; }.metric small { font-size:8px; }.card { padding:17px; }.dashboard-aside { grid-template-columns:1fr; }.order-row { grid-template-columns:45px minmax(0,1fr) auto; gap:8px; }.order-customer strong { font-size:12px; }.order-customer .badge { margin:4px 0 0; }.order-customer small { font-size:10px; }.order-amount { font-size:13px; }.order-tabs { gap:17px; }.order-tabs a { font-size:11px; }.board-toolbar { gap:6px; }.board-toolbar label { min-width:90px; }.board-toolbar .search-field { min-width:160px; }.order-more-content { grid-template-columns:1fr; }.sound-control { font-size:9px; max-width:100px; }.section-head h2 { font-size:16px; }.admin-table td { min-width:120px; }.admin-table td:first-child { min-width:180px; }.setup-step small { font-size:9px; }footer { padding:14px 16px; } }
+
+/* Account action remains visible independently of the sidebar height. */
+.logout-form { margin:0; flex-shrink:0; }
+.logout-button { background:#fff; color:#b64720; border:1px solid #f1c8b8; white-space:nowrap; padding:9px 12px; }
+.sidebar { overflow-y:auto; }
+.sidebar-bottom { flex-shrink:0; }
+@media(max-width:720px) {
+    .sidebar-bottom { display:none; }
+    .topbar { min-height:57px; height:auto; padding-top:10px; padding-bottom:10px; flex-wrap:wrap; }
+    .topbar-actions { margin-left:auto; flex-wrap:wrap; justify-content:flex-end; }
+    .logout-button { padding:8px 10px; font-size:11px; }
+    .logout-detail { display:none; }
+}
+.command-row { padding:16px 0; border-top:1px solid var(--line); margin-top:14px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.command-row small { margin-left:auto; }
+.command-row p { flex-basis:100%; margin:0; color:#7b5544; }

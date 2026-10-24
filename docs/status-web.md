@@ -1,6 +1,22 @@
 # Estado e prioridades da versão web
 
-Atualizado em 24/10/2026 após o novo painel e a recepção inicial de pedidos iFood de teste, branch `feat/platform-foundation`.
+Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
+
+## iFood: solicitações operacionais de teste e saída da conta
+
+Implementada a próxima etapa: o proprietário solicita aceite, início de preparo, pronto, despacho de entrega própria e cancelamento nos detalhes privados do pedido de teste. Cada comando é persistido antes de sair do servidor, com chave idempotente, revisão das credenciais e bloqueio de outra ação enquanto houver resultado pendente/incerto. O status do pedido continua sendo alterado somente pelos eventos do iFood. Preparação FOOD reconhece PRS, além do mapeamento anterior SPS; confirmações CFM/RTP/DSP/CAN reconciliam os comandos aplicáveis.
+
+Em **Superadmin → Integração iFood**, habilitar separadamente **ações de teste** em uma conexão verificada com recebimento ativo. A migração vem com ações desligadas para todas as lojas. Trocar credenciais ou desligar o recebimento também desliga novos envios. Comandos já enviados permanecem no histórico aguardando eventos. O comando `php artisan ifood:send-commands` é agendado a cada dez segundos em segundo plano, com até três solicitações por ciclo. Antes de enviar, consulta novamente a identidade do pedido, identificação de teste e modalidade logística na API. Despacho só é enviado quando a API confirma DELIVERY/MERCHANT; entrega iFood não gera despacho próprio nem corrida freelancer.
+
+Cancelamento usa somente motivos obtidos no endpoint do próprio pedido, com validade local de cinco minutos e nova validação antes do envio. Pedido agendado aguarda o horário de preparo; aceite vencido é bloqueado localmente. Alterações OPA/DAR e negociações HSD preservadas nos eventos impedem ações sobre contexto ainda não tratado. Nenhum valor é lançado como recebido e nenhum status é antecipado em função de um clique ou `202`.
+
+Estados do comando: aguardando envio, verificando, enviando, enviado/aguardando evento, confirmado, recusado/não enviado, resultado incerto e encerrado sem reenvio. `429` respeita atraso e admite até três tentativas; falha antes do envio não é confundida com resultado confirmado. Timeout durante POST, respostas ambíguas/`5xx` e reinício depois de marcar o envio não são reenviados automaticamente. Sem evento por cinco minutos, o resultado fica incerto. CARF sem correlação inequívoca também conserva incerteza: não assume que o pedido foi cancelado nem libera outra ação automaticamente. Resolução assistida dessas situações é trabalho pendente antes de produção. Eventos terminais não podem ser sobrescritos por uma resposta HTTP tardia.
+
+Os detalhes atualizam situação e histórico de ações pelo navegador sem sobrescrever um formulário em foco ou cancelamento aberto. Testes simulados cobrem o ciclo completo, clique repetido, isolamento, retorno por eventos, motivo inválido, limite de API, timeout, erro de servidor, rotação de credenciais, agendamento, logística e retorno terminal durante o envio. Chamadas seguem a referência atual de endpoints Order com POST; homologação real deve confirmar os contratos, pois parte dos guias narrativos ainda mostra verbos divergentes para pronto/despacho. Ainda faltam negociações completas, códigos de coleta/entrega, alterações de composição/endereço, conciliação, catálogo e homologação real.
+
+Botão **Sair da conta** movido para o cabeçalho autenticado, com contraste próprio e versão compacta para celular; não depende mais do rodapé do menu. O menu lateral pode rolar em telas baixas. CSS/JS receberam nova versão de URL para invalidar o cache do visual anterior. A saída preserva o POST com CSRF e invalida a sessão.
+
+Referência dos contratos: [Order endpoints](https://developer.ifood.com.br/en-US/docs/food/guides/modules/order/endpoints).
 
 ## iFood: recepção de pedidos de teste
 
@@ -14,15 +30,15 @@ Cobertura desta etapa: pedidos de teste explicitamente identificados (`isTest` o
 
 Falhas na busca de detalhes ou no ACK são retomadas, com atraso progressivo de até uma hora para processamento. Desligar novos recebimentos não interrompe eventos já armazenados. Vínculos com pendências ou pedidos ativos não podem ser removidos, e um Merchant com histórico não pode ser transferido silenciosamente para outra loja. O piloto limita recebimento a 100 lojas por aplicativo e processamento a cinco eventos por ciclo; dimensionamento, limites e concorrência precisam de validação real antes de produção.
 
-Validação local: API simulada, testes de repetição, isolamento, eventos fora de ordem, ACK após persistência, recuperação após erro, pedidos reais bloqueados e atualização web com perda de rede. Ainda não há teste com credenciais reais nem homologação. Próxima etapa: comandos operacionais com outbox, retorno por eventos, cancelamentos/negociações, informação de pagamento e modalidade logística completas. O aplicativo iFood deve pertencer à empresa dona deste SaaS; restaurantes clientes autorizam o acesso após homologação. A loja de um amigo pode servir como piloto posterior, sem substituir o cadastro de desenvolvedor da plataforma.
+Validação local: API simulada, testes de repetição, isolamento, eventos fora de ordem, ACK após persistência, recuperação após erro, pedidos reais bloqueados e atualização web com perda de rede. Ainda não há teste com credenciais reais nem homologação. O envio inicial de comandos está descrito na seção acima; negociações, informação de pagamento e modalidade logística completas seguem pendentes. O aplicativo iFood deve pertencer à empresa dona deste SaaS; restaurantes clientes autorizam o acesso após homologação. A loja de um amigo pode servir como piloto posterior, sem substituir o cadastro de desenvolvedor da plataforma.
 
-## Atualização: painel e iFood
+## Histórico: painel e conexão inicial iFood
 
 Painéis de tenant e superadmin redesenhados com base na prévia aprovada, navegação responsiva, busca de empresas, cópia do link do cardápio, pausa rápida e indicadores completos do período. Conferência local no Chrome em desktop e celular, com fixtures isoladas. O usuário confirmou acesso de administrador e cadastro de tenants no Coolify; isso não substitui o piloto de todos os fluxos em produção.
 
 Integração iFood adicionada ao escopo na seção 16.1, antecipada em relação aos demais marketplaces. Primeira etapa implementada: configuração central de aplicativo de teste, credenciais e cache de token criptografados, autenticação, vínculo exclusivo de Merchant ID à loja por superadmin, consulta manual de situação e leitura segregada por tenant. Rotação de credenciais exige nova verificação. As telas identificam teste e a data da última consulta; situação consultada não é monitoramento nem habilitação para receber pedidos.
 
-Validação atual do iFood: testes HTTP simulados. Ainda é necessário cadastrar credenciais e Merchant ID de teste no painel e validar com a API real. A recepção inicial de eventos está descrita acima; ações operacionais, catálogo, produção e homologação permanecem pendentes.
+Validação do iFood: testes HTTP simulados. Ainda é necessário cadastrar credenciais e Merchant ID de teste no painel e validar com a API real. Recepção e ações iniciais de teste estão descritas acima; catálogo, produção e homologação permanecem pendentes.
 
 Operação: após publicar esta versão, a inicialização do Compose executa as migrations. Em **Superadmin → Integração iFood**, informar Client ID e Client Secret do aplicativo centralizado de teste, testar autenticação, selecionar empresa/loja e informar Merchant ID da loja de teste. Nunca enviar a chave pelo chat. O tenant acompanha em **Integração iFood**; não recebe credenciais globais nem pode reivindicar Merchant ID de outra empresa. O ambiente de teste é declarado por credenciais/loja, não detectado pela URL compartilhada da API.
 

@@ -2,7 +2,7 @@
 @section('page-label','Integração iFood')
 @section('content')
 <div class="page-heading"><div><h1>Integração iFood</h1><p>Configure o aplicativo e vincule cada loja ao restaurante correto.</p></div><span class="badge pending">Ambiente de teste</span></div>
-<div class="notice">Recepção de pedidos de teste disponível mediante ativação por loja. O sistema guarda e confirma a leitura dos eventos, mas ainda não aceita pedidos nem envia ações operacionais. Catálogo e produção permanecem pendentes.</div>
+<div class="notice">Recepção e ações de pedidos de teste exigem ativações separadas por loja. Uma solicitação enviada só é confirmada pelos eventos do iFood. Catálogo, homologação e operação de restaurantes reais permanecem pendentes.</div>
 @if($application)<p class="compact muted">Última busca de eventos: {{ $application->last_polled_at?Illuminate\Support\Carbon::parse($application->last_polled_at)->timezone('America/Sao_Paulo')->format('d/m/Y H:i:s'):'Ainda não executada' }}</p>@if($application->last_poll_error)<p class="notice error" role="alert">{{ $application->last_poll_error }}</p>@endif @endif
 <div class="two">
     <section class="card"><h2>Aplicativo de teste</h2><p class="muted">Use as credenciais do aplicativo centralizado de teste criado no portal iFood Developer. Somente o superadmin administra essas chaves.</p>

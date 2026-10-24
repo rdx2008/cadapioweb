@@ -122,7 +122,7 @@ test('hidden page pauses requests and customer tracking writes messages as text'
 
 test('ifood list pauses in hidden pages and preserves the last view on network failure', async () => {
     const message = {};
-    const feed = {dataset: {url: '/integrations/ifood/orders/live'}, contains: () => false, innerHTML: 'Initial'};
+    const feed = {dataset: {url: '/integrations/ifood/orders/live'}, contains: () => false, querySelector: () => null, innerHTML: 'Initial'};
     let calls = 0;
     let failed = false;
     const runtime = environment({'[data-ifood-feed]': [feed]}, {'[data-ifood-connection]': message}, async () => {

@@ -189,7 +189,7 @@ document.querySelectorAll('[data-ifood-feed]').forEach((feed) => {
         running = true;
         try {
             const data = await readLiveJson(feed.dataset.url);
-            if (signature !== data.signature && !feed.contains(document.activeElement)) {
+            if (signature !== data.signature && !feed.contains(document.activeElement) && !feed.querySelector('details[open]')) {
                 feed.innerHTML = data.html;
                 signature = data.signature;
             }

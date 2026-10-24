@@ -127,6 +127,73 @@ class IfoodClient
         return $order;
     }
 
+    public function cancellationReasons(object $app, string $id): array
+    {
+        if (! Str::isUuid($id)) {
+            $this->fail('Identificador de pedido inválido.');
+        }
+        $payload = $this->read($app, '/order/v1.0/orders/'.$id.'/cancellationReasons')->json();
+        $reasons = is_array($payload) ? ($payload['reasons'] ?? $payload) : null;
+        if (! is_array($reasons) || ! array_is_list($reasons) || count($reasons) > 100) {
+            $this->fail('O iFood retornou uma lista de motivos inválida.');
+        }
+        $result = [];
+        foreach ($reasons as $reason) {
+            if (! is_array($reason) || ! is_scalar($reason['code'] ?? null) || ! preg_match('/^[A-Za-z0-9_-]{1,40}$/D', (string) $reason['code']) || ! is_string($reason['description'] ?? null) || mb_strlen($reason['description']) > 500) {
+                $this->fail('O iFood retornou um motivo de cancelamento inválido.');
+            }
+            $result[(string) $reason['code']] = $reason['description'];
+        }
+
+        return $result;
+    }
+
+    public function execute(object $app, string $id, string $action, array $payload): array
+    {
+        $endpoints = ['confirm' => 'confirm', 'prepare' => 'startPreparation', 'ready' => 'readyToPickup', 'dispatch' => 'dispatch', 'cancel' => 'requestCancellation'];
+        if (! Str::isUuid($id) || ! isset($endpoints[$action])) {
+            $this->fail('Ação de pedido inválida.');
+        }
+        try {
+            $token = $this->token($app);
+        } catch (ValidationException) {
+            return ['status' => 'retry', 'message' => 'Autenticação indisponível antes do envio. Nova tentativa será feita.', 'retry_after' => 30];
+        }
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            try {
+                $response = Http::withToken($token)->acceptJson()->connectTimeout(5)->timeout(10)->withoutRedirecting()
+                    ->send('POST', self::BASE.'/order/v1.0/orders/'.$id.'/'.$endpoints[$action], $payload === [] ? ['body' => '{}'] : ['json' => $payload]);
+            } catch (ConnectionException) {
+                return ['status' => 'uncertain', 'message' => 'Conexão interrompida durante o envio. Aguarde o evento ou confira no iFood antes de tentar outra ação.'];
+            }
+            if ($response->status() === 401 && $attempt === 0) {
+                Cache::forget($this->tokenKey($app));
+                try {
+                    $token = $this->token($app);
+                } catch (ValidationException) {
+                    return ['status' => 'rejected', 'message' => 'Autenticação recusada. Confira as credenciais antes de solicitar novamente.'];
+                }
+
+                continue;
+            }
+            if ($response->status() === 202) {
+                return ['status' => 'awaiting_event', 'message' => null];
+            }
+            if ($response->status() === 429) {
+                $delay = $response->header('Retry-After') ?? $response->header('X-RateLimit-Reset');
+
+                return ['status' => 'retry', 'message' => 'Limite de envios atingido. A solicitação aguarda nova tentativa.', 'retry_after' => is_numeric($delay) ? max(30, min(3600, (int) $delay)) : 60];
+            }
+            if (in_array($response->status(), [400, 401, 403, 404, 422], true)) {
+                return ['status' => 'rejected', 'message' => 'O iFood recusou a solicitação (HTTP '.$response->status().'). Revise o pedido e a autorização da loja.'];
+            }
+
+            return ['status' => 'uncertain', 'message' => 'Resposta sem confirmação do resultado. O comando não será reenviado automaticamente; confira o retorno do iFood.'];
+        }
+
+        return ['status' => 'rejected', 'message' => 'Autenticação recusada pelo iFood.'];
+    }
+
     private function request(object $app, string $method, string $path, array $data = [], array $headers = []): Response
     {
         for ($attempt = 0; $attempt < 2; $attempt++) {

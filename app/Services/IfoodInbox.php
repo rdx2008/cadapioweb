@@ -13,7 +13,7 @@ use Throwable;
 
 class IfoodInbox
 {
-    private const STATES = ['PLC' => 'pending', 'CFM' => 'accepted', 'SPS' => 'preparing', 'RTP' => 'ready', 'DSP' => 'dispatched', 'CON' => 'completed', 'CAN' => 'cancelled'];
+    private const STATES = ['PLC' => 'pending', 'CFM' => 'accepted', 'PRS' => 'preparing', 'SPS' => 'preparing', 'RTP' => 'ready', 'DSP' => 'dispatched', 'CON' => 'completed', 'CAN' => 'cancelled'];
 
     private const PROGRESS = ['pending' => 0, 'accepted' => 1, 'preparing' => 2, 'ready' => 3, 'dispatched' => 4, 'completed' => 5, 'cancelled' => 6];
 
@@ -138,7 +138,8 @@ class IfoodInbox
     private function process(object $app, object $event): void
     {
         $state = self::STATES[$event->code] ?? null;
-        if (! $state) {
+        $control = in_array($event->code, ['CAR', 'CARF'], true);
+        if (! $state && ! $control) {
             DB::table('ifood_events')->where('id', $event->id)->update(['status' => 'ignored', 'retry_at' => null, 'last_error' => null, 'updated_at' => now()]);
 
             return;
@@ -147,6 +148,9 @@ class IfoodInbox
             $this->fail('Evento de pedido sem identificador. Confira no portal iFood.');
         }
         $existing = DB::table('ifood_orders')->where('app_id', $app->id)->where('external_order_id', $event->external_order_id)->first();
+        if (! $existing && $control) {
+            $this->fail('Aguardando um evento de situação para identificar o pedido desta solicitação de cancelamento.');
+        }
         $normalized = $existing ? null : $this->normalize($this->client->order($app, $event->external_order_id), $event);
         DB::transaction(function () use ($app, $event, $state, $normalized): void {
             $this->currentApp($app, true);
@@ -165,9 +169,11 @@ class IfoodInbox
                     'status' => $state, 'last_event_at' => $event->occurred_at, 'created_at' => now(), 'updated_at' => now(),
                 ]);
                 Audit::record('ifood.order_received', ['external_order_id' => $event->external_order_id, 'store_id' => $event->store_id], $event->tenant_id);
-            } elseif (Carbon::parse($event->occurred_at)->gte(Carbon::parse($order->last_event_at)) && self::PROGRESS[$state] >= self::PROGRESS[$order->status]) {
+            } elseif ($state && Carbon::parse($event->occurred_at)->gte(Carbon::parse($order->last_event_at)) && self::PROGRESS[$state] >= self::PROGRESS[$order->status]) {
                 DB::table('ifood_orders')->where('id', $order->id)->update(['status' => $state, 'last_event_at' => $event->occurred_at, 'updated_at' => now()]);
             }
+            $orderId = $order?->id ?? DB::table('ifood_orders')->where('app_id', $app->id)->where('external_order_id', $event->external_order_id)->value('id');
+            app(IfoodOutbox::class)->observe($event, (int) $orderId);
             DB::table('ifood_events')->where('id', $event->id)->update(['status' => 'processed', 'retry_at' => null, 'last_error' => null, 'updated_at' => now()]);
         });
     }
@@ -185,6 +191,7 @@ class IfoodInbox
             'items' => 'required|array|min:1|max:500', 'items.*.name' => 'required|string|max:1000', 'items.*.quantity' => 'required|numeric|gt:0|max:100000',
             'items.*.unitPrice' => 'required|numeric|min:0', 'items.*.totalPrice' => 'required|numeric|min:0', 'items.*.observations' => 'nullable|string|max:1024',
             'items.*.options' => 'nullable|array|max:100',
+            'delivery.deliveredBy' => 'nullable|in:MERCHANT,IFOOD',
         ]);
         if ($validator->fails()) {
             $this->fail('Formato de pedido ainda não suportado ou incompleto. Revisão necessária; o evento está preservado.');
@@ -207,6 +214,7 @@ class IfoodInbox
             'display_id' => $data['displayId'], 'customer_name' => $data['customer']['name'], 'order_type' => $data['orderType'], 'timing' => $data['orderTiming'],
             'ordered_at' => $this->date($data['createdAt']), 'preparation_at' => ! empty($data['preparationStartDateTime']) ? $this->date($data['preparationStartDateTime']) : null,
             'total_cents' => $totals['orderAmount'], 'prepaid_cents' => $this->money($data['payments']['prepaid']), 'pending_cents' => $this->money($data['payments']['pending']),
+            'delivered_by' => $data['delivery']['deliveredBy'] ?? null,
             'snapshot' => Crypt::encryptString(json_encode($snapshot, JSON_THROW_ON_ERROR)),
         ];
     }

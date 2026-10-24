@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Services\IfoodClient;
+use App\Services\IfoodOutbox;
 use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -49,7 +51,7 @@ class IfoodController extends Controller
             ];
             if ($app) {
                 DB::table('ifood_apps')->where('id', $app->id)->update($values);
-                DB::table('ifood_connections')->where('app_id', $app->id)->update(['receiving_enabled' => false, 'status' => 'pending', 'checked_at' => null, 'operations' => null, 'last_error' => null, 'updated_at' => now()]);
+                DB::table('ifood_connections')->where('app_id', $app->id)->update(['actions_enabled' => false, 'receiving_enabled' => false, 'status' => 'pending', 'checked_at' => null, 'operations' => null, 'last_error' => null, 'updated_at' => now()]);
             } else {
                 DB::table('ifood_apps')->insert($values + ['environment' => 'test', 'created_at' => now()]);
             }
@@ -128,6 +130,7 @@ class IfoodController extends Controller
             $app = $this->application();
             $this->lockApplication($app);
             $connection = DB::table('ifood_connections')->where('id', $id)->lockForUpdate()->firstOrFail();
+            abort_if(DB::table('ifood_commands')->where('connection_id', $id)->whereIn('status', IfoodOutbox::ACTIVE)->exists(), 409, 'Há ações aguardando resultado. Confira o retorno do iFood antes de remover o vínculo.');
             abort_if(DB::table('ifood_events')->where('connection_id', $id)->whereIn('status', ['received', 'processing', 'error'])->exists()
                 || DB::table('ifood_orders')->where('app_id', $app->id)->where('merchant_id', $connection->merchant_id)->whereNotIn('status', ['completed', 'cancelled'])->exists(), 409, 'Há eventos pendentes ou pedidos ativos. Desligue novos recebimentos e resolva as pendências antes de remover o vínculo.');
             DB::table('ifood_connections')->where('id', $id)->delete();
@@ -146,7 +149,11 @@ class IfoodController extends Controller
             $connection = DB::table('ifood_connections')->where('id', $id)->where('app_id', $app->id)->lockForUpdate()->firstOrFail();
             abort_if($data['enabled'] && $connection->status !== 'verified', 409, 'Verifique o acesso à loja antes de habilitar o recebimento.');
             abort_if($data['enabled'] && ! $connection->receiving_enabled && DB::table('ifood_connections')->where('app_id', $app->id)->where('receiving_enabled', true)->count() >= 100, 409, 'Limite de 100 lojas no piloto de recebimento.');
-            DB::table('ifood_connections')->where('id', $id)->update(['receiving_enabled' => $data['enabled'], 'updated_at' => now()]);
+            $values = ['receiving_enabled' => $data['enabled'], 'updated_at' => now()];
+            if (! $data['enabled']) {
+                $values['actions_enabled'] = false;
+            }
+            DB::table('ifood_connections')->where('id', $id)->update($values);
             Audit::record('ifood.receiving_changed', ['connection_id' => $id, 'enabled' => (bool) $data['enabled']], $connection->tenant_id);
         });
 
@@ -164,7 +171,62 @@ class IfoodController extends Controller
     {
         $order = DB::table('ifood_orders')->where('tenant_id', $request->user()->tenant_id)->where('id', $id)->firstOrFail();
 
-        return view('integrations.ifood-order', ['order' => $order, 'timezone' => DB::table('stores')->where('id', $order->store_id)->value('timezone'), 'snapshot' => json_decode(Crypt::decryptString($order->snapshot), true, flags: JSON_THROW_ON_ERROR)]);
+        return view('integrations.ifood-order', ['order' => $order, 'timezone' => DB::table('stores')->where('id', $order->store_id)->value('timezone'), 'snapshot' => json_decode(Crypt::decryptString($order->snapshot), true, flags: JSON_THROW_ON_ERROR)] + $this->commandData($order));
+    }
+
+    public function enableActions(Request $request, int $id): RedirectResponse
+    {
+        $data = $request->validate(['enabled' => 'required|boolean', 'test_actions_confirmed' => 'accepted_if:enabled,1']);
+        DB::transaction(function () use ($data, $id): void {
+            $app = $this->application();
+            $this->lockApplication($app);
+            $connection = DB::table('ifood_connections')->where('app_id', $app->id)->where('id', $id)->lockForUpdate()->firstOrFail();
+            abort_if($data['enabled'] && (! $connection->receiving_enabled || $connection->status !== 'verified'), 409, 'Ative o recebimento em uma loja verificada antes de liberar ações de teste.');
+            DB::table('ifood_connections')->where('id', $id)->update(['actions_enabled' => $data['enabled'], 'updated_at' => now()]);
+            Audit::record('ifood.actions_changed', ['connection_id' => $id, 'enabled' => (bool) $data['enabled']], $connection->tenant_id);
+        });
+
+        return back()->with('success', $data['enabled'] ? 'Ações de teste habilitadas. Cada ação será solicitada pelo proprietário e confirmada por evento.' : 'Novos envios desabilitados. Solicitações já enviadas continuam aguardando o resultado.');
+    }
+
+    public function action(Request $request, int $id, IfoodOutbox $outbox): RedirectResponse
+    {
+        $data = $request->validate(['action' => 'required|in:confirm,prepare,ready,dispatch,cancel', 'request_key' => 'required|uuid', 'reason' => 'required_if:action,cancel|nullable|string|max:40']);
+        $outbox->enqueue((int) $request->user()->tenant_id, $id, $data['action'], $data['request_key'], $data['reason'] ?? null);
+
+        return back()->with('success', 'Solicitação registrada. O status do pedido só muda quando o evento do iFood chegar.');
+    }
+
+    public function reasons(Request $request, int $id, IfoodOutbox $outbox): RedirectResponse
+    {
+        $outbox->reasons((int) $request->user()->tenant_id, $id);
+
+        return back()->with('success', 'Motivos consultados no iFood. Selecione um deles para solicitar o cancelamento.');
+    }
+
+    public function orderLive(Request $request, int $id): JsonResponse
+    {
+        $order = DB::table('ifood_orders')->where('tenant_id', $request->user()->tenant_id)->where('id', $id)->firstOrFail();
+        $html = view('integrations.ifood-actions', ['order' => $order] + $this->commandData($order))->render();
+
+        return response()->json(['html' => $html, 'signature' => hash('sha256', $html)])->header('Cache-Control', 'no-store');
+    }
+
+    private function commandData(object $order): array
+    {
+        $available = app(IfoodOutbox::class)->available($order);
+        $commands = DB::table('ifood_commands')->where('order_id', $order->id)->latest('id')->limit(20)->get(['id', 'action', 'status', 'attempts', 'last_error', 'created_at', 'sent_at', 'retry_at']);
+        $keys = [];
+        foreach ($available as $action) {
+            $key = 'ifood_form_keys.'.$order->id.'.'.$action.'.'.($commands->first()?->id ?? 0);
+            $keys[$action] = session()->get($key, (string) Str::uuid());
+            session()->put($key, $keys[$action]);
+        }
+
+        return [
+            'availableActions' => $available, 'commands' => $commands, 'requestKeys' => $keys,
+            'reasons' => $order->cancellation_reasons && $order->reasons_checked_at && Carbon::parse($order->reasons_checked_at)->gte(now()->subMinutes(5)) ? json_decode(Crypt::decryptString($order->cancellation_reasons), true, flags: JSON_THROW_ON_ERROR) : [],
+        ];
     }
 
     private function orderData(Request $request): array
