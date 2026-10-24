@@ -7,7 +7,7 @@ x-app: &app
         APP_ENV: production
         APP_DEBUG: "false"
         APP_KEY: ${APP_KEY:-base64:${SERVICE_REALBASE64_APPKEY}}
-        APP_URL: ${APP_URL:-${SERVICE_URL_WEB_8080}}
+        APP_URL: ${APP_URL:-${SERVICE_URL_WEB_8080:-${SERVICE_URL_WEB:-http://localhost}}}
         APP_LOCALE: pt_BR
         TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
         DB_CONNECTION: pgsql
@@ -23,6 +23,7 @@ x-app: &app
         SESSION_DRIVER: database
         SESSION_SECURE_COOKIE: "true"
         LOG_CHANNEL: stderr
+        RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
     volumes:
         - app_storage:/var/www/html/storage
     depends_on:
@@ -49,6 +50,7 @@ services:
             interval: 30s
             timeout: 5s
             retries: 3
+            start_period: 90s
     worker:
         <<: *app
         command:

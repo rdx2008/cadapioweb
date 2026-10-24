@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\RuntimeEnvironment;
+
 return [
 
     /*
@@ -52,7 +54,11 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+    'url' => RuntimeEnvironment::url([
+        'APP_URL' => env('APP_URL'),
+        'SERVICE_URL_WEB_8080' => env('SERVICE_URL_WEB_8080'),
+        'SERVICE_URL_WEB' => env('SERVICE_URL_WEB'),
+    ]),
 
     /*
     |--------------------------------------------------------------------------

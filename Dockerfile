@@ -11,7 +11,7 @@ RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoload
     && chown -R www-data:www-data storage bootstrap/cache
 COPY docker/nginx.conf /etc/nginx/sites-enabled/default
 COPY docker/supervisord.conf /etc/supervisor/conf.d/app.conf
-RUN chmod +x docker/entrypoint.sh
+RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
 ENV APP_ENV=production APP_DEBUG=false
 EXPOSE 8080
 ENTRYPOINT ["/var/www/html/docker/entrypoint.sh"]
