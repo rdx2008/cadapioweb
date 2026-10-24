@@ -134,6 +134,16 @@ document.querySelectorAll("[data-order-board]").forEach((board) => {
         running = true;
         try {
             const data = await readLiveJson(board.dataset.url);
+            if (data.summary) {
+                document.querySelectorAll('[data-summary]').forEach((element) => {
+                    const value = data.summary[element.dataset.summary];
+                    if (value !== undefined) {
+                        element.textContent = element.dataset.format === 'money'
+                            ? new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL'}).format(value / 100)
+                            : String(value);
+                    }
+                });
+            }
             if (data.latest_id > latest) {
                 beep();
                 alert.textContent =
@@ -167,6 +177,66 @@ document.querySelectorAll("[data-order-board]").forEach((board) => {
     });
     timer = setTimeout(refresh, 5000);
 });
+
+document.querySelectorAll('[data-copy-link]').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const card = button.closest('.share-card');
+        const input = card.querySelector('input');
+        const message = card.querySelector('[data-copy-status]');
+        try {
+            await navigator.clipboard.writeText(input.value);
+            message.textContent = 'Link copiado! Pronto para compartilhar.';
+        } catch {
+            input.focus();
+            input.select();
+            message.textContent = 'Selecione e copie o link acima.';
+        }
+    });
+});
+
+document.querySelectorAll('[data-table-search]').forEach((input) => {
+    input.addEventListener('input', () => {
+        const term = input.value.trim().toLocaleLowerCase('pt-BR');
+        let visible = 0;
+        document.querySelectorAll('[data-search-row]').forEach((row) => {
+            row.hidden = !row.textContent.toLocaleLowerCase('pt-BR').includes(term);
+            if (!row.hidden) { visible++; }
+        });
+        document.querySelector('[data-search-result]').textContent = term
+            ? visible + (visible === 1 ? ' empresa encontrada.' : ' empresas encontradas.')
+            : '';
+    });
+});
+
+const workspaceOverview = document.querySelector('[data-workspace-overview]');
+if (workspaceOverview) {
+    const panels = document.querySelectorAll('[data-workspace-panel]');
+    const links = document.querySelectorAll('[data-nav-link]');
+    const showWorkspace = () => {
+        const hash = window.location.hash.slice(1);
+        const selectedPanel = Array.from(panels).find((panel) => panel.id === hash);
+        workspaceOverview.hidden = Boolean(selectedPanel);
+        panels.forEach((panel) => { panel.hidden = panel !== selectedPanel; });
+        links.forEach((link) => {
+            const destination = new URL(link.href).hash.slice(1);
+            const active = destination === hash || (!destination && !hash);
+            link.classList.toggle('is-active', active);
+            if (active) { link.setAttribute('aria-current', 'page'); }
+            else { link.removeAttribute('aria-current'); }
+        });
+        const activeLink = Array.from(links).find((link) => link.classList.contains('is-active'));
+        document.querySelector('[data-page-label]').textContent = activeLink
+            ? activeLink.querySelector('span').textContent : 'Visão geral';
+    };
+    window.addEventListener('hashchange', showWorkspace);
+    showWorkspace();
+} else {
+    document.querySelectorAll('[data-nav-link]').forEach((link) => {
+        if (new URL(link.href).pathname === window.location.pathname && new URL(link.href).hash === window.location.hash) {
+            link.classList.add('is-active');
+        }
+    });
+}
 document.querySelectorAll("[data-tracking-url]").forEach((panel) => {
     const labels = {
         pending: "Aguardando aceite",

@@ -72,19 +72,21 @@ test('board polling updates new orders, preserves an open edit and survives netw
     let editing = false;
     let failure = false;
     let version = 2;
+    const metric = {dataset: {summary: 'paid_cents', format: 'money'}};
     const board = {
         dataset: {url: '/orders/live', latestId: '1'}, innerHTML: 'Initial board',
         contains: () => false,
         querySelector: () => editing ? {} : null,
     };
-    const runtime = environment({'[data-order-board]': [board]}, fields, async (url, options) => {
+    const runtime = environment({'[data-order-board]': [board], '[data-summary]': [metric]}, fields, async (url, options) => {
         assert.equal(url, '/orders/live');
         assert.equal(options.cache, 'no-store');
         if (failure) {throw new Error('Sem rede');}
-        return jsonResponse({html: 'Board ' + version, signature: 'v' + version, latest_id: version});
+        return jsonResponse({html: 'Board ' + version, signature: 'v' + version, latest_id: version, summary: {paid_cents: version * 1000}});
     });
     await runtime.tick();
     assert.equal(board.innerHTML, 'Board 2');
+    assert.match(metric.textContent, /20,00/);
     assert.match(fields['[data-order-alert]'].textContent, /Novo pedido/);
     version = 3; editing = true;
     await runtime.tick();
@@ -96,6 +98,7 @@ test('board polling updates new orders, preserves an open edit and survives netw
     failure = false;
     await runtime.tick();
     assert.equal(board.innerHTML, 'Board 3');
+    assert.match(metric.textContent, /30,00/);
 });
 
 test('hidden page pauses requests and customer tracking writes messages as text', async () => {

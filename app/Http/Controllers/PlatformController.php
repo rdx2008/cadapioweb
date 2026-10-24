@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\DashboardSummary;
 use App\Services\DispatchService;
 use App\Services\FareCalculator;
 use App\Support\Audit;
@@ -32,7 +33,7 @@ class PlatformController extends Controller
 
     public function admin()
     {
-        return view('admin', ['tenants' => DB::table('tenants')->get(), 'drivers' => DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->select('drivers.*', 'users.name', 'users.email')->get(), 'evolutionUrl' => DB::table('settings')->where('key', 'evolution_url')->value('value')]);
+        return view('admin', ['tenants' => DB::table('tenants')->orderByDesc('id')->get(), 'drivers' => DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->select('drivers.*', 'users.name', 'users.email')->get(), 'storeCount' => DB::table('stores')->count(), 'owners' => User::where('role', 'owner')->get()->groupBy('tenant_id'), 'evolutionUrl' => DB::table('settings')->where('key', 'evolution_url')->value('value')]);
     }
 
     public function createTenant(Request $r)
@@ -97,13 +98,17 @@ class PlatformController extends Controller
 
     public function dashboard(Request $request)
     {
+        $board = app(OrderBoardController::class)->data($request);
         $setupStores = DB::table('stores')->where('tenant_id', $this->tid())
             ->select('stores.*')
             ->selectSub(DB::table('products')->selectRaw('count(*)')->whereColumn('store_id', 'stores.id')->where('tenant_id', $this->tid())->where('available', true), 'available_products')
             ->selectSub(DB::table('delivery_zones')->selectRaw('count(*)')->whereColumn('store_id', 'stores.id')->where('enabled', true), 'active_zones')
             ->get();
 
-        return view('dashboard', ['setupStores' => $setupStores, 'tenant' => DB::table('tenants')->find($this->tid()), 'stores' => DB::table('stores')->where('tenant_id', $this->tid())->get(), 'orders' => DB::table('orders')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'products' => DB::table('products')->where('tenant_id', $this->tid())->get(), 'rides' => DB::table('rides')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'connections' => DB::table('whatsapp_connections')->where('tenant_id', $this->tid())->get()] + app(OrderBoardController::class)->data($request));
+        $selectedStore = $request->filled('store_id') ? $setupStores->firstWhere('id', (int) $request->store_id) : $setupStores->first();
+        $summary = app(DashboardSummary::class)->forTenant($this->tid(), $request->filled('store_id') ? (int) $request->store_id : null);
+
+        return view('dashboard', ['summary' => $summary, 'selectedStore' => $selectedStore, 'setupStores' => $setupStores, 'tenant' => DB::table('tenants')->find($this->tid()), 'stores' => $setupStores, 'products' => DB::table('products')->where('tenant_id', $this->tid())->get(), 'rides' => DB::table('rides')->where('tenant_id', $this->tid())->latest()->limit(30)->get(), 'connections' => DB::table('whatsapp_connections')->where('tenant_id', $this->tid())->get()] + $board);
     }
 
     public function createStore(Request $r)

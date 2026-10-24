@@ -56,6 +56,19 @@ class CatalogController extends Controller
         return back()->with('success', 'Loja e horários atualizados.');
     }
 
+    public function availability(Request $request, int $id): RedirectResponse
+    {
+        $store = $this->store($id);
+        $data = $request->validate(['open' => 'required|boolean']);
+        DB::transaction(function () use ($store, $data) {
+            DB::table('stores')->where('id', $store->id)->lockForUpdate()->firstOrFail();
+            DB::table('stores')->where('id', $store->id)->update(['open' => $data['open'], 'updated_at' => now()]);
+            Audit::record('store.availability', ['store_id' => $store->id, 'open' => (bool) $data['open']], $store->tenant_id);
+        });
+
+        return back()->with('success', $data['open'] ? 'Pedidos habilitados conforme os horários da loja.' : 'Loja pausada para novos pedidos.');
+    }
+
     public function zone(Request $request, int $storeId): RedirectResponse
     {
         $store = $this->store($storeId);

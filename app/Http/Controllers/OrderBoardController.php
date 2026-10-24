@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DashboardSummary;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,7 @@ class OrderBoardController extends Controller
         $filters = $request->validate(['store_id' => 'nullable|integer', 'status' => 'nullable|in:active,all,pending,accepted,preparing,ready,completed,cancelled', 'q' => 'nullable|string|max:80', 'page' => 'nullable|integer|min:1|max:100000']);
         $query = DB::table('orders')->where('tenant_id', $request->user()->tenant_id);
         if (! empty($filters['store_id'])) {
+            DB::table('stores')->where('tenant_id', $request->user()->tenant_id)->where('id', $filters['store_id'])->firstOrFail();
             $query->where('store_id', $filters['store_id']);
         }
         $latestId = (clone $query)->max('id') ?? 0;
@@ -39,7 +41,7 @@ class OrderBoardController extends Controller
         $tenant = DB::table('tenants')->where('id', $request->user()->tenant_id)->firstOrFail();
         $html = view('partials.orders', $data + ['tenant' => $tenant])->render();
 
-        return response()->json(['html' => $html, 'latest_id' => $data['latestId'], 'signature' => hash('sha256', $html)])->header('Cache-Control', 'no-store');
+        return response()->json(['html' => $html, 'latest_id' => $data['latestId'], 'signature' => hash('sha256', $html), 'summary' => app(DashboardSummary::class)->forTenant((int) $request->user()->tenant_id, ! empty($data['filters']['store_id']) ? (int) $data['filters']['store_id'] : null)])->header('Cache-Control', 'no-store');
     }
 
     public function show(Request $request, int $id): View
