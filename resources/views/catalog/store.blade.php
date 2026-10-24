@@ -41,7 +41,8 @@
 </label>
     </div>
 <h2 style="margin-top:24px">Horários semanais</h2>
-<p class="muted">Um intervalo por dia. Fechamento anterior à abertura continua no dia seguinte. Horários iguais significam 24 horas a partir da abertura.</p>
+<p class="muted">Até dois períodos por dia, como almoço e jantar. Entre os períodos, novos pedidos ficam bloqueados automaticamente.</p>
+<p class="muted">No celular, deslize a tabela para o lado para editar os horários.</p>
     <div class="table-wrap">
 <table>
 <tr>
@@ -49,6 +50,8 @@
 <th>Atendimento</th>
 <th>Abre</th>
 <th>Fecha</th>
+<th>2º período: abre</th>
+<th>2º período: fecha</th>
 </tr>
     @foreach(['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'] as $day=>$label)
     <tr>
@@ -65,9 +68,12 @@
 <td>
 <input type="time" name="hours[{{ $day }}][closes_at]" value="{{ old('hours.'.$day.'.closes_at', $hours[$day]['closes_at']??'23:00') }}" required>
 </td>
+<td><input type="time" aria-label="{{ $label }}: abertura do segundo período" name="hours[{{ $day }}][second_opens_at]" value="{{ old('hours.'.$day.'.second_opens_at', $hours[$day]['second_opens_at']??'') }}"></td>
+<td><input type="time" aria-label="{{ $label }}: fechamento do segundo período" name="hours[{{ $day }}][second_closes_at]" value="{{ old('hours.'.$day.'.second_closes_at', $hours[$day]['second_closes_at']??'') }}"></td>
 </tr>
     @endforeach</table>
 </div>
+<p class="muted">O segundo período é opcional. Deixe os dois campos vazios para atender em um único período. Fechamento anterior à abertura indica atendimento até o dia seguinte; horários iguais representam 24 horas.</p>
     <h2 style="margin-top:24px">Remuneração do freelancer</h2>
 <div class="fields">
     <label>Modo<select name="rate_mode">@foreach(['fixed'=>'Taxa fixa','per_km'=>'Base + quilômetro','per_ride'=>'Cotação por corrida'] as $value=>$label)<option value="{{ $value }}" @selected(old('rate_mode', $store->rate_mode)===$value)>{{ $label }}</option>@endforeach</select>

@@ -41,6 +41,8 @@ class CatalogController extends Controller
             'open' => 'required|boolean', 'timezone' => ['required', Rule::in(timezone_identifiers_list())], 'minimum_order_cents' => 'required|integer|min:0|max:1000000',
             'use_hours' => 'required|boolean', 'hours' => 'required|array:0,1,2,3,4,5,6|size:7', 'hours.*.enabled' => 'required|boolean',
             'hours.*.opens_at' => 'required|date_format:H:i', 'hours.*.closes_at' => 'required|date_format:H:i',
+            'hours.*.second_opens_at' => 'nullable|required_with:hours.*.second_closes_at|date_format:H:i',
+            'hours.*.second_closes_at' => 'nullable|required_with:hours.*.second_opens_at|date_format:H:i',
             'rate_mode' => 'required|in:fixed,per_km,per_ride', 'base_cents' => 'required|integer|min:0|max:100000',
             'per_km_cents' => 'required|integer|min:0|max:100000', 'minimum_cents' => 'required|integer|min:0|max:100000',
         ]);

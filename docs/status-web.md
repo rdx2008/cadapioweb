@@ -2,6 +2,10 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Horários com almoço e jantar
+
+Configuração da loja permite um segundo período opcional por dia. O checkout respeita o fechamento entre períodos, o fuso da loja, a passagem da meia-noite e a pausa manual. Horários antigos seguem compatíveis, sem nova migration. Painel mostra os dois períodos. Validação: 72 testes PHP e quatro testes JavaScript; Chrome em desktop e celular.
+
 ## iFood: solicitações operacionais de teste e saída da conta
 
 Implementada a próxima etapa: o proprietário solicita aceite, início de preparo, pronto, despacho de entrega própria e cancelamento nos detalhes privados do pedido de teste. Cada comando é persistido antes de sair do servidor, com chave idempotente, revisão das credenciais e bloqueio de outra ação enquanto houver resultado pendente/incerto. O status do pedido continua sendo alterado somente pelos eventos do iFood. Preparação FOOD reconhece PRS, além do mapeamento anterior SPS; confirmações CFM/RTP/DSP/CAN reconciliam os comandos aplicáveis.
@@ -49,7 +53,7 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 | Área | Estado confirmado |
 |---|---|
 | Empresas e acesso | Login, perfis e isolamento das operações existentes; faltam usuários/permissões por loja e recuperação de senha |
-| Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; faltam variações, combos, feriados e múltiplos intervalos diários |
+| Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; faltam variações, combos, feriados e mais de dois períodos diários |
 | Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; faltam validação geográfica do endereço, agendamento e pagamento online |
 | Pedidos e cozinha | Aceite, preparo, pronto, conclusão, filtros, paginação, detalhes privados, atualização automática e som ativável; faltam estações e ocorrências completas |
 | Freelancers | Cadastro global, aprovação, check-in, FIFO, oferta regional, aceite, coleta e conclusão; faltam presença web automática, posição da fila visível, alertas, regras editáveis e ocorrências |
@@ -63,7 +67,7 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 
 ### 1. Tornar utilizável o fluxo de venda e produção
 
-**Implementado nesta entrega:** edição de loja/produto, fotos, um horário por dia e pausas; categorias e grupos de adicionais; checkout com revisão, regiões e frete; filtros, detalhes privados e atualização automática com som ativável. Cancelamento exige motivo e os valores das vendas ficam preservados.
+**Implementado nesta entrega:** edição de loja/produto, fotos, até dois períodos por dia e pausas; categorias e grupos de adicionais; checkout com revisão, regiões e frete; filtros, detalhes privados e atualização automática com som ativável. Cancelamento exige motivo e os valores das vendas ficam preservados.
 
 **Ainda pendente neste bloco:** validação visual completa em navegadores reais, geocodificação do endereço, agendamento, variações/combos e homologação Coolify/PostgreSQL. A cobertura atual é por região declarada pelo cliente, sem prova de que o endereço está naquela região. Os testes JavaScript usam DOM simulado e não substituem teste em navegador real.
 

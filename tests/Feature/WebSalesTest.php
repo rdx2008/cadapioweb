@@ -200,6 +200,22 @@ class WebSalesTest extends TestCase
         $this->assertArrayNotHasKey('address', $response->json());
     }
 
+    public function test_two_daily_periods_respect_breaks_timezone_overnight_and_manual_pause(): void
+    {
+        $hours = array_fill(0, 7, ['enabled' => false, 'opens_at' => '11:00', 'closes_at' => '14:00']);
+        $hours[1] = ['enabled' => true, 'opens_at' => '11:00', 'closes_at' => '14:00', 'second_opens_at' => '18:00', 'second_closes_at' => '02:00'];
+        $store = (object) ['open' => true, 'timezone' => 'America/Sao_Paulo', 'weekly_hours' => json_encode($hours)];
+        $availability = app(StoreAvailability::class);
+        foreach (['2026-10-26 14:00:00' => true, '2026-10-26 17:00:00' => false, '2026-10-26 21:00:00' => true, '2026-10-27 04:59:00' => true, '2026-10-27 05:00:00' => false] as $utc => $expected) {
+            $this->assertSame($expected, $availability->isOpen($store, Carbon::parse($utc, 'UTC')), $utc);
+        }
+        $this->travelTo(Carbon::parse('2026-10-26 12:00:00', 'America/Sao_Paulo'));
+        $this->assertSame('11:00 às 14:00 · 18:00 às 02:00', $availability->todayLabel($store));
+        $store->open = false;
+        $this->assertFalse($availability->isOpen($store));
+        $this->travelBack();
+    }
+
     public function test_store_configuration_can_save_hours_tariffs_and_delivery_zones(): void
     {
         $tenant = $this->tenant();
@@ -207,7 +223,13 @@ class WebSalesTest extends TestCase
         $this->actingAs($this->owner($tenant));
         $hours = array_fill(0, 7, ['enabled' => 1, 'opens_at' => '18:00', 'closes_at' => '01:00']);
         $data = ['name' => 'Minha Loja', 'slug' => 'loja', 'address' => 'Rua B, 20', 'latitude' => -23.55, 'longitude' => -46.63, 'open' => 1, 'timezone' => 'America/Sao_Paulo', 'minimum_order_cents' => 2500, 'use_hours' => 1, 'hours' => $hours, 'rate_mode' => 'per_km', 'base_cents' => 400, 'per_km_cents' => 200, 'minimum_cents' => 800];
+        $data['hours'][1] = ['enabled' => 1, 'opens_at' => '11:00', 'closes_at' => '14:00', 'second_opens_at' => '18:00', 'second_closes_at' => '23:00'];
         $this->post('/stores/'.$store.'/edit', $data)->assertRedirect();
+        $savedHours = json_decode(DB::table('stores')->where('id', $store)->value('weekly_hours'), true);
+        $this->assertSame('18:00', $savedHours[1]['second_opens_at']);
+        $data['hours'][1]['second_closes_at'] = '';
+        $this->postJson('/stores/'.$store.'/edit', $data)->assertUnprocessable()->assertJsonValidationErrors('hours.1.second_closes_at');
+        $this->assertSame($savedHours, json_decode(DB::table('stores')->where('id', $store)->value('weekly_hours'), true));
         $this->assertDatabaseHas('stores', ['id' => $store, 'name' => 'Minha Loja', 'minimum_order_cents' => 2500]);
         $this->post('/stores/'.$store.'/zones', ['name' => 'Centro', 'fee_cents' => 750, 'enabled' => 1])->assertRedirect();
         $this->assertDatabaseHas('delivery_zones', ['store_id' => $store, 'name' => 'Centro', 'fee_cents' => 750]);
