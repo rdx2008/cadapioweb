@@ -111,7 +111,9 @@ class IfoodConnectionTest extends TestCase
         ]);
         $this->actingAs(User::factory()->create(['role' => 'admin']))
             ->postJson('/admin/ifood/connect', ['store_id' => $store, 'merchant_id' => self::MERCHANT, 'test_merchant_confirmed' => 1])
-            ->assertUnprocessable()->assertJsonValidationErrors('ifood')->assertDontSee('SECRET-ONLY-SERVER')->assertDontSee('private-token');
+            ->assertUnprocessable()->assertJsonValidationErrors('ifood')
+            ->assertJsonPath('errors.ifood.0', 'Aplicativo sem autorização para esta loja no iFood. [HTTP 403 · GET /merchant/v1.0/merchants/'.self::MERCHANT.']')
+            ->assertDontSee('SECRET-ONLY-SERVER')->assertDontSee('private-token');
         $this->assertDatabaseCount('ifood_connections', 0);
         $this->assertDatabaseCount('orders', 0);
     }
@@ -178,7 +180,7 @@ class IfoodConnectionTest extends TestCase
         $id = DB::table('ifood_connections')->value('id');
         $denied = true;
         $this->postJson('/admin/ifood/'.$id.'/check')->assertUnprocessable()->assertDontSee('private-token');
-        $this->assertDatabaseHas('ifood_connections', ['id' => $id, 'status' => 'error', 'operations' => null, 'last_error' => 'Aplicativo sem autorização para esta loja no iFood.']);
+        $this->assertDatabaseHas('ifood_connections', ['id' => $id, 'status' => 'error', 'operations' => null, 'last_error' => 'Aplicativo sem autorização para esta loja no iFood. [HTTP 403 · GET /merchant/v1.0/merchants/'.self::MERCHANT.']']);
         $this->get('/admin/ifood')->assertOk()->assertSee('Falha na consulta')->assertDontSee('private-token')->assertDontSee('SECRET-ONLY-SERVER');
     }
 

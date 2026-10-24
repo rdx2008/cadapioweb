@@ -36,7 +36,7 @@ class IfoodClient
                 } catch (ConnectionException) {
                     $this->fail('Não foi possível conectar ao iFood. Tente novamente.');
                 }
-                $this->check($response);
+                $this->check($response, 'POST /authentication/v1.0/oauth/token');
                 $token = $response->json('accessToken');
                 $expires = $response->json('expiresIn');
                 if (! is_string($token) || $token === '' || strlen($token) > 8000 || preg_match('/[\x00-\x20\x7f]/', $token) || ! is_numeric($expires) || (int) $expires < 1) {
@@ -208,7 +208,7 @@ class IfoodClient
 
                 continue;
             }
-            $this->check($response);
+            $this->check($response, $method.' '.$path);
 
             return $response;
         }
@@ -220,18 +220,19 @@ class IfoodClient
         return 'ifood:token:'.$app->id.':'.$app->revision;
     }
 
-    private function check(Response $response): void
+    private function check(Response $response, string $operation): void
     {
         if ($response->successful()) {
             return;
         }
-        $this->fail(match ($response->status()) {
+        $message = match ($response->status()) {
             400, 401 => 'Credenciais ou solicitação iFood inválidas. Revise a configuração do aplicativo.',
             403 => 'Aplicativo sem autorização para esta loja no iFood.',
             404 => 'Loja não encontrada no iFood. Confira o Merchant ID.',
             429 => 'Limite de consultas iFood atingido. Aguarde antes de tentar novamente.',
             default => 'iFood indisponível ou resposta inesperada. Tente novamente mais tarde.',
-        });
+        };
+        $this->fail($message.' [HTTP '.$response->status().' · '.$operation.']');
     }
 
     private function fail(string $message): never
