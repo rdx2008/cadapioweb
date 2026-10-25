@@ -19,6 +19,7 @@ Route::middleware('guest')->group(function () {
 });
 Route::get('/cardapio/{slug}', [MenuController::class, 'menu']);
 Route::post('/cardapio/{slug}/delivery', [MenuController::class, 'delivery'])->middleware('throttle:10,1');
+Route::post('/cardapio/{slug}/postcode', [MenuController::class, 'postcode'])->middleware('throttle:10,1');
 Route::post('/cardapio/{slug}/review', [MenuController::class, 'review'])->middleware('throttle:30,1');
 Route::get('/cardapio/{slug}/review/{draftId}', [MenuController::class, 'reviewPage']);
 Route::post('/cardapio/{slug}', [MenuController::class, 'checkout'])->middleware('throttle:20,1');

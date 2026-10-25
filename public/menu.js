@@ -14,6 +14,12 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
     const mode = form.querySelector('[data-mode]'), address = form.querySelector('[data-delivery-address]');
     const token = form.querySelector('[name=delivery_token]');
     const addressParts = [...form.querySelectorAll('[data-address-part]')];
+    const postcode = addressParts.find(field=>field.dataset.addressPart==='postcode');
+    const addressDetails = form.querySelector('[data-address-details]');
+    const postcodeMessage = form.querySelector('[data-postcode-message]');
+    const manualAddress = form.querySelector('[data-postcode-manual]');
+    let postcodeVersion=0;
+    let addressReady=Boolean(postcode?.value && addressParts.find(field=>field.dataset.addressPart==='street')?.value);
     const results = form.querySelector('[data-delivery-results]');
     let deliveryFee = null, lookupVersion = 0;
     function update() {
@@ -36,8 +42,10 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         if(!count){const empty=document.createElement('div');empty.className='bag-empty';empty.textContent='Sua sacola está esperando seus favoritos.';lines.append(empty);}
         const delivery=mode.value==='delivery';
         address.required=delivery;
-        addressParts.forEach(field=>{field.required=delivery&&field.dataset.addressPart!=='postcode';field.disabled=!delivery;});
+        addressParts.forEach(field=>{const active=delivery&&(field===postcode||addressReady);field.required=active;field.disabled=!active;});
         form.querySelectorAll('[data-delivery-field]').forEach(field=>field.hidden=!delivery);
+        if(addressDetails)addressDetails.hidden=!delivery||!addressReady;
+        const complement=form.querySelector('[name=address_complement]');if(complement)complement.disabled=!delivery||!addressReady;
         const fee=delivery ? deliveryFee : 0;
         document.querySelectorAll('[data-bag-count],[data-menu-count],[data-mobile-count]').forEach(el=>el.textContent=String(count));
         form.querySelector('[data-menu-subtotal]').textContent=menuMoney(subtotal);
@@ -69,6 +77,36 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         const invalidateAddress=()=>{lookupVersion++;token.value='';deliveryFee=null;results.replaceChildren();update();};
         address.addEventListener('input',invalidateAddress);
         addressParts.forEach(field=>{field.addEventListener('input',invalidateAddress);field.addEventListener('change',invalidateAddress);});
+        if(postcode && addressDetails){
+            postcode.addEventListener('input',()=>{
+                postcodeVersion++;addressReady=false;manualAddress.hidden=true;postcodeMessage.textContent='';
+                addressParts.filter(field=>field!==postcode).forEach(field=>field.value='');
+                form.querySelector('[name=address_complement]').value='';update();
+            });
+            postcode.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();form.querySelector('[data-postcode-search]').click();}});
+            manualAddress.addEventListener('click',()=>{
+                if(!postcode.reportValidity())return;
+                postcodeVersion++;addressReady=true;postcodeMessage.textContent='Preencha o endereço completo. O frete será validado após localizar o número.';manualAddress.hidden=true;update();
+                addressParts.find(field=>field.dataset.addressPart==='street').focus();
+            });
+            form.querySelector('[data-postcode-search]').addEventListener('click',async event=>{
+                if(!postcode.reportValidity())return;
+                const button=event.currentTarget,version=++postcodeVersion,submitted=postcode.value;
+                invalidateAddress();addressReady=false;update();button.disabled=true;manualAddress.hidden=true;postcodeMessage.textContent='Buscando endereço…';
+                const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),9000);
+                try{
+                    const response=await fetch(form.querySelector('[data-postcode-step]').dataset.url,{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content},body:JSON.stringify({postcode:submitted})});
+                    const data=await response.json();
+                    if(version!==postcodeVersion||postcode.value!==submitted)return;
+                    if(!response.ok)throw new Error(data.errors?Object.values(data.errors).flat()[0]:'Não foi possível consultar o CEP.');
+                    addressParts.filter(field=>field!==postcode).forEach(field=>field.value=data.address[field.dataset.addressPart]||'');
+                    addressReady=true;postcodeMessage.textContent=data.address.street&&data.address.neighborhood?'Endereço encontrado. Confira os dados e informe o número.':'Este CEP não informa todos os dados. Complete os campos abaixo.';
+                    update();const missing=addressParts.find(field=>!field.value&&field!==postcode);missing?.focus();
+                }catch(error){if(version===postcodeVersion){postcodeMessage.textContent=error.name==='AbortError'?'A consulta demorou. Tente novamente ou preencha manualmente.':error.message;manualAddress.hidden=false;}}
+                finally{clearTimeout(timeout);button.disabled=false;}
+            });
+            mode.addEventListener('change',()=>{if(mode.value!=='delivery')postcodeVersion++;});
+        }
         form.querySelector('[data-delivery-search]').addEventListener('click',async event=>{
             const button=event.currentTarget, version=++lookupVersion;
             token.value='';deliveryFee=null;update();button.disabled=true;results.textContent='Consultando seu endereço…';
@@ -85,7 +123,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
     }
     form.addEventListener('submit',event=>{
         if(event.submitter?.type!=='submit')return;
-        if(mode.value==='delivery' && token && !token.value){event.preventDefault();results.textContent='Consulte o frete e confirme seu endereço antes de continuar.';(addressParts[0]||address).focus();}
+        if(mode.value==='delivery' && token && !token.value){event.preventDefault();if(!addressReady&&postcodeMessage){postcodeMessage.textContent='Busque o CEP para completar o endereço antes de continuar.';postcode.focus();}else{results.textContent='Consulte o frete e confirme seu endereço antes de continuar.';(addressParts.find(field=>field.dataset.addressPart==='number')||address).focus();}}
     });
     update();
 });

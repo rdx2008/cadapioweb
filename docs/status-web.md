@@ -2,7 +2,13 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
-## Endereço do cliente em campos separados — 25/10/2026
+## CEP primeiro e preenchimento automático — 25/10/2026
+
+Fluxo atual do cliente: escolher entrega → informar CEP obrigatório e buscar endereço → revelar rua/bairro/cidade/UF preenchidos → informar número e complemento → consultar e confirmar frete → revisar pedido. ViaCEP no servidor preenche dados postais, com cache por sete dias, timeout e limite de requisições. Não exige nova chave. CEP genérico libera campos faltantes; erro/inexistência oferece nova tentativa ou preenchimento manual com CEP no formato válido. CEP alterado limpa endereço, número, complemento e comprovante do frete; respostas antigas são ignoradas. Retirada não exige endereço. Campos antigos são restaurados na edição do carrinho.
+
+ViaCEP não fornece localização validada nem aprova cobertura. Geoapify continua localizando endereço com número antes de calcular frete; nenhum centroide de CEP vira posição da casa. Não há envio de nome/telefone à busca postal, e complemento descritivo do provedor não é copiado para o apartamento do cliente. Validado com 88 testes PHP, quatro JavaScript e Chrome em 1280/390/320 px: busca completa, genérica, erro, preenchimento manual, troca durante requisição, invalidação de frete e retirada. Integrações externas nos testes são simuladas. Esta seção substitui o fluxo anterior de CEP opcional.
+
+## Histórico: endereço do cliente em campos separados — 25/10/2026
 
 Checkout passa a pedir rua, número, bairro, cidade, UF e CEP opcional, com complemento separado. Consulta Geoapify usa parâmetros estruturados de rua/número/cidade/estado e envia CEP somente quando informado. Servidor monta o endereço canônico na consulta e revisão, preserva campos na edição e invalida comprovante após alterações. Bairro informado não determina a tarifa: permanece necessário o bairro identificado pelo geocodificador. Número/localização precisos continuam obrigatórios; CEP não é exigido, mas cobertura real do provedor pode variar. Nenhum fallback aprova coordenadas aproximadas como número exato. Validação: 86 testes PHP, quatro JavaScript; Chrome em desktop e celular com consulta simulada sem CEP e retirada sem exigir endereço. Teste real com endereços locais segue necessário.
 

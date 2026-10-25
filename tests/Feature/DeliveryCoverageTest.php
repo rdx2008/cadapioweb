@@ -192,13 +192,13 @@ class DeliveryCoverageTest extends TestCase
         $this->postJson('/stores/'.$store.'/zones', ['zone_kind' => 'radius', 'name' => 'Faixa', 'fee_cents' => 500, 'enabled' => 1])->assertUnprocessable()->assertJsonValidationErrors('radius_km');
     }
 
-    public function test_separate_address_fields_work_without_postcode_and_are_preserved_when_editing(): void
+    public function test_separate_address_fields_are_preserved_when_editing_and_cannot_change_a_verified_quote(): void
     {
         [, , $product] = $this->setupStore();
         $this->fakePlace();
-        $fields = ['street' => 'Rua A', 'number' => '100', 'neighborhood' => 'Centro', 'city' => 'São Paulo', 'state' => 'SP', 'postcode' => ''];
+        $fields = ['street' => 'Rua A', 'number' => '100', 'neighborhood' => 'Centro', 'city' => 'São Paulo', 'state' => 'SP', 'postcode' => '01000-000'];
         $response = $this->postJson('/cardapio/loja/delivery', ['address_fields' => $fields])->assertOk()->assertJsonPath('choices.0.fee_cents', 500);
-        Http::assertSent(fn ($request) => $request['street'] === 'Rua A' && $request['housenumber'] === '100' && $request['city'] === 'São Paulo' && $request['state'] === 'SP' && ! isset($request['text']) && ! isset($request['postcode']));
+        Http::assertSent(fn ($request) => $request['street'] === 'Rua A' && $request['housenumber'] === '100' && $request['city'] === 'São Paulo' && $request['state'] === 'SP' && ! isset($request['text']) && $request['postcode'] === '01000-000');
         $draft = $this->draft($product, $response->json('choices.0.token'));
         $draft['address_fields'] = $fields;
         $draft['address'] = 'valor do navegador ignorado';
@@ -210,7 +210,7 @@ class DeliveryCoverageTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
-    public function test_postcode_is_optional_but_validated_when_present_and_cannot_replace_street_and_number(): void
+    public function test_postcode_is_required_and_cannot_replace_street_and_number(): void
     {
         $this->setupStore();
         $this->fakePlace();
@@ -221,6 +221,34 @@ class DeliveryCoverageTest extends TestCase
         $this->postJson('/cardapio/loja/delivery', ['address_fields' => $fields])->assertUnprocessable()->assertJsonValidationErrors('address_fields.postcode');
         $this->postJson('/cardapio/loja/delivery', ['address_fields' => ['postcode' => '01000-000']])->assertUnprocessable()->assertJsonValidationErrors(['address_fields.street', 'address_fields.number', 'address_fields.city']);
         Http::assertSentCount(1);
+    }
+
+    public function test_postcode_lookup_returns_only_address_fields_caches_results_and_never_quotes_freight(): void
+    {
+        $this->setupStore();
+        Http::fake(['viacep.com.br/ws/01001000/json/' => Http::response(['cep' => '01001-000', 'logradouro' => 'Praça da Sé', 'bairro' => 'Sé', 'localidade' => 'São Paulo', 'uf' => 'SP', 'complemento' => 'lado ímpar'])]);
+        $response = $this->postJson('/cardapio/loja/postcode', ['postcode' => '01001-000'])->assertOk()->assertJsonPath('address.street', 'Praça da Sé')->assertJsonPath('address.city', 'São Paulo');
+        $this->assertArrayNotHasKey('token', $response->json());
+        $this->assertArrayNotHasKey('latitude', $response->json('address'));
+        $this->assertArrayNotHasKey('complemento', $response->json('address'));
+        $this->postJson('/cardapio/loja/postcode', ['postcode' => '01001000'])->assertOk();
+        Http::assertSentCount(1);
+        $this->postJson('/cardapio/loja/postcode', ['postcode' => 'bad'])->assertUnprocessable();
+        Http::assertSentCount(1);
+    }
+
+    public function test_generic_postcodes_allow_missing_street_and_provider_failures_are_safe(): void
+    {
+        $this->setupStore();
+        Http::fake([
+            '*/ws/12345000/json/' => Http::response(['cep' => '12345-000', 'logradouro' => '', 'bairro' => '', 'localidade' => 'Cidade', 'uf' => 'SP']),
+            '*/ws/99999999/json/' => Http::response(['erro' => true]),
+            '*/ws/11111111/json/' => Http::response('unavailable', 503),
+        ]);
+        $this->postJson('/cardapio/loja/postcode', ['postcode' => '12345-000'])->assertOk()->assertJsonPath('address.street', '')->assertJsonPath('address.city', 'Cidade');
+        $this->postJson('/cardapio/loja/postcode', ['postcode' => '99999-999'])->assertUnprocessable()->assertJsonValidationErrors('postcode');
+        $this->postJson('/cardapio/loja/postcode', ['postcode' => '11111-111'])->assertUnprocessable()->assertDontSee('unavailable');
+        $this->assertDatabaseCount('orders', 0);
     }
 
     public function test_store_branding_upload_and_radius_configuration_are_tenant_scoped(): void

@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use App\Services\CheckoutQuote;
 use App\Services\DeliveryCoverage;
 use App\Services\StoreAvailability;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -94,10 +97,40 @@ class MenuController extends Controller
             'address_fields.neighborhood' => 'required|string|max:100',
             'address_fields.city' => 'required|string|max:100',
             'address_fields.state' => 'required|string|size:2|regex:/^[A-Za-z]{2}$/',
-            'address_fields.postcode' => 'nullable|string|regex:/^[0-9]{5}-?[0-9]{3}$/',
+            'address_fields.postcode' => 'required|string|regex:/^[0-9]{5}-?[0-9]{3}$/',
         ]);
 
         return $data['address_fields'];
+    }
+
+    public function postcode(Request $request, string $slug): JsonResponse
+    {
+        $this->store($slug);
+        $data = $request->validate(['postcode' => 'required|string|regex:/^[0-9]{5}-?[0-9]{3}$/']);
+        $postcode = str_replace('-', '', $data['postcode']);
+        $address = Cache::remember('postcode:br:'.$postcode, now()->addDays(7), function () use ($postcode): array {
+            try {
+                $response = Http::acceptJson()->connectTimeout(3)->timeout(6)->withoutRedirecting()->get('https://viacep.com.br/ws/'.$postcode.'/json/');
+            } catch (ConnectionException) {
+                throw ValidationException::withMessages(['postcode' => 'A busca de CEP está indisponível. Tente novamente ou preencha o endereço manualmente.']);
+            }
+            if (! $response->successful() || ! is_array($response->json())) {
+                throw ValidationException::withMessages(['postcode' => 'Não foi possível consultar o CEP. Tente novamente ou preencha o endereço manualmente.']);
+            }
+            $body = $response->json();
+            if (! empty($body['erro'])) {
+                throw ValidationException::withMessages(['postcode' => 'CEP não encontrado. Confira os números ou preencha o endereço manualmente.']);
+            }
+            if (! is_string($body['cep'] ?? null) || ! is_string($body['localidade'] ?? null) || ! is_string($body['uf'] ?? null)
+                || ! is_string($body['logradouro'] ?? '') || ! is_string($body['bairro'] ?? '')
+                || preg_replace('/\D/', '', $body['cep']) !== $postcode || $body['localidade'] === '' || ! preg_match('/^[A-Z]{2}$/', $body['uf'])) {
+                throw ValidationException::withMessages(['postcode' => 'O serviço retornou um endereço incompleto. Tente novamente ou preencha manualmente.']);
+            }
+
+            return ['street' => mb_substr((string) ($body['logradouro'] ?? ''), 0, 120), 'neighborhood' => mb_substr((string) ($body['bairro'] ?? ''), 0, 100), 'city' => mb_substr((string) $body['localidade'], 0, 100), 'state' => $body['uf']];
+        });
+
+        return response()->json(['address' => $address])->header('Cache-Control', 'no-store');
     }
 
     private function formatAddress(array $fields): string
