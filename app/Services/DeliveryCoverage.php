@@ -14,12 +14,12 @@ use Illuminate\Validation\ValidationException;
 
 class DeliveryCoverage
 {
-    public function search(string $address): array
+    public function search(string $address, ?array $fields = null): array
     {
         if (! config('services.geoapify.key')) {
             $this->fail('A consulta de endereços ainda não foi configurada pela plataforma.');
         }
-        $key = 'geocode:v2:'.hash('sha256', $this->normalize($address));
+        $key = 'geocode:v3:'.hash('sha256', $this->normalize($address).($fields ? ':structured' : ':text'));
         $cached = Cache::get($key);
         if (is_string($cached)) {
             return json_decode(Crypt::decryptString($cached), true, flags: JSON_THROW_ON_ERROR);
@@ -34,7 +34,8 @@ class DeliveryCoverage
         try {
             $response = Http::acceptJson()->connectTimeout(4)->timeout(8)->withoutRedirecting()
                 ->get('https://api.geoapify.com/v1/geocode/search', [
-                    'text' => $address, 'filter' => 'countrycode:br', 'lang' => 'pt',
+                    ...($fields ? array_filter(['street' => $fields['street'], 'housenumber' => $fields['number'], 'city' => $fields['city'], 'state' => strtoupper($fields['state']), 'postcode' => $fields['postcode'] ?? null], fn ($value) => $value !== null && $value !== '') : ['text' => $address]),
+                    'filter' => 'countrycode:br', 'lang' => 'pt',
                     'limit' => 3, 'format' => 'json', 'apiKey' => config('services.geoapify.key'),
                 ]);
         } catch (ConnectionException) {
@@ -66,10 +67,10 @@ class DeliveryCoverage
         return $results;
     }
 
-    public function choices(object $store, string $address): array
+    public function choices(object $store, string $address, ?array $fields = null): array
     {
         $choices = [];
-        foreach ($this->search($address) as $place) {
+        foreach ($this->search($address, $fields) as $place) {
             $zone = $this->zone($store, $place);
             $choices[] = ['label' => $place['label'], 'available' => $zone !== null,
                 'message' => $this->mode($store) === 'neighborhood' && (empty($place['neighborhood']) || empty($place['city']) || empty($place['state_code']))

@@ -43,12 +43,17 @@ class MenuController extends Controller
     public function review(Request $request, string $slug, CheckoutQuote $calculator): RedirectResponse
     {
         $store = $this->store($slug);
+        if ($request->input('mode') === 'delivery' && $request->has('address_fields')) {
+            $fields = $this->addressFields($request);
+            $request->merge(['address' => $this->formatAddress($fields)]);
+        }
         $data = $request->validate([
             'customer_name' => 'required|string|max:120', 'phone' => 'required|string|min:8|max:25',
             'mode' => 'required|in:pickup,delivery', 'address' => 'required_if:mode,delivery|nullable|string|max:500',
             'delivery_zone_id' => 'nullable|integer',
             'delivery_token' => 'nullable|string|max:5000',
             'address_complement' => 'nullable|string|max:120',
+            'address_fields' => 'sometimes|array:street,number,neighborhood,city,state,postcode',
             'items' => 'required|array|min:1|max:500', 'items.*' => 'required|integer|min:0|max:50',
             'choices' => 'nullable|array|max:50', 'choices.*' => 'array|max:20', 'choices.*.*' => 'array|max:20', 'choices.*.*.*' => 'integer|min:1',
             'idempotency_key' => 'required|uuid',
@@ -74,9 +79,31 @@ class MenuController extends Controller
     public function delivery(Request $request, string $slug, DeliveryCoverage $coverage): JsonResponse
     {
         $store = $this->store($slug);
-        $data = $request->validate(['address' => 'required|string|min:12|max:300']);
+        $fields = $request->has('address_fields') ? $this->addressFields($request) : null;
+        $address = $fields ? $this->formatAddress($fields) : $request->validate(['address' => 'required|string|min:12|max:300'])['address'];
 
-        return response()->json(['choices' => $coverage->choices($store, $data['address'])])->header('Cache-Control', 'no-store');
+        return response()->json(['choices' => $coverage->choices($store, $address, $fields)])->header('Cache-Control', 'no-store');
+    }
+
+    private function addressFields(Request $request): array
+    {
+        $data = $request->validate([
+            'address_fields' => 'required|array:street,number,neighborhood,city,state,postcode',
+            'address_fields.street' => 'required|string|max:120',
+            'address_fields.number' => 'required|string|max:15|regex:/^[0-9]+[A-Za-z0-9 \/-]*$/',
+            'address_fields.neighborhood' => 'required|string|max:100',
+            'address_fields.city' => 'required|string|max:100',
+            'address_fields.state' => 'required|string|size:2|regex:/^[A-Za-z]{2}$/',
+            'address_fields.postcode' => 'nullable|string|regex:/^[0-9]{5}-?[0-9]{3}$/',
+        ]);
+
+        return $data['address_fields'];
+    }
+
+    private function formatAddress(array $fields): string
+    {
+        return $fields['street'].', '.$fields['number'].' - '.$fields['neighborhood'].', '.$fields['city'].' - '.strtoupper($fields['state'])
+            .(! empty($fields['postcode']) ? ', '.preg_replace('/\D/', '', $fields['postcode']) : '');
     }
 
     private function draft(Request $request, object $store, string $id): array

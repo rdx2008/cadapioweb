@@ -3,7 +3,7 @@ async function addressRequest(url, address) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
     try {
-        const response = await fetch(url,{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content},body:JSON.stringify({address})});
+        const response = await fetch(url,{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content},body:JSON.stringify(typeof address==='string'?{address}:{address_fields:address})});
         const data = await response.json();
         if (!response.ok) throw new Error(data.errors ? Object.values(data.errors).flat()[0] : 'Consulta indisponível. Tente novamente.');
         return data.choices;
@@ -13,6 +13,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
     const products = [...form.querySelectorAll('[data-menu-product]')];
     const mode = form.querySelector('[data-mode]'), address = form.querySelector('[data-delivery-address]');
     const token = form.querySelector('[name=delivery_token]');
+    const addressParts = [...form.querySelectorAll('[data-address-part]')];
     const results = form.querySelector('[data-delivery-results]');
     let deliveryFee = null, lookupVersion = 0;
     function update() {
@@ -35,6 +36,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         if(!count){const empty=document.createElement('div');empty.className='bag-empty';empty.textContent='Sua sacola está esperando seus favoritos.';lines.append(empty);}
         const delivery=mode.value==='delivery';
         address.required=delivery;
+        addressParts.forEach(field=>{field.required=delivery&&field.dataset.addressPart!=='postcode';field.disabled=!delivery;});
         form.querySelectorAll('[data-delivery-field]').forEach(field=>field.hidden=!delivery);
         const fee=delivery ? deliveryFee : 0;
         document.querySelectorAll('[data-bag-count],[data-menu-count],[data-mobile-count]').forEach(el=>el.textContent=String(count));
@@ -64,12 +66,16 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         form.querySelector('[data-search-empty]').hidden=visible>0;
     });
     if(token){
-        address.addEventListener('input',()=>{lookupVersion++;token.value='';deliveryFee=null;results.replaceChildren();update();});
+        const invalidateAddress=()=>{lookupVersion++;token.value='';deliveryFee=null;results.replaceChildren();update();};
+        address.addEventListener('input',invalidateAddress);
+        addressParts.forEach(field=>{field.addEventListener('input',invalidateAddress);field.addEventListener('change',invalidateAddress);});
         form.querySelector('[data-delivery-search]').addEventListener('click',async event=>{
             const button=event.currentTarget, version=++lookupVersion;
             token.value='';deliveryFee=null;update();button.disabled=true;results.textContent='Consultando seu endereço…';
             try {
-                const choices=await addressRequest(form.querySelector('[data-delivery-lookup]').dataset.url,address.value);
+                if(addressParts.some(field=>!field.reportValidity())){results.textContent='Preencha os campos do endereço para consultar o frete.';return;}
+                const fields=Object.fromEntries(addressParts.map(field=>[field.dataset.addressPart,field.value.trim()]));
+                const choices=await addressRequest(form.querySelector('[data-delivery-lookup]').dataset.url,addressParts.length?fields:address.value);
                 if(version!==lookupVersion)return;
                 results.replaceChildren();
                 choices.forEach(choice=>{const pick=document.createElement('button');pick.type='button';pick.className='address-choice';pick.disabled=!choice.available;pick.textContent=choice.label+' — '+(choice.available?'Frete '+menuMoney(choice.fee_cents):(choice.message||'Fora da área de entrega'));pick.addEventListener('click',()=>{token.value=choice.token;deliveryFee=choice.fee_cents;results.replaceChildren();const confirmed=document.createElement('p');confirmed.className='lookup-message';confirmed.textContent='Endereço confirmado: '+choice.label;results.append(confirmed);update();});results.append(pick);});
@@ -79,7 +85,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
     }
     form.addEventListener('submit',event=>{
         if(event.submitter?.type!=='submit')return;
-        if(mode.value==='delivery' && token && !token.value){event.preventDefault();results.textContent='Consulte o frete e confirme seu endereço antes de continuar.';address.focus();}
+        if(mode.value==='delivery' && token && !token.value){event.preventDefault();results.textContent='Consulte o frete e confirme seu endereço antes de continuar.';(addressParts[0]||address).focus();}
     });
     update();
 });
