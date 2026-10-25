@@ -31,8 +31,9 @@ class ImplementationTest extends TestCase
         $t = $this->tenant();
         $s = $this->store($t);
         $p = DB::table('products')->insertGetId(['tenant_id' => $t, 'store_id' => $s, 'name' => 'Burger', 'category' => 'Lanches', 'price_cents' => 2990]);
-        $zone = DB::table('delivery_zones')->insertGetId(['store_id' => $s, 'name' => 'Centro', 'fee_cents' => 500]);
+        $zone = DB::table('delivery_zones')->insertGetId(['store_id' => $s, 'name' => 'Centro', 'city' => 'São Paulo', 'state_code' => 'SP', 'fee_cents' => 500]);
         $body = ['customer_name' => 'Ana', 'phone' => '11999999999', 'mode' => 'delivery', 'address' => 'Rua A, 10', 'delivery_zone_id' => $zone, 'items' => [$p => 2], 'idempotency_key' => (string) Str::uuid(), 'total_cents' => 1];
+        $body['delivery_token'] = $this->deliveryToken($s, $body['address']);
         $this->post('/cardapio/loja/review', $body)->assertRedirect();
         $this->assertDatabaseCount('orders', 0);
         $first = $this->post('/cardapio/loja', ['draft_id' => $body['idempotency_key']])->assertRedirect();

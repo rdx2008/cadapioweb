@@ -3,11 +3,18 @@
 namespace Tests;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 trait BuildsPlatform
 {
+    protected function deliveryToken(int $store, string $address, string $neighborhood = 'Centro', string $city = 'São Paulo', string $state = 'SP'): string
+    {
+        return Crypt::encryptString(json_encode(['purpose' => 'delivery', 'store_id' => $store, 'address_hash' => hash('sha256', mb_strtolower(Str::ascii(trim($address)))), 'expires' => now()->addMinutes(30)->timestamp,
+            'latitude' => -23.55, 'longitude' => -46.63, 'label' => $address, 'neighborhood' => $neighborhood, 'city' => $city, 'state_code' => $state], JSON_THROW_ON_ERROR));
+    }
+
     protected function tenant(string $slug = 'demo'): int
     {
         return DB::table('tenants')->insertGetId(['name' => ucfirst($slug), 'slug' => $slug, 'courier_module' => 'active', 'created_at' => now(), 'updated_at' => now()]);

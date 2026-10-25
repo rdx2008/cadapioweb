@@ -83,11 +83,12 @@ class WebSalesTest extends TestCase
         $product = $this->product($tenant, $store);
         $other = $this->store($tenant, 'outra');
         $foreignZone = DB::table('delivery_zones')->insertGetId(['store_id' => $other, 'name' => 'Outra região', 'fee_cents' => 1]);
-        $zone = DB::table('delivery_zones')->insertGetId(['store_id' => $store, 'name' => 'Centro', 'fee_cents' => 600]);
+        $zone = DB::table('delivery_zones')->insertGetId(['store_id' => $store, 'name' => 'Centro', 'city' => 'São Paulo', 'state_code' => 'SP', 'fee_cents' => 600]);
         $cart = $this->cart($product) + ['delivery_zone_id' => $foreignZone, 'address' => 'Rua A, 10'];
         $cart['mode'] = 'delivery';
         $this->postJson('/cardapio/loja/review', $cart)->assertUnprocessable();
         $cart['delivery_zone_id'] = $zone;
+        $cart['delivery_token'] = $this->deliveryToken($store, $cart['address']);
         DB::table('stores')->where('id', $store)->update(['minimum_order_cents' => 2500]);
         $this->postJson('/cardapio/loja/review', $cart)->assertUnprocessable();
         $cart['items'][$product] = 3;

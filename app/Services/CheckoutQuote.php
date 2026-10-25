@@ -47,9 +47,7 @@ class CheckoutQuote
         $zoneName = null;
         $deliveryAddress = null;
         if ($draft['mode'] === 'delivery') {
-            $zone = ($store->delivery_by_radius ?? false)
-                ? app(DeliveryCoverage::class)->verify($store, $draft['address'], $draft['delivery_token'] ?? null)
-                : DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)->where('id', $draft['delivery_zone_id'] ?? 0)->first();
+            $zone = app(DeliveryCoverage::class)->verify($store, $draft['address'], $draft['delivery_token'] ?? null);
             $this->require($zone !== null, 'Selecione uma região atendida pela loja.');
             $fee = (int) $zone->fee_cents;
             $zoneName = $zone->name;

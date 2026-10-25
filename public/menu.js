@@ -11,7 +11,7 @@ async function addressRequest(url, address) {
 }
 document.querySelectorAll('[data-menu-cart]').forEach(form => {
     const products = [...form.querySelectorAll('[data-menu-product]')];
-    const mode = form.querySelector('[data-mode]'), zone = form.querySelector('[data-zone]'), address = form.querySelector('[data-delivery-address]');
+    const mode = form.querySelector('[data-mode]'), address = form.querySelector('[data-delivery-address]');
     const token = form.querySelector('[name=delivery_token]');
     const results = form.querySelector('[data-delivery-results]');
     let deliveryFee = null, lookupVersion = 0;
@@ -34,10 +34,9 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         });
         if(!count){const empty=document.createElement('div');empty.className='bag-empty';empty.textContent='Sua sacola está esperando seus favoritos.';lines.append(empty);}
         const delivery=mode.value==='delivery';
-        if(zone){zone.required=delivery;zone.disabled=!delivery;}
         address.required=delivery;
         form.querySelectorAll('[data-delivery-field]').forEach(field=>field.hidden=!delivery);
-        const fee=delivery ? (token ? deliveryFee : Number(zone?.selectedOptions[0]?.dataset.fee||0)) : 0;
+        const fee=delivery ? deliveryFee : 0;
         document.querySelectorAll('[data-bag-count],[data-menu-count],[data-mobile-count]').forEach(el=>el.textContent=String(count));
         form.querySelector('[data-menu-subtotal]').textContent=menuMoney(subtotal);
         form.querySelector('[data-menu-freight]').textContent=!delivery?'Sem frete':fee===null?'Consultar endereço':menuMoney(fee);
@@ -73,7 +72,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
                 const choices=await addressRequest(form.querySelector('[data-delivery-lookup]').dataset.url,address.value);
                 if(version!==lookupVersion)return;
                 results.replaceChildren();
-                choices.forEach(choice=>{const pick=document.createElement('button');pick.type='button';pick.className='address-choice';pick.disabled=!choice.available;pick.textContent=choice.label+' — '+(choice.available?'Frete '+menuMoney(choice.fee_cents):'Fora da área de entrega');pick.addEventListener('click',()=>{token.value=choice.token;deliveryFee=choice.fee_cents;results.replaceChildren();const confirmed=document.createElement('p');confirmed.className='lookup-message';confirmed.textContent='Endereço confirmado: '+choice.label;results.append(confirmed);update();});results.append(pick);});
+                choices.forEach(choice=>{const pick=document.createElement('button');pick.type='button';pick.className='address-choice';pick.disabled=!choice.available;pick.textContent=choice.label+' — '+(choice.available?'Frete '+menuMoney(choice.fee_cents):(choice.message||'Fora da área de entrega'));pick.addEventListener('click',()=>{token.value=choice.token;deliveryFee=choice.fee_cents;results.replaceChildren();const confirmed=document.createElement('p');confirmed.className='lookup-message';confirmed.textContent='Endereço confirmado: '+choice.label;results.append(confirmed);update();});results.append(pick);});
             }catch(error){if(version===lookupVersion)results.textContent=error.name==='AbortError'?'Consulta lenta. Tente novamente.':error.message;}
             finally{button.disabled=false;}
         });
@@ -96,3 +95,18 @@ document.querySelectorAll('[data-store-locate]').forEach(button=>button.addEvent
     }catch(error){message.textContent=error.name==='AbortError'?'Consulta lenta. Tente novamente.':error.message;}
     finally{button.disabled=false;}
 }));
+document.querySelectorAll('[data-delivery-settings]').forEach(section=>{
+    const form=section.querySelector('[data-delivery-settings-form]');
+    const mode=form.querySelector('[data-delivery-setting-mode]');
+    const pricing=form.querySelector('[data-delivery-setting-pricing]');
+    const show=(container,visible)=>{
+        container.hidden=!visible;
+        container.querySelectorAll('input,select,button').forEach(field=>field.disabled=!visible);
+    };
+    const update=()=>{
+        section.querySelectorAll('[data-setting-area]').forEach(el=>show(el,el.dataset.settingArea===mode.value));
+        section.querySelectorAll('[data-setting-rule]').forEach(el=>show(el,mode.value==='radius'&&el.dataset.settingRule.split(',').includes(pricing.value)));
+        section.querySelectorAll('[data-area-editor]').forEach(el=>show(el,el.dataset.areaEditor===mode.value&&(mode.value==='neighborhood'||pricing.value==='bands')));
+    };
+    mode.addEventListener('change',update);pricing.addEventListener('change',update);update();
+});

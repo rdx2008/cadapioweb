@@ -2,7 +2,15 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
-## Cardápio público e cobertura por raio
+## Cálculo pelo endereço em todos os modos — 25/10/2026
+
+Configuração de entrega separada da remuneração do motoboy. A loja escolhe bairros/regiões ou raio; somente os campos relevantes aparecem. Por bairro, geocodificação fornece bairro, cidade e UF para correspondência exata normalizada (acentos/caixa/espaços). Mesmo bairro em outra cidade não recebe tarifa, dados faltantes não aprovam entrega e cadastros ambíguos são recusados. Bairros legados são preservados, mas precisam de cidade e UF preenchidas. Não há mais seleção manual de região no cardápio público.
+
+Por raio: frete fixo dentro do alcance máximo; faixas com menor limite que cobre o ponto; ou base + valor proporcional por quilômetro, com mínimo e alcance máximo. Distância em linha reta, arredondamento monetário para centavos. Fixo/quilômetro dispensam cadastro de bairros/faixas. API de localização é usada nos dois modos; comprovante assinado é conferido novamente na revisão/confirmação. Valores e região enviados pelo navegador não decidem o frete. Falha de geocodificação continua bloqueando a entrega automática, mantendo retirada.
+
+Migration aditiva preserva bairros, faixas e configurações anteriores; modo legado deriva da opção de raio até a loja salvar a nova tela. Cadastro de bairros sem cidade/UF passa a exigir complementação na tela. Validado com 84 testes PHP, quatro testes JavaScript e Chrome em 1280/390/320 px: troca entre os modos, persistência, campos ocultos/desabilitados, frete do cliente sem alterar remuneração do motoboy e checkout sem seleção de bairro. API real e PostgreSQL local ainda dependem do piloto. Esta seção prevalece sobre descrições históricas de modo manual abaixo.
+
+## Histórico: cardápio público e cobertura por raio
 
 Cardápio público redesenhado em layout próprio, sem menu administrativo: capa e logo enviados pela loja, categorias com navegação, busca, seleção de produtos em diálogo, adicionais, sacola responsiva e revisão antes da confirmação. Cliente vê somente o frete com ícone animado de motoboy; animação respeita movimento reduzido. Configurações internas identificam explicitamente a remuneração do motoboy freelancer.
 

@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/orders/{id}', [OrderBoardController::class, 'show']);
         Route::get('/stores/{id}/edit', [CatalogController::class, 'editStore']);
         Route::post('/stores/{id}/edit', [CatalogController::class, 'updateStore']);
+        Route::post('/stores/{id}/delivery-settings', [CatalogController::class, 'deliverySettings']);
         Route::post('/stores/{id}/locate', [CatalogController::class, 'locate'])->middleware('throttle:10,1');
         Route::post('/stores/{id}/availability', [CatalogController::class, 'availability'])->name('stores.availability');
         Route::post('/stores/{storeId}/zones', [CatalogController::class, 'zone']);

@@ -37,11 +37,11 @@ class DeliveryCoverageTest extends TestCase
         return [$tenant, $store, $product];
     }
 
-    private function fakePlace(float $latitude = -23.56, string $type = 'building'): void
+    private function fakePlace(float $latitude = -23.56, string $type = 'building', string $neighborhood = 'Centro', string $city = 'São Paulo', string $state = 'SP'): void
     {
         Http::swap(new Factory);
         Http::preventStrayRequests();
-        Http::fake(['api.geoapify.com/*' => Http::response(['results' => [['formatted' => 'Rua A, 100, São Paulo, SP', 'country_code' => 'br', 'housenumber' => '100', 'street' => 'Rua A', 'result_type' => $type, 'lat' => $latitude, 'lon' => -46.63, 'rank' => ['confidence' => 1]]]])]);
+        Http::fake(['api.geoapify.com/*' => Http::response(['results' => [['formatted' => 'Rua A, 100, São Paulo, SP', 'country_code' => 'br', 'housenumber' => '100', 'street' => 'Rua A', 'result_type' => $type, 'lat' => $latitude, 'lon' => -46.63, 'suburb' => $neighborhood, 'city' => $city, 'state_code' => $state, 'rank' => ['confidence' => 1]]]])]);
     }
 
     private function draft(int $product, string $token): array
@@ -136,6 +136,60 @@ class DeliveryCoverageTest extends TestCase
         Http::assertNothingSent();
         $this->fakePlace();
         $this->actingAs($this->owner($tenant))->postJson('/stores/'.$store.'/locate', ['address' => 'Rua A, 100, São Paulo, SP'])->assertOk()->assertJsonPath('choices.0.latitude', -23.56);
+    }
+
+    public function test_neighborhood_is_identified_from_address_and_customer_cannot_choose_a_cheaper_zone(): void
+    {
+        [, $store, $product] = $this->setupStore();
+        DB::table('stores')->where('id', $store)->update(['delivery_mode' => 'neighborhood']);
+        DB::table('delivery_zones')->insert(['store_id' => $store, 'name' => 'Centro', 'city' => 'Sao Paulo', 'state_code' => 'SP', 'fee_cents' => 900, 'enabled' => true]);
+        $cheap = DB::table('delivery_zones')->insertGetId(['store_id' => $store, 'name' => 'Jardim', 'city' => 'Sao Paulo', 'state_code' => 'SP', 'fee_cents' => 1, 'enabled' => true]);
+        $this->fakePlace();
+        $response = $this->postJson('/cardapio/loja/delivery', ['address' => 'Rua A, 100, São Paulo, SP'])->assertOk()->assertJsonPath('choices.0.fee_cents', 900);
+        $draft = $this->draft($product, $response->json('choices.0.token'));
+        $draft['delivery_zone_id'] = $cheap;
+        $this->post('/cardapio/loja/review', $draft)->assertSessionHasNoErrors();
+        $this->post('/cardapio/loja', ['draft_id' => $draft['idempotency_key']])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('orders', ['fee_cents' => 900, 'delivery_zone_name' => 'Centro']);
+        $this->get('/cardapio/loja')->assertOk()->assertDontSee('name="delivery_zone_id"', false)->assertSee('Consultar frete');
+    }
+
+    public function test_same_neighborhood_in_another_city_or_missing_neighborhood_is_not_covered(): void
+    {
+        [, $store] = $this->setupStore();
+        DB::table('stores')->where('id', $store)->update(['delivery_mode' => 'neighborhood']);
+        DB::table('delivery_zones')->insert(['store_id' => $store, 'name' => 'Centro', 'city' => 'São Paulo', 'state_code' => 'SP', 'fee_cents' => 500, 'enabled' => true]);
+        $this->fakePlace(-23.56, 'building', 'Centro', 'Campinas');
+        $this->postJson('/cardapio/loja/delivery', ['address' => 'Rua A, 100, Campinas, SP'])->assertOk()->assertJsonPath('choices.0.available', false);
+        $this->fakePlace(-23.56, 'building', '');
+        $this->postJson('/cardapio/loja/delivery', ['address' => 'Outra rua, 100, São Paulo, SP'])->assertOk()->assertJsonPath('choices.0.available', false);
+    }
+
+    public function test_fixed_and_per_km_customer_fares_need_no_neighborhoods_and_enforce_radius(): void
+    {
+        [$tenant, $store] = $this->setupStore();
+        DB::table('delivery_zones')->where('store_id', $store)->delete();
+        $this->actingAs($this->owner($tenant));
+        $this->postJson('/stores/'.$store.'/delivery-settings', ['delivery_mode' => 'radius', 'delivery_pricing' => 'fixed'])->assertUnprocessable()->assertJsonValidationErrors('delivery_max_km');
+        $this->post('/stores/'.$store.'/delivery-settings', ['delivery_mode' => 'radius', 'delivery_pricing' => 'fixed', 'delivery_max_km' => 5, 'delivery_fixed' => '7,00'])->assertSessionHasNoErrors();
+        $this->get('/cardapio/loja')->assertOk()->assertSee('Receber no meu endereço');
+        $this->fakePlace();
+        $this->postJson('/cardapio/loja/delivery', ['address' => 'Rua A, 100, São Paulo, SP'])->assertOk()->assertJsonPath('choices.0.fee_cents', 700);
+        $this->post('/stores/'.$store.'/delivery-settings', ['delivery_mode' => 'radius', 'delivery_pricing' => 'per_km', 'delivery_max_km' => 5, 'delivery_base' => '3,00', 'delivery_per_km' => '1,50', 'delivery_minimum' => '0,00'])->assertSessionHasNoErrors();
+        $this->postJson('/cardapio/loja/delivery', ['address' => 'Rua A, 100, São Paulo, SP'])->assertOk()->assertJsonPath('choices.0.fee_cents', 467);
+        $this->post('/stores/'.$store.'/delivery-settings', ['delivery_mode' => 'radius', 'delivery_pricing' => 'per_km', 'delivery_max_km' => 5, 'delivery_base' => '3,00', 'delivery_per_km' => '1,50', 'delivery_minimum' => '6,00'])->assertSessionHasNoErrors();
+        $this->postJson('/cardapio/loja/delivery', ['address' => 'Rua A, 100, São Paulo, SP'])->assertOk()->assertJsonPath('choices.0.fee_cents', 600);
+        $this->fakePlace(-24.5);
+        $this->postJson('/cardapio/loja/delivery', ['address' => 'Rua distante, 100, São Paulo, SP'])->assertOk()->assertJsonPath('choices.0.available', false);
+        $this->actingAs($this->owner($this->tenant('other')))->post('/stores/'.$store.'/delivery-settings', ['delivery_mode' => 'neighborhood'])->assertNotFound();
+    }
+
+    public function test_neighborhood_configuration_requires_city_and_state_and_radius_band_requires_distance(): void
+    {
+        [$tenant, $store] = $this->setupStore();
+        $this->actingAs($this->owner($tenant));
+        $this->postJson('/stores/'.$store.'/zones', ['zone_kind' => 'neighborhood', 'name' => 'Centro', 'fee_cents' => 500, 'enabled' => 1])->assertUnprocessable()->assertJsonValidationErrors(['city', 'state_code']);
+        $this->postJson('/stores/'.$store.'/zones', ['zone_kind' => 'radius', 'name' => 'Faixa', 'fee_cents' => 500, 'enabled' => 1])->assertUnprocessable()->assertJsonValidationErrors('radius_km');
     }
 
     public function test_store_branding_upload_and_radius_configuration_are_tenant_scoped(): void

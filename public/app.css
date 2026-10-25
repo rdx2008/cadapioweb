@@ -777,3 +777,5 @@ footer { padding:15px 32px 25px; font-size:10px; }
 .command-row { padding:16px 0; border-top:1px solid var(--line); margin-top:14px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
 .command-row small { margin-left:auto; }
 .command-row p { flex-basis:100%; margin:0; color:#7b5544; }
+
+[data-delivery-settings] [hidden] { display: none !important; }

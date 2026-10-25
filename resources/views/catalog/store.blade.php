@@ -77,11 +77,8 @@
     @endforeach</table>
 </div>
 <p class="muted">O segundo período é opcional. Deixe os dois campos vazios para atender em um único período. Fechamento anterior à abertura indica atendimento até o dia seguinte; horários iguais representam 24 horas.</p>
-<h2 id="delivery-mode" style="margin-top:24px">Como validar a entrega do cliente</h2>
-<label>Área de atendimento<select name="delivery_by_radius"><option value="0" @selected(!old('delivery_by_radius',$store->delivery_by_radius))>Regiões manuais — conferência do endereço pela loja</option><option value="1" @selected(old('delivery_by_radius',$store->delivery_by_radius))>Raio automático — localizar endereço e calcular frete</option></select></label>
-@if(!config('services.geoapify.key'))<p class="notice">A plataforma precisa configurar GEOAPIFY_API_KEY para ativar consultas reais. A entrega por raio não aprova endereços sem uma consulta válida.</p>@endif
     <h2 style="margin-top:24px">Remuneração do motoboy freelancer</h2>
-<p class="muted">Valor que a loja paga ao motoboy freelancer por corrida. Esta configuração é interna e não aparece no cardápio do cliente. O frete cobrado do cliente é configurado separadamente, nas faixas de entrega abaixo.</p>
+<p class="muted">Valor que a loja paga ao motoboy freelancer por corrida. Esta configuração é interna e não aparece no cardápio do cliente. O frete cobrado do cliente é configurado separadamente, na seção Entrega e frete abaixo.</p>
 <div class="fields">
     <label>Modo<select name="rate_mode">@foreach(['fixed'=>'Taxa fixa','per_km'=>'Base + quilômetro','per_ride'=>'Cotação por corrida'] as $value=>$label)<option value="{{ $value }}" @selected(old('rate_mode', $store->rate_mode)===$value)>{{ $label }}</option>@endforeach</select>
 </label>
@@ -97,35 +94,5 @@
 <a class="button secondary" href="/cardapio/{{ $store->slug }}">Ver cardápio</a>
 </div>
 </form>
-<section>
-<h2>Regiões atendidas e frete do cliente</h2>
-<p class="muted">No modo por raio, o endereço do cliente é localizado por API. A menor faixa ativa que cobre o endereço define o frete. Exemplo: até 3 km por R$ 5 e até 5 km por R$ 8. O raio é medido em linha reta, não representa distância de rota nem remuneração por quilômetro do motoboy. Faixas sem raio não são usadas neste modo.</p>
-<a class="subtle-link" href="#delivery-mode">Configurar modo de entrega ↑</a>
-@foreach($zones as $zone)<form action="/stores/{{ $store->id }}/zones" method="post" class="card fields" style="margin-bottom:12px">@csrf<input type="hidden" name="zone_id" value="{{ $zone->id }}">
-<label>Região<input name="name" value="{{ $zone->name }}" required>
-</label>
-<label>Frete (R$)<input name="fee" type="text" inputmode="decimal" value="{{ number_format($zone->fee_cents/100,2,',','') }}" required>
-</label>
-<label>Raio máximo a partir da loja (km)<input name="radius_km" type="number" step="0.1" min="0.1" max="100" value="{{ $zone->radius_meters?$zone->radius_meters/1000:'' }}"><small>Opcional no modo manual; obrigatório para participar da entrega por raio.</small></label>
-<label>Disponibilidade<select name="enabled">
-<option value="1" @selected($zone->enabled)>Ativa</option>
-<option value="0" @selected(!$zone->enabled)>Pausada</option>
-</select>
-</label>
-<div class="actions">
-<button class="secondary">Salvar região</button>
-</div>
-</form>@endforeach
-<details>
-<summary>+ Adicionar região</summary>
-<form action="/stores/{{ $store->id }}/zones" method="post" class="fields">@csrf<input type="hidden" name="enabled" value="1">
-<label>Nome do bairro/região<input name="name" required maxlength="120">
-</label>
-<label>Frete (R$)<input name="fee" type="text" inputmode="decimal" value="5,00" required>
-</label>
-<label>Raio máximo a partir da loja (km)<input name="radius_km" type="number" step="0.1" min="0.1" max="100" placeholder="Ex.: 3"><small>Deixe vazio somente para regiões manuais.</small></label>
-<button>Cadastrar região</button>
-</form>
-</details>
-</section>
+@include('catalog.delivery-settings')
 @endsection

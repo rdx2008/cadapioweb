@@ -32,7 +32,12 @@ class MenuController extends Controller
         $options = DB::table('product_options')->whereIn('option_group_id', $groups->pluck('id'))->where('available', true)->orderBy('id')->get()->groupBy('option_group_id');
         $zones = DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)->orderBy('name')->get();
 
-        return view('menu', ['store' => $store, 'products' => $products, 'groups' => $groups->groupBy('product_id'), 'options' => $options, 'zones' => $zones, 'isOpen' => $availability->isOpen($store)]);
+        $deliveryMode = app(DeliveryCoverage::class)->mode($store);
+        $hasDelivery = $deliveryMode === 'radius'
+            ? ($store->delivery_pricing !== 'bands' || $zones->contains(fn ($zone) => $zone->radius_meters !== null))
+            : $zones->contains(fn ($zone) => $zone->radius_meters === null && $zone->city && $zone->state_code);
+
+        return view('menu', ['store' => $store, 'products' => $products, 'groups' => $groups->groupBy('product_id'), 'options' => $options, 'zones' => $zones, 'hasDelivery' => $hasDelivery, 'isOpen' => $availability->isOpen($store)]);
     }
 
     public function review(Request $request, string $slug, CheckoutQuote $calculator): RedirectResponse
@@ -69,7 +74,6 @@ class MenuController extends Controller
     public function delivery(Request $request, string $slug, DeliveryCoverage $coverage): JsonResponse
     {
         $store = $this->store($slug);
-        abort_unless($store->delivery_by_radius, 404);
         $data = $request->validate(['address' => 'required|string|min:12|max:300']);
 
         return response()->json(['choices' => $coverage->choices($store, $data['address'])])->header('Cache-Control', 'no-store');

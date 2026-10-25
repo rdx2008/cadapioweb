@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class DeliveryCoverage
@@ -18,7 +19,7 @@ class DeliveryCoverage
         if (! config('services.geoapify.key')) {
             $this->fail('A consulta de endereços ainda não foi configurada pela plataforma.');
         }
-        $key = 'geocode:'.hash('sha256', $this->normalize($address));
+        $key = 'geocode:v2:'.hash('sha256', $this->normalize($address));
         $cached = Cache::get($key);
         if (is_string($cached)) {
             return json_decode(Crypt::decryptString($cached), true, flags: JSON_THROW_ON_ERROR);
@@ -52,7 +53,10 @@ class DeliveryCoverage
                 || abs((float) $place['lat']) > 90 || abs((float) $place['lon']) > 180) {
                 continue;
             }
-            $results[] = ['label' => mb_substr((string) ($place['formatted'] ?? ''), 0, 500), 'latitude' => (float) $place['lat'], 'longitude' => (float) $place['lon']];
+            $results[] = ['label' => mb_substr((string) ($place['formatted'] ?? ''), 0, 500), 'latitude' => (float) $place['lat'], 'longitude' => (float) $place['lon'],
+                'neighborhood' => mb_substr((string) ($place['suburb'] ?? $place['quarter'] ?? $place['district'] ?? ''), 0, 120),
+                'city' => mb_substr((string) ($place['city'] ?? $place['town'] ?? $place['village'] ?? ''), 0, 120),
+                'state_code' => strtoupper(substr((string) ($place['state_code'] ?? ''), -2))];
         }
         if ($results === []) {
             $this->fail('Não localizamos o número com precisão. Informe rua, número, bairro, cidade e estado.');
@@ -66,8 +70,10 @@ class DeliveryCoverage
     {
         $choices = [];
         foreach ($this->search($address) as $place) {
-            $zone = $this->zone($store, $place['latitude'], $place['longitude']);
+            $zone = $this->zone($store, $place);
             $choices[] = ['label' => $place['label'], 'available' => $zone !== null,
+                'message' => $this->mode($store) === 'neighborhood' && (empty($place['neighborhood']) || empty($place['city']) || empty($place['state_code']))
+                    ? 'Não identificamos o bairro e a cidade com segurança. Confira o endereço completo.' : 'Fora da área de entrega',
                 'fee_cents' => $zone ? (int) $zone->fee_cents : null,
                 'token' => $zone ? Crypt::encryptString(json_encode($place + ['purpose' => 'delivery', 'store_id' => $store->id, 'address_hash' => hash('sha256', $this->normalize($address)), 'expires' => now()->addMinutes(30)->timestamp], JSON_THROW_ON_ERROR)) : null];
         }
@@ -87,7 +93,7 @@ class DeliveryCoverage
             || ! hash_equals($place['address_hash'] ?? '', hash('sha256', $this->normalize($address)))) {
             $this->fail('O endereço mudou ou a consulta expirou. Consulte o frete novamente.');
         }
-        $zone = $this->zone($store, $place['latitude'], $place['longitude']);
+        $zone = $this->zone($store, $place);
         if (! $zone) {
             $this->fail('Este endereço está fora da área de entrega da loja.');
         }
@@ -96,12 +102,39 @@ class DeliveryCoverage
         return $zone;
     }
 
-    private function zone(object $store, float $latitude, float $longitude): ?object
+    public function mode(object $store): string
     {
-        $lat = deg2rad($latitude - (float) $store->latitude);
-        $lon = deg2rad($longitude - (float) $store->longitude);
-        $a = sin($lat / 2) ** 2 + cos(deg2rad((float) $store->latitude)) * cos(deg2rad($latitude)) * sin($lon / 2) ** 2;
+        return $store->delivery_mode ?? ($store->delivery_by_radius ? 'radius' : 'neighborhood');
+    }
+
+    private function zone(object $store, array $place): ?object
+    {
+        if ($this->mode($store) === 'neighborhood') {
+            if (empty($place['neighborhood']) || empty($place['city']) || empty($place['state_code'])) {
+                return null;
+            }
+
+            $matches = DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)->whereNull('radius_meters')->orderBy('id')->get()
+                ->filter(fn ($zone) => $this->normalize($zone->name) === $this->normalize($place['neighborhood'])
+                    && $this->normalize($zone->city ?? '') === $this->normalize($place['city'])
+                    && strtoupper($zone->state_code ?? '') === $place['state_code']);
+
+            return $matches->count() === 1 ? $matches->first() : null;
+        }
+        $lat = deg2rad($place['latitude'] - (float) $store->latitude);
+        $lon = deg2rad($place['longitude'] - (float) $store->longitude);
+        $a = sin($lat / 2) ** 2 + cos(deg2rad((float) $store->latitude)) * cos(deg2rad($place['latitude'])) * sin($lon / 2) ** 2;
         $meters = 6371000 * 2 * asin(sqrt(min(1, max(0, $a))));
+        $pricing = $store->delivery_pricing ?? 'bands';
+        if ($pricing !== 'bands') {
+            if ($meters > $store->delivery_max_meters) {
+                return null;
+            }
+            $fee = $pricing === 'fixed' ? (int) $store->delivery_fixed_cents
+                : max((int) $store->delivery_minimum_cents, (int) $store->delivery_base_cents + (int) round($meters * $store->delivery_per_km_cents / 1000));
+
+            return (object) ['name' => 'Entrega por raio', 'fee_cents' => $fee];
+        }
 
         return DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)
             ->where('radius_meters', '>=', $meters)->orderBy('radius_meters')->orderBy('id')->first();
@@ -109,7 +142,7 @@ class DeliveryCoverage
 
     private function normalize(string $address): string
     {
-        return mb_strtolower(preg_replace('/\s+/u', ' ', trim($address)));
+        return mb_strtolower(Str::ascii(preg_replace('/\s+/u', ' ', trim($address))));
     }
 
     private function fail(string $message): never

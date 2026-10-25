@@ -94,7 +94,20 @@ class CatalogController extends Controller
         MoneyInput::normalize($request, ['fee' => 'fee_cents']);
         $data = $request->validate(['zone_id' => 'nullable|integer', 'name' => 'required|string|max:120', 'fee_cents' => 'required|integer|min:0|max:100000', 'enabled' => 'required|boolean']);
         $radius = $request->validate(['radius_km' => 'nullable|numeric|min:0.1|max:100']);
+        $area = $request->validate([
+            'zone_kind' => 'sometimes|in:neighborhood,radius',
+            'city' => [Rule::requiredIf($request->input('zone_kind') === 'neighborhood'), 'nullable', 'string', 'max:120'],
+            'state_code' => [Rule::requiredIf($request->input('zone_kind') === 'neighborhood'), 'nullable', 'regex:/^[A-Za-z]{2}$/'],
+        ]);
+        if (($area['zone_kind'] ?? null) === 'radius') {
+            $request->validate(['radius_km' => 'required|numeric|min:0.1|max:100']);
+        }
         $data['radius_meters'] = isset($radius['radius_km']) ? (int) round($radius['radius_km'] * 1000) : null;
+        if (($area['zone_kind'] ?? null) === 'neighborhood') {
+            $data['radius_meters'] = null;
+        }
+        $data['city'] = $data['radius_meters'] ? null : ($area['city'] ?? null);
+        $data['state_code'] = $data['radius_meters'] ? null : strtoupper($area['state_code'] ?? '');
         DB::transaction(function () use ($store, $data) {
             DB::table('stores')->where('id', $store->id)->lockForUpdate()->first();
             $zoneId = $data['zone_id'] ?? null;
@@ -108,6 +121,35 @@ class CatalogController extends Controller
         });
 
         return back()->with('success', 'Região de entrega salva.');
+    }
+
+    public function deliverySettings(Request $request, int $id): RedirectResponse
+    {
+        $store = $this->store($id);
+        MoneyInput::normalize($request, ['delivery_fixed' => 'delivery_fixed_cents', 'delivery_base' => 'delivery_base_cents', 'delivery_per_km' => 'delivery_per_km_cents', 'delivery_minimum' => 'delivery_minimum_cents']);
+        $pricedRadius = $request->input('delivery_mode') === 'radius' && $request->input('delivery_pricing') !== 'bands';
+        $data = $request->validate([
+            'delivery_mode' => 'required|in:neighborhood,radius',
+            'delivery_pricing' => 'required_if:delivery_mode,radius|nullable|in:fixed,bands,per_km',
+            'delivery_max_km' => [Rule::requiredIf($pricedRadius), 'nullable', 'numeric', 'min:0.1', 'max:100'],
+            'delivery_fixed_cents' => [Rule::requiredIf($pricedRadius && $request->input('delivery_pricing') === 'fixed'), 'nullable', 'integer', 'min:0', 'max:100000'],
+            'delivery_base_cents' => [Rule::requiredIf($pricedRadius && $request->input('delivery_pricing') === 'per_km'), 'nullable', 'integer', 'min:0', 'max:100000'],
+            'delivery_per_km_cents' => [Rule::requiredIf($pricedRadius && $request->input('delivery_pricing') === 'per_km'), 'nullable', 'integer', 'min:0', 'max:100000'],
+            'delivery_minimum_cents' => [Rule::requiredIf($pricedRadius && $request->input('delivery_pricing') === 'per_km'), 'nullable', 'integer', 'min:0', 'max:100000'],
+        ]);
+        if (isset($data['delivery_max_km'])) {
+            $data['delivery_max_meters'] = (int) round($data['delivery_max_km'] * 1000);
+        }
+        unset($data['delivery_max_km']);
+        $data = array_filter($data, fn ($value) => $value !== null);
+        $data['delivery_by_radius'] = $data['delivery_mode'] === 'radius';
+        DB::transaction(function () use ($store, $data): void {
+            DB::table('stores')->where('id', $store->id)->lockForUpdate()->firstOrFail();
+            DB::table('stores')->where('id', $store->id)->update($data + ['updated_at' => now()]);
+            Audit::record('store.delivery_settings', ['store_id' => $store->id], $store->tenant_id);
+        });
+
+        return back()->with('success', 'Área de atendimento e cálculo de frete atualizados.');
     }
 
     public function editProduct(int $id): View
