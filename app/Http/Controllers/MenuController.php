@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\CheckoutQuote;
+use App\Services\DeliveryCoverage;
 use App\Services\StoreAvailability;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -40,7 +41,9 @@ class MenuController extends Controller
         $data = $request->validate([
             'customer_name' => 'required|string|max:120', 'phone' => 'required|string|min:8|max:25',
             'mode' => 'required|in:pickup,delivery', 'address' => 'required_if:mode,delivery|nullable|string|max:500',
-            'delivery_zone_id' => 'required_if:mode,delivery|nullable|integer',
+            'delivery_zone_id' => 'nullable|integer',
+            'delivery_token' => 'nullable|string|max:5000',
+            'address_complement' => 'nullable|string|max:120',
             'items' => 'required|array|min:1|max:500', 'items.*' => 'required|integer|min:0|max:50',
             'choices' => 'nullable|array|max:50', 'choices.*' => 'array|max:20', 'choices.*.*' => 'array|max:20', 'choices.*.*.*' => 'integer|min:1',
             'idempotency_key' => 'required|uuid',
@@ -61,6 +64,15 @@ class MenuController extends Controller
         $draft = $this->draft($request, $store, $draftId);
 
         return view('checkout-review', ['store' => $store, 'draft' => $draft, 'draftId' => $draftId]);
+    }
+
+    public function delivery(Request $request, string $slug, DeliveryCoverage $coverage): JsonResponse
+    {
+        $store = $this->store($slug);
+        abort_unless($store->delivery_by_radius, 404);
+        $data = $request->validate(['address' => 'required|string|min:12|max:300']);
+
+        return response()->json(['choices' => $coverage->choices($store, $data['address'])])->header('Cache-Control', 'no-store');
     }
 
     private function draft(Request $request, object $store, string $id): array
@@ -95,7 +107,7 @@ class MenuController extends Controller
                 $id = DB::table('orders')->insertGetId([
                     'public_id' => $public, 'tenant_id' => $store->tenant_id, 'store_id' => $store->id, 'idempotency_key' => $data['draft_id'],
                     'customer_name' => $draft['data']['customer_name'], 'phone' => $draft['data']['phone'], 'mode' => $draft['data']['mode'],
-                    'address' => $draft['data']['mode'] === 'delivery' ? $draft['data']['address'] : null,
+                    'address' => $quote['delivery_address'],
                     'delivery_zone_name' => $quote['delivery_zone_name'], 'subtotal_cents' => $quote['subtotal_cents'],
                     'fee_cents' => $quote['fee_cents'], 'total_cents' => $quote['total_cents'], 'created_at' => now(), 'updated_at' => now(),
                 ]);
@@ -118,7 +130,7 @@ class MenuController extends Controller
     {
         $order = DB::table('orders')->where('public_id', $id)->firstOrFail();
 
-        return view('tracking', ['order' => $order, 'items' => DB::table('order_items')->where('order_id', $order->id)->get(), 'ride' => DB::table('rides')->where('order_id', $order->id)->first()]);
+        return view('tracking', ['store' => DB::table('stores')->find($order->store_id), 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $order->id)->get(), 'ride' => DB::table('rides')->where('order_id', $order->id)->first()]);
     }
 
     public function status(string $id): JsonResponse

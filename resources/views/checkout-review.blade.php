@@ -1,4 +1,4 @@
-@extends('layout')
+@extends('menu-layout')
 @section('content')
 <div class="auth">
 <div class="heading">
@@ -17,7 +17,7 @@
 <strong>R$ {{ number_format($draft['quote']['subtotal_cents']/100,2,',','.') }}</strong>
 </div>
 <div class="review-line">
-<span>Frete</span>
+<span class="freight-row">@include('partials.motoboy') Frete</span>
 <strong>R$ {{ number_format($draft['quote']['fee_cents']/100,2,',','.') }}</strong>
 </div>
 <div class="review-line">
@@ -27,7 +27,7 @@
 <p>
 <strong>{{ $draft['data']['customer_name'] }}</strong>
 <br>{{ $draft['data']['phone'] }}</p>
-@if($draft['data']['mode']==='delivery')<p>Entrega em {{ $draft['quote']['delivery_zone_name'] }}<br>{{ $draft['data']['address'] }}</p>@else<p>Retirada na loja: {{ $store->address }}</p>@endif
+@if($draft['data']['mode']==='delivery')<p>Entrega em {{ $draft['quote']['delivery_zone_name'] }}<br>{{ $draft['quote']['delivery_address'] ?? $draft['data']['address'] }}</p>@else<p>Retirada na loja: {{ $store->address }}</p>@endif
 <p class="muted">Pagamento presencial, na entrega ou retirada. Revisão válida por 15 minutos.</p>
 <form method="post" action="/cardapio/{{ $store->slug }}">@csrf<input type="hidden" name="draft_id" value="{{ $draftId }}">
 <div class="actions">

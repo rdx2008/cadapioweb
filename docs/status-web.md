@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Cardápio público e cobertura por raio
+
+Cardápio público redesenhado em layout próprio, sem menu administrativo: capa e logo enviados pela loja, categorias com navegação, busca, seleção de produtos em diálogo, adicionais, sacola responsiva e revisão antes da confirmação. Cliente vê somente o frete com ícone animado de motoboy; animação respeita movimento reduzido. Configurações internas identificam explicitamente a remuneração do motoboy freelancer.
+
+Cobertura automática opcional por faixas de raio: geocodificação Geoapify no servidor, confirmação do endereço encontrado, menor faixa ativa que cobre o ponto e nova validação antes de criar pedido. Coordenadas e frete enviados pelo navegador não são autoridade. Comprovantes criptografados vinculam loja, endereço e validade de 30 minutos; edição do endereço invalida a seleção no navegador. Consulta fora da área, resultado sem precisão de número, falha ou ausência de chave não aprovam entrega. Raio usa distância geográfica em linha reta; não é distância de rota nem altera remuneração do motoboy. Regiões antigas permanecem no modo manual até ativação explícita.
+
+Configurar GEOAPIFY_API_KEY no Coolify e fazer redeploy. GEOCODING_DAILY_LIMIT tem padrão 2800 para reservar margem no plano gratuito; cache criptografado por endereço por 24 horas e limite global de quatro consultas por segundo reduzem consumo. Limites do provedor são compartilhados pela conta e devem ser acompanhados no painel Geoapify. Não há chave real cadastrada no desenvolvimento; testes de API são simulados e a cobertura brasileira precisa de piloto real. Atribuição Geoapify/OpenStreetMap aparece nas consultas. Nunca usar nome ou telefone na busca de endereço; complemento é armazenado no pedido sem envio ao geocodificador.
+
+Na loja: localizar endereço, escolher o ponto encontrado, salvar, cadastrar faixas (ex.: 3 km/R$ 5 e 5 km/R$ 8) e escolher “Raio automático”. Capa e logo ficam no armazenamento existente por tenant. Migration acrescenta campos, sem apagar dados. Validação: 80 testes PHP, quatro testes JavaScript, Chrome em 1440/390/320 px, fluxo real de retirada e confirmação, consulta de entrega simulada no navegador, invalidação de endereço alterado e movimento reduzido. Sem homologação real do provedor ou PostgreSQL local.
+
 ## Horários com almoço e jantar
 
 Configuração da loja permite um segundo período opcional por dia. O checkout respeita o fechamento entre períodos, o fuso da loja, a passagem da meia-noite e a pausa manual. Horários antigos seguem compatíveis, sem nova migration. Painel mostra os dois períodos. Validação: 72 testes PHP e quatro testes JavaScript; Chrome em desktop e celular.
@@ -54,7 +64,7 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 |---|---|
 | Empresas e acesso | Login, perfis e isolamento das operações existentes; faltam usuários/permissões por loja e recuperação de senha |
 | Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; faltam variações, combos, feriados e mais de dois períodos diários |
-| Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; faltam validação geográfica do endereço, agendamento e pagamento online |
+| Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; validação geográfica por raio implementada com API configurável, pendente de piloto; faltam agendamento e pagamento online |
 | Pedidos e cozinha | Aceite, preparo, pronto, conclusão, filtros, paginação, detalhes privados, atualização automática e som ativável; faltam estações e ocorrências completas |
 | Freelancers | Cadastro global, aprovação, check-in, FIFO, oferta regional, aceite, coleta e conclusão; faltam presença web automática, posição da fila visível, alertas, regras editáveis e ocorrências |
 | Tarifação e acerto | Três modos de cálculo e registro manual; distância de rota ainda é informada pela loja, sem mapas ou repasse automático |

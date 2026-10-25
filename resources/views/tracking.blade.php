@@ -1,4 +1,4 @@
-@extends('layout')
+@extends('menu-layout')
 @section('content')
 <div class="auth" data-tracking-url="/pedido/{{ $order->public_id }}/status">
 <div class="heading">
@@ -13,7 +13,7 @@
 <span>R$ {{ number_format($item->quantity*$item->unit_cents/100,2,',','.') }}</span>
 </div>@foreach(json_decode($item->options??'[]',true) as $option)<p class="compact muted">{{ $option['group'] }}: {{ $option['name'] }}</p>@endforeach
 @endforeach<hr>
-<p>Entrega: R$ {{ number_format($order->fee_cents/100,2,',','.') }}</p>
+<p class="freight-row">@include('partials.motoboy') Frete: R$ {{ number_format($order->fee_cents/100,2,',','.') }}</p>
 <h2>Total: R$ {{ number_format($order->total_cents/100,2,',','.') }}</h2>
 <p>Pagamento: <span data-tracking-payment>{{ $order->payment_status==='paid'?'Recebido':'Na entrega ou retirada' }}</span>
 </p>

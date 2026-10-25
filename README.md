@@ -97,3 +97,11 @@ Para restaurar: criar ambiente isolado com a mesma versão, restaurar PostgreSQL
 3. Completar o painel web do entregador, atualização de presença com página ativa, ofertas e acertos validados em duas lojas e três entregadores. Android/localização em segundo plano ficam para depois.
 4. Homologar Evolution QR e implementar onboarding WABA e outbox de mensagens.
 5. Implementar gateway, fiscal conforme cenário e os módulos operacionais restantes em fases.
+
+## Cardápio e entrega por raio
+
+Em Lojas → Configurar loja, enviar logo e capa, localizar o endereço da loja e salvar. O cardápio público tem categorias, busca, produtos/adicionais em diálogo e sacola responsiva. O cliente vê frete com ícone animado; as tarifas do motoboy freelancer são internas.
+
+Para geocodificação, criar uma chave no Geoapify e definir `GEOAPIFY_API_KEY` nas variáveis do Coolify antes do redeploy. O Compose repassa a chave ao servidor. Em Regiões atendidas, cadastrar faixas de raio e frete; escolher “Raio automático” e salvar. A menor faixa ativa que cobre o endereço define o frete. Regiões sem raio ficam disponíveis somente no modo manual. O raio é em linha reta, não distância de rota.
+
+O plano gratuito do Geoapify tem quota e exige atribuição: consultar [preços e condições](https://www.geoapify.com/pricing/). O app usa cache criptografado de 24 horas, limite global de consultas e orçamento padrão `GEOCODING_DAILY_LIMIT=2800`. Conferir consumo da conta e ajustar ao plano contratado. Chave nunca deve ser enviada ao navegador. Sem chave ou em falha da API, a entrega automática não aprova endereços; retirada e modo manual permanecem disponíveis. Validar endereços reais e posição da loja antes do piloto.

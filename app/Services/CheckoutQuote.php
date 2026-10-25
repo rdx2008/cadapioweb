@@ -45,14 +45,21 @@ class CheckoutQuote
         $this->require($subtotal >= $store->minimum_order_cents, 'O pedido mínimo em produtos é R$ '.number_format($store->minimum_order_cents / 100, 2, ',', '.').'.');
         $fee = 0;
         $zoneName = null;
+        $deliveryAddress = null;
         if ($draft['mode'] === 'delivery') {
-            $zone = DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)->where('id', $draft['delivery_zone_id'] ?? 0)->first();
+            $zone = ($store->delivery_by_radius ?? false)
+                ? app(DeliveryCoverage::class)->verify($store, $draft['address'], $draft['delivery_token'] ?? null)
+                : DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)->where('id', $draft['delivery_zone_id'] ?? 0)->first();
             $this->require($zone !== null, 'Selecione uma região atendida pela loja.');
             $fee = (int) $zone->fee_cents;
             $zoneName = $zone->name;
+            $deliveryAddress = $zone->resolved_address ?? $draft['address'];
+            if (! empty($draft['address_complement'])) {
+                $deliveryAddress .= ' · '.$draft['address_complement'];
+            }
         }
 
-        return ['items' => $lines, 'subtotal_cents' => $subtotal, 'fee_cents' => $fee, 'total_cents' => $subtotal + $fee, 'delivery_zone_name' => $zoneName];
+        return ['items' => $lines, 'subtotal_cents' => $subtotal, 'fee_cents' => $fee, 'total_cents' => $subtotal + $fee, 'delivery_zone_name' => $zoneName, 'delivery_address' => $deliveryAddress];
     }
 
     public function fingerprint(array $quote): string

@@ -24,6 +24,8 @@ x-app: &app
         SESSION_SECURE_COOKIE: "true"
         LOG_CHANNEL: stderr
         RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+        GEOAPIFY_API_KEY: ${GEOAPIFY_API_KEY:-}
+        GEOCODING_DAILY_LIMIT: ${GEOCODING_DAILY_LIMIT:-2800}
     volumes:
         - app_storage:/var/www/html/storage
     depends_on:

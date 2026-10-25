@@ -18,12 +18,14 @@ Route::middleware('guest')->group(function () {
     Route::post('/entregadores/cadastro', [AuthController::class, 'register'])->middleware('throttle:5,1');
 });
 Route::get('/cardapio/{slug}', [MenuController::class, 'menu']);
+Route::post('/cardapio/{slug}/delivery', [MenuController::class, 'delivery'])->middleware('throttle:10,1');
 Route::post('/cardapio/{slug}/review', [MenuController::class, 'review'])->middleware('throttle:30,1');
 Route::get('/cardapio/{slug}/review/{draftId}', [MenuController::class, 'reviewPage']);
 Route::post('/cardapio/{slug}', [MenuController::class, 'checkout'])->middleware('throttle:20,1');
 Route::get('/pedido/{id}', [MenuController::class, 'tracking']);
 Route::get('/pedido/{id}/status', [MenuController::class, 'status'])->middleware('throttle:60,1');
 Route::get('/media/products/{id}', [CatalogController::class, 'photo']);
+Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])->whereIn('kind', ['logo', 'cover']);
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
@@ -56,6 +58,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/orders/{id}', [OrderBoardController::class, 'show']);
         Route::get('/stores/{id}/edit', [CatalogController::class, 'editStore']);
         Route::post('/stores/{id}/edit', [CatalogController::class, 'updateStore']);
+        Route::post('/stores/{id}/locate', [CatalogController::class, 'locate'])->middleware('throttle:10,1');
         Route::post('/stores/{id}/availability', [CatalogController::class, 'availability'])->name('stores.availability');
         Route::post('/stores/{storeId}/zones', [CatalogController::class, 'zone']);
         Route::get('/products/{id}/edit', [CatalogController::class, 'editProduct']);

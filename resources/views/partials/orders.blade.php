@@ -11,7 +11,7 @@
         @if($order->payment_status!=='paid')<form action="/orders/{{ $order->id }}/paid" method="post">@csrf<button class="secondary">Registrar recebido</button></form>@endif
         <details><summary>Cancelar pedido</summary><form action="/orders/{{ $order->id }}/status" method="post">@csrf<input type="hidden" name="status" value="cancelled"><label>Motivo<textarea name="cancellation_reason" required maxlength="500"></textarea></label><button class="secondary">Confirmar cancelamento</button></form></details>
     @endif
-    @if($order->status==='ready'&&$order->mode==='delivery'&&$tenant->courier_module==='active')<details><summary>Solicitar freelancer</summary><form action="/orders/{{ $order->id }}/dispatch" method="post">@csrf<label>Distância de rota em metros (tarifa/km)<input name="route_meters" type="number" min="1"></label><label>Cotação (R$) (por corrida)<input name="fare" type="text" inputmode="decimal"></label><button>Despachar</button></form></details>@endif
+    @if($order->status==='ready'&&$order->mode==='delivery'&&$tenant->courier_module==='active')<details><summary>Solicitar motoboy freelancer</summary><form action="/orders/{{ $order->id }}/dispatch" method="post">@csrf<label>Distância de rota em metros (tarifa/km)<input name="route_meters" type="number" min="1"></label><label>Cotação (R$) (por corrida)<input name="fare" type="text" inputmode="decimal"></label><button>Despachar</button></form></details>@endif
     </div></div></details>
 </article>
 @empty<div class="empty orders-empty">@include('partials.icon',['name'=>'orders'])<h3>Nenhum pedido neste filtro</h3><p>Os novos pedidos aparecerão aqui automaticamente.</p></div>@endforelse

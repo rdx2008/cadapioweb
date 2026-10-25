@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DeliveryCoverage;
 use App\Support\Audit;
 use App\Support\MoneyInput;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,17 +45,32 @@ class CatalogController extends Controller
             'hours.*.opens_at' => 'required|date_format:H:i', 'hours.*.closes_at' => 'required|date_format:H:i',
             'hours.*.second_opens_at' => 'nullable|required_with:hours.*.second_closes_at|date_format:H:i',
             'hours.*.second_closes_at' => 'nullable|required_with:hours.*.second_opens_at|date_format:H:i',
+            'delivery_by_radius' => 'sometimes|boolean',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'cover' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'rate_mode' => 'required|in:fixed,per_km,per_ride', 'base_cents' => 'required|integer|min:0|max:100000',
             'per_km_cents' => 'required|integer|min:0|max:100000', 'minimum_cents' => 'required|integer|min:0|max:100000',
         ]);
         ksort($data['hours']);
         $data['weekly_hours'] = $data['use_hours'] ? json_encode(array_values($data['hours']), JSON_THROW_ON_ERROR) : null;
         unset($data['hours'], $data['use_hours']);
-        DB::transaction(function () use ($store, $data) {
-            DB::table('stores')->where('id', $store->id)->lockForUpdate()->first();
-            DB::table('stores')->where('id', $store->id)->update($data + ['updated_at' => now()]);
-            Audit::record('store.updated', ['store_id' => $store->id], $store->tenant_id);
-        });
+        unset($data['logo'], $data['cover']);
+        $uploads = [];
+        foreach (['logo', 'cover'] as $kind) {
+            if ($request->hasFile($kind)) {
+                $uploads[] = $data[$kind.'_path'] = $request->file($kind)->store('tenants/'.$store->tenant_id.'/stores', 'local');
+            }
+        }
+        try {
+            DB::transaction(function () use ($store, $data) {
+                DB::table('stores')->where('id', $store->id)->lockForUpdate()->first();
+                DB::table('stores')->where('id', $store->id)->update($data + ['updated_at' => now()]);
+                Audit::record('store.updated', ['store_id' => $store->id], $store->tenant_id);
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($uploads);
+            throw $exception;
+        }
 
         return back()->with('success', 'Loja e horários atualizados.');
     }
@@ -76,6 +93,8 @@ class CatalogController extends Controller
         $store = $this->store($storeId);
         MoneyInput::normalize($request, ['fee' => 'fee_cents']);
         $data = $request->validate(['zone_id' => 'nullable|integer', 'name' => 'required|string|max:120', 'fee_cents' => 'required|integer|min:0|max:100000', 'enabled' => 'required|boolean']);
+        $radius = $request->validate(['radius_km' => 'nullable|numeric|min:0.1|max:100']);
+        $data['radius_meters'] = isset($radius['radius_km']) ? (int) round($radius['radius_km'] * 1000) : null;
         DB::transaction(function () use ($store, $data) {
             DB::table('stores')->where('id', $store->id)->lockForUpdate()->first();
             $zoneId = $data['zone_id'] ?? null;
@@ -133,6 +152,24 @@ class CatalogController extends Controller
         abort_unless($product->photo_path && Storage::disk('local')->exists($product->photo_path), 404);
 
         return Storage::disk('local')->response($product->photo_path, null, ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'public, max-age=300']);
+    }
+
+    public function branding(int $id, string $kind): StreamedResponse
+    {
+        abort_unless(in_array($kind, ['logo', 'cover'], true), 404);
+        $store = DB::table('stores')->where('id', $id)->firstOrFail();
+        $path = $store->{$kind.'_path'};
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, null, ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'public, max-age=300']);
+    }
+
+    public function locate(Request $request, int $id, DeliveryCoverage $coverage): JsonResponse
+    {
+        $this->store($id);
+        $data = $request->validate(['address' => 'required|string|min:12|max:300']);
+
+        return response()->json(['choices' => $coverage->search($data['address'])])->header('Cache-Control', 'no-store');
     }
 
     public function group(Request $request, int $id): RedirectResponse

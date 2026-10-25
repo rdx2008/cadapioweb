@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'geoapify' => [
+        'key' => env('GEOAPIFY_API_KEY'),
+        'daily_limit' => (int) env('GEOCODING_DAILY_LIMIT', 2800),
+    ],
 
     /*
     |--------------------------------------------------------------------------

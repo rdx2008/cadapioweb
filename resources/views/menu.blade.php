@@ -1,64 +1,28 @@
-@extends('layout')
+@extends('menu-layout')
 @section('content')
-<div class="hero">
-<div>
-<div class="eyebrow">Feito para o seu momento</div>
-<h1>{{ $store->name }}</h1>
-<p class="muted">{{ $store->address }}</p>
-<span class="badge {{ $isOpen?'':'disabled' }}">{{ $isOpen?'Recebendo pedidos':'Fechado ou pausado no momento' }}</span>
-</div>
-<div class="orb">✦</div>
-</div>
-<form method="post" action="/cardapio/{{ $store->slug }}/review" data-cart>@csrf
-<input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) Illuminate\Support\Str::uuid()) }}">
-<div class="section-head">
-<h2>Escolha seus favoritos</h2>
-<span class="muted">Pagamento na retirada ou entrega</span>
-</div>
-@foreach($products->groupBy('category') as $category=>$categoryProducts)<section>
-<h2>{{ $category }}</h2>
-<div class="grid">
-@foreach($categoryProducts as $product)<article class="card product" data-cart-product data-price="{{ $product->price_cents }}">
-@if($product->photo_path)<img class="product-photo" src="/media/products/{{ $product->id }}?v={{ urlencode($product->updated_at) }}" alt="{{ $product->name }}" loading="lazy">@else<div class="art">✦</div>@endif
-<h2>{{ $product->name }}</h2>
-<p class="muted">{{ $product->description }}</p>
-<div class="price">R$ {{ number_format($product->price_cents/100,2,',','.') }}</div>
-<label>Quantidade<input data-quantity name="items[{{ $product->id }}]" type="number" min="0" max="50" value="{{ old('items.'.$product->id,0) }}">
-</label>
-@foreach($groups->get($product->id,collect()) as $group)<fieldset class="option-group">
-<legend>{{ $group->name }} <small>Escolha {{ $group->minimum }}–{{ $group->maximum }}</small>
-</legend>
-@forelse($options->get($group->id,collect()) as $option)<label class="option-choice">
-<input type="checkbox" data-option-price="{{ $option->price_cents }}" name="choices[{{ $product->id }}][{{ $group->id }}][]" value="{{ $option->id }}" @checked(in_array($option->id,old('choices.'.$product->id.'.'.$group->id,[])))>
-<span>{{ $option->name }} · + R$ {{ number_format($option->price_cents/100,2,',','.') }}</span>
-</label>@empty<p class="muted">Sem opções disponíveis neste grupo.</p>@endforelse</fieldset>@endforeach
-</article>@endforeach</div>
-</section>@endforeach
-@if($products->isEmpty())<div class="empty">O cardápio está sendo preparado. Volte em breve.</div>@endif
-<section class="card">
-<h2>Como vamos entregar seu pedido?</h2>
-<div class="fields">
-<label>Seu nome<input name="customer_name" value="{{ old('customer_name') }}" required maxlength="120" autocomplete="name">
-</label>
-<label>Telefone<input name="phone" value="{{ old('phone') }}" required minlength="8" maxlength="25" autocomplete="tel">
-</label>
-<label>Modalidade<select name="mode" data-mode>
-<option value="pickup" @selected(old('mode')!=='delivery')>Retirada · sem frete</option>@if($zones->isNotEmpty())<option value="delivery" @selected(old('mode')==='delivery')>Entrega</option>@endif</select>
-</label>
-<label>Região de entrega<select name="delivery_zone_id" data-zone>
-<option value="">Selecione para entrega</option>@foreach($zones as $zone)<option value="{{ $zone->id }}" data-fee="{{ $zone->fee_cents }}" @selected(old('delivery_zone_id')==$zone->id)>{{ $zone->name }} · R$ {{ number_format($zone->fee_cents/100,2,',','.') }}</option>@endforeach</select>
-</label>
-<label class="full">Endereço completo (para entrega)<input name="address" value="{{ old('address') }}" maxlength="500" autocomplete="street-address" data-delivery-address>
-</label>
-</div>
-@if($zones->isEmpty())<p class="muted">Esta loja oferece somente retirada enquanto não houver regiões de entrega ativas.</p>@endif
-<p class="muted">Pedido mínimo em produtos: R$ {{ number_format($store->minimum_order_cents/100,2,',','.') }}. O frete é separado da remuneração do entregador.</p>
-<div class="cart-summary">
-<strong>Total estimado: <span data-cart-total>—</span>
-</strong>
-<span class="muted">Você revisará o total calculado pelo servidor antes de confirmar.</span>
-</div>
-<button class="orange" @disabled(!$isOpen || $products->isEmpty())>Revisar pedido →</button>
+<section class="menu-cover {{ $store->cover_path?'has-photo':'' }}">
+@if($store->cover_path)<img src="/media/stores/{{ $store->id }}/cover?v={{ urlencode($store->updated_at) }}" alt="" class="cover-photo">@endif
+<div class="cover-copy"><span>ESCOLHA. APROVEITE. REPITA.</span><h1>Hoje combina<br>com algo especial.</h1><p>Da nossa cozinha para o seu momento.</p></div><div class="cover-decoration" aria-hidden="true">✳</div>
 </section>
-</form>
+<section class="restaurant-intro"><div class="restaurant-logo">@if($store->logo_path)<img src="/media/stores/{{ $store->id }}/logo?v={{ urlencode($store->updated_at) }}" alt="Logo {{ $store->name }}">@else{{ mb_strtoupper(mb_substr($store->name,0,2)) }}@endif</div><div><span class="menu-kicker">BEM-VINDO À NOSSA CASA</span><h2>{{ $store->name }}</h2><p><span class="open-status {{ $isOpen?'':'closed' }}">● {{ $isOpen?'Aberto agora':'Fechado no momento' }}</span><span> · Retirada @if($zones->isNotEmpty())e entrega @endif</span></p><p class="muted">{{ $store->address }}</p></div><div class="restaurant-hours"><small>Horários de hoje</small><strong>{{ app(App\Services\StoreAvailability::class)->todayLabel($store) }}</strong><small>Pedido mínimo R$ {{ number_format($store->minimum_order_cents/100,2,',','.') }}</small></div></section>
+<form method="post" action="/cardapio/{{ $store->slug }}/review" data-menu-cart data-radius="{{ $store->delivery_by_radius?1:0 }}">@csrf
+<input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) Illuminate\Support\Str::uuid()) }}">
+<div class="menu-layout"><div class="menu-catalog">
+<div class="catalog-tools"><nav class="category-pills" aria-label="Categorias">@foreach($products->groupBy('category') as $category=>$categoryProducts)<a href="#category-{{ $loop->index }}">{{ $category }}</a>@endforeach</nav><label class="menu-search"><span>⌕</span><input type="search" data-menu-search placeholder="O que você quer saborear?" aria-label="Buscar produto"></label></div>
+@if($products->isNotEmpty())<div class="discovery-banner"><span class="discovery-spark">✦</span><div><strong>Encontre seu novo favorito</strong><span>Escolha um prato e deixe o resto com a gente.</span></div></div>@endif
+@if($products->isNotEmpty())<section class="menu-discover"><div class="category-heading"><h2>Para começar bem</h2><span>Explore o cardápio</span></div><div class="discover-products">@foreach($products->take(3) as $suggestion)<button type="button" class="discover-product" data-discover-open="product-title-{{ $suggestion->id }}">@if($suggestion->photo_path)<img src="/media/products/{{ $suggestion->id }}?v={{ urlencode($suggestion->updated_at) }}" alt="{{ $suggestion->name }}" loading="lazy">@else<span class="discover-art" aria-hidden="true">✳</span>@endif<span class="discover-copy"><strong>{{ $suggestion->name }}</strong><span>R$ {{ number_format($suggestion->price_cents/100,2,',','.') }} <b>+</b></span></span></button>@endforeach</div></section>@endif
+<p data-search-empty hidden class="empty">Nenhum produto encontrado. Tente outro nome.</p>
+@foreach($products->groupBy('category') as $category=>$categoryProducts)<section class="menu-category" id="category-{{ $loop->index }}" data-menu-category><div class="category-heading"><h2>{{ $category }}</h2><span>{{ $categoryProducts->count() }} opções</span></div><div class="menu-products">
+@foreach($categoryProducts as $product)<article class="menu-product" data-menu-product data-name="{{ $product->name }}" data-price="{{ $product->price_cents }}"><button class="product-open" type="button" data-product-open aria-haspopup="dialog"><span class="product-copy"><strong>{{ $product->name }}</strong><span>{{ $product->description }}</span><b>R$ {{ number_format($product->price_cents/100,2,',','.') }}</b></span><span class="product-image">@if($product->photo_path)<img src="/media/products/{{ $product->id }}?v={{ urlencode($product->updated_at) }}" alt="{{ $product->name }}" loading="lazy">@else<span class="food-placeholder" aria-hidden="true">✳</span>@endif<span class="product-plus">+</span></span></button>
+<dialog class="product-dialog" aria-labelledby="product-title-{{ $product->id }}"><button type="button" class="dialog-close" data-product-close aria-label="Fechar produto">×</button>@if($product->photo_path)<img class="dialog-photo" src="/media/products/{{ $product->id }}?v={{ urlencode($product->updated_at) }}" alt="{{ $product->name }}" loading="lazy">@endif<div class="dialog-body"><span class="menu-kicker">{{ $category }}</span><h2 id="product-title-{{ $product->id }}">{{ $product->name }}</h2><p class="muted">{{ $product->description }}</p><strong class="dialog-price">R$ {{ number_format($product->price_cents/100,2,',','.') }}</strong>
+@foreach($groups->get($product->id,collect()) as $group)<fieldset class="option-group"><legend>{{ $group->name }} <small>Escolha {{ $group->minimum }}–{{ $group->maximum }}</small></legend>@forelse($options->get($group->id,collect()) as $option)<label class="option-choice"><input type="checkbox" data-option-price="{{ $option->price_cents }}" name="choices[{{ $product->id }}][{{ $group->id }}][]" value="{{ $option->id }}" @checked(in_array($option->id,old('choices.'.$product->id.'.'.$group->id,[])))><span>{{ $option->name }} · + R$ {{ number_format($option->price_cents/100,2,',','.') }}</span></label>@empty<p>Sem opções disponíveis.</p>@endforelse</fieldset>@endforeach
+<div class="product-add"><label>Quantidade<input data-quantity name="items[{{ $product->id }}]" type="number" min="0" max="50" value="{{ old('items.'.$product->id,0) }}"></label><button type="button" data-product-add>Atualizar sacola</button></div></div></dialog></article>@endforeach</div></section>@endforeach
+@if($products->isEmpty())<div class="empty">Nosso cardápio está sendo preparado. Volte em breve!</div>@endif
+<section class="menu-checkout card" id="checkout"><span class="menu-kicker">QUASE NA SUA MESA</span><h2>Vamos finalizar?</h2><div class="fields"><label>Seu nome<input name="customer_name" value="{{ old('customer_name') }}" required maxlength="120" autocomplete="name"></label><label>Telefone<input name="phone" value="{{ old('phone') }}" required minlength="8" maxlength="25" autocomplete="tel"></label><label>Como você prefere?<select name="mode" data-mode><option value="pickup" @selected(old('mode')!=='delivery')>Retirar na loja · sem frete</option>@if($zones->isNotEmpty())<option value="delivery" @selected(old('mode')==='delivery')>Receber no meu endereço</option>@endif</select></label>
+@if(!$store->delivery_by_radius)<label data-delivery-field>Região<select name="delivery_zone_id" data-zone><option value="">Selecione para entrega</option>@foreach($zones as $zone)<option value="{{ $zone->id }}" data-fee="{{ $zone->fee_cents }}" @selected(old('delivery_zone_id')==$zone->id)>{{ $zone->name }} · R$ {{ number_format($zone->fee_cents/100,2,',','.') }}</option>@endforeach</select></label>@endif
+<label class="full" data-delivery-field>Endereço de entrega<input name="address" value="{{ old('address') }}" maxlength="300" placeholder="Rua, número, bairro, cidade e estado" autocomplete="street-address" data-delivery-address></label>
+@if($store->delivery_by_radius)<label class="full" data-delivery-field>Complemento (opcional)<input name="address_complement" value="{{ old('address_complement') }}" maxlength="120" placeholder="Apartamento, bloco ou referência"></label><div class="full" data-delivery-field data-delivery-lookup data-url="/cardapio/{{ $store->slug }}/delivery"><input type="hidden" name="delivery_token" value="{{ old('delivery_token') }}"><button type="button" class="outline" data-delivery-search>Consultar frete</button><p class="muted compact">Ao consultar, o endereço será enviado ao serviço de localização para verificar a entrega. Não inclua nome ou telefone neste campo.</p><div data-delivery-results role="status" aria-live="polite"></div><small class="geo-attribution">Powered by <a href="https://www.geoapify.com/" target="_blank" rel="noopener">Geoapify</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></small></div>@endif
+</div><p class="muted">Pagamento na entrega ou retirada. Você confere tudo antes de enviar.</p><button class="full-button" @disabled(!$isOpen || $products->isEmpty())>Revisar meu pedido →</button></section></div>
+<aside class="menu-bag"><div class="bag-heading"><h2>Sua sacola</h2><span data-menu-count>0</span></div><div data-menu-lines class="bag-lines"><div class="bag-empty"><span>♧</span><strong>Sua próxima delícia<br>começa aqui.</strong><p>Escolha seus favoritos no cardápio.</p></div></div><div class="bag-totals"><div><span>Produtos</span><strong data-menu-subtotal>R$ 0,00</strong></div><div class="freight-row"><span>@include('partials.motoboy') Frete</span><strong data-menu-freight>Sem frete</strong></div><div class="bag-total"><span>Total estimado</span><strong data-menu-total>R$ 0,00</strong></div></div><a href="#checkout" class="button bag-checkout">Continuar pedido →</a><small>Preparado com carinho. Pedido feito com segurança.</small></aside></div>
+<a href="#checkout" class="mobile-bag"><span>Sacola <b data-mobile-count>0</b></span><strong data-mobile-total>R$ 0,00</strong><span>Continuar →</span></a></form>
 @endsection
