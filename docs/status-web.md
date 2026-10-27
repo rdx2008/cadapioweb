@@ -2,6 +2,18 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Pizzas com sabores e bordas — 27/10/2026
+
+Editor permite ativar modo pizza após habilitar tamanhos e cadastrar sabores com preço em tamanho disponível. Cada tamanho aceita de 1 a 4 sabores distintos, em partes iguais. Regra por produto: maior preço entre sabores ou média aritmética com arredondamento em centavos. Preços são da pizza inteira de cada sabor/tamanho e substituem o preço padrão da variação neste modo. Campo vazio deixa sabor indisponível naquele tamanho; sabor pode ser pausado. Tamanhos sem qualquer sabor ativo/preço não aparecem no cardápio, e produto sem tamanho vendável sai da vitrine.
+
+Sabores próprios por produto, até 100, com descrição e preços por tamanho. Endpoints verificam tenant/produto e IDs de tamanhos, travam a loja e auditam alterações. Migration aditiva cria pizza_flavors e adiciona campos de modo/regra, limite por tamanho e tipo de grupo de adicionais. Produtos existentes permanecem fora do modo pizza. Não permite desligar tamanhos enquanto modo pizza estiver ativo.
+
+Tipo Borda em grupos de adicionais: um grupo de borda por produto, no máximo uma escolha; mínimo 0 opcional ou 1 obrigatório. Preço fixo da opção soma uma vez por pizza, antes de multiplicar pela quantidade. Sem borda pode ser opção de R$0. Não há preço de borda diferente por tamanho nesta etapa. Grupos existentes continuam como adicionais, sem conversão automática.
+
+Cardápio mostra sabores compatíveis, limites e regra de cálculo; trocar tamanho desmarca sabores incompatíveis. Sacola, edição/retorno da revisão e pedido preservam tamanhos, sabores/frações e borda. Servidor rejeita sabores de outro produto, repetidos, pausados, sem preço e acima do limite; mudança de preço/regra/disponibilidade após revisão bloqueia confirmação. Snapshot mantém as escolhas na cozinha e no acompanhamento sem alterar pedidos antigos. Continua suportando várias combinações do mesmo produto.
+
+Validação: 133 testes PHP e 11 JavaScript. Sete cenários novos de backend cobrem maior preço, média/arredondamento, combinações/tamanhos independentes, isolamento, indisponibilidade, configuração/bordas e snapshot na cozinha. Chrome com cadastro completo por UI: tamanhos, dois sabores, média e borda; duas pizzas de base R$60 + borda R$8 totalizam R$136. Testados retorno da revisão, confirmação e telas 390/320 px. Frações livres por fatias, sabores com partes desiguais, combos e piloto real PostgreSQL/Coolify continuam pendentes.
+
 ## Várias combinações do mesmo produto — 27/10/2026
 
 Sacola permite adicionar o mesmo produto em linhas independentes, com tamanho, adicionais e quantidade próprios. Cada linha mostra as escolhas e permite editar/remover. Abrir diálogo prepara uma nova combinação; fechar ou cancelar não altera a sacola. Salvar item substitui somente a linha em edição. Limites: até 50 itens e 50 unidades somadas do mesmo produto. Itens iguais podem permanecer em linhas separadas.

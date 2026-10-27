@@ -37,9 +37,21 @@ class CheckoutQuote
                 $variant = DB::table('product_variants')->where('product_id', $product->id)->where('id', $variantId)->where('available', true)->first();
                 $this->require($variant !== null, 'Escolha uma variação disponível de '.$product->name.'.');
                 $unit = (int) $variant->price_cents;
+                if ($product->pizza_enabled) {
+                    $pizza = app(PizzaPricing::class)->quote($product, $variant, $entry['flavors'] ?? []);
+                    $unit = $pizza['price_cents'];
+                }
                 $options[] = ['group' => 'Variação', 'name' => $variant->name, 'price_cents' => $unit, 'kind' => 'variant'];
+                if (isset($pizza)) {
+                    $options[] = ['group' => 'Sabores (partes iguais)', 'name' => $pizza['description'], 'price_cents' => 0, 'kind' => 'description'];
+                    $options[] = ['group' => 'Cálculo da pizza', 'name' => $pizza['rule'], 'price_cents' => 0, 'kind' => 'description'];
+                    unset($pizza);
+                }
             } else {
                 $this->require(empty($entry['variant_id']), 'O modo de preço de '.$product->name.' mudou. Revise o carrinho.');
+            }
+            if (! $product->pizza_enabled) {
+                $this->require(empty($entry['flavors']), 'O modo pizza mudou. Revise as escolhas deste produto.');
             }
             foreach ($groups as $group) {
                 $ids = array_map('intval', $chosen[$group->id] ?? []);

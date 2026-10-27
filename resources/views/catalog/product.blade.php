@@ -7,7 +7,7 @@
 <h1>{{ $product->name }}</h1>
 <a href="/catalog">← Voltar ao catálogo</a>
 </div>
-<nav class="catalog-editor-steps" aria-label="Etapas do produto"><a href="#product-basics">Dados e foto</a><a href="#variants">Tamanhos e preços</a><a href="#product-addons">Adicionais e revisão</a></nav><p class="muted">Confira a apresentação, os tamanhos e os adicionais antes de divulgar. Os botões de cada seção salvam suas próprias alterações.</p><form id="product-basics" action="/products/{{ $product->id }}/edit" method="post" enctype="multipart/form-data" class="card">@csrf
+<nav class="catalog-editor-steps" aria-label="Etapas do produto"><a href="#product-basics">Dados e foto</a><a href="#variants">Tamanhos e preços</a><a href="#pizza">Sabores de pizza</a><a href="#product-addons">Adicionais e revisão</a></nav><p class="muted">Confira a apresentação, os tamanhos e os adicionais antes de divulgar. Os botões de cada seção salvam suas próprias alterações.</p><form id="product-basics" action="/products/{{ $product->id }}/edit" method="post" enctype="multipart/form-data" class="card">@csrf
 <div class="fields">
 <label>Nome<input name="name" value="{{ old('name', $product->name) }}" required>
 </label>
@@ -29,6 +29,7 @@
 </div>
 </form>
 @include('catalog.variants')
+@include('catalog.pizza')
 <section id="product-addons">
 <h2>Grupos e adicionais</h2>
 <p class="muted">As escolhas valem para cada unidade do produto. Exemplo: 2 lanches com queijo cobram o queijo duas vezes. Para combinações diferentes, o cliente pode adicionar outro item do mesmo produto na sacola.</p>
@@ -36,7 +37,7 @@
 <form action="/products/{{ $product->id }}/groups" method="post" class="fields">@csrf<input type="hidden" name="group_id" value="{{ $group->id }}">
 <label>Nome do grupo<input name="name" value="{{ $group->name }}" required>
 </label>
-<label>Mínimo de escolhas<input name="minimum" type="number" min="0" max="20" value="{{ $group->minimum }}" required>
+<label>Tipo<select name="kind"><option value="addon" @selected($group->kind==='addon')>Adicionais</option><option value="border" @selected($group->kind==='border')>Borda (uma escolha)</option></select></label><label>Mínimo de escolhas<input name="minimum" type="number" min="0" max="20" value="{{ $group->minimum }}" required>
 </label>
 <label>Máximo de escolhas<input name="maximum" type="number" min="1" max="20" value="{{ $group->maximum }}" required>
 </label>
@@ -75,7 +76,7 @@
 <summary>+ Criar grupo de escolhas</summary>
 <form action="/products/{{ $product->id }}/groups" method="post" class="fields">@csrf<label>Nome do grupo<input name="name" placeholder="Escolha o molho" required>
 </label>
-<label>Mínimo (0 = opcional)<input name="minimum" type="number" min="0" max="20" value="0" required>
+<label>Tipo<select name="kind"><option value="addon">Adicionais</option><option value="border">Borda (uma escolha)</option></select></label><label>Mínimo (0 = opcional)<input name="minimum" type="number" min="0" max="20" value="0" required>
 </label>
 <label>Máximo<input name="maximum" type="number" min="1" max="20" value="1" required>
 </label>

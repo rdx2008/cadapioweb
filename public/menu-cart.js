@@ -1,4 +1,8 @@
 class MenuCart {
+    static pizzaPrice(prices, rule) {
+        if(!prices.length)return null;
+        return rule==='average'?Math.round(prices.reduce((sum,price)=>sum+price,0)/prices.length):Math.max(...prices);
+    }
     constructor() { this.lines = []; this.nextId = 1; }
     save(line, editingId = null) {
         if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 50) throw new Error('Informe uma quantidade inteira entre 1 e 50.');
@@ -15,7 +19,7 @@ class MenuCart {
     remove(id) { this.lines = this.lines.filter(item => item.id !== id); }
     payload() {
         return this.lines.map(line => ({product_id:line.productId,quantity:line.quantity,
-            ...(line.variantId ? {variant_id:line.variantId} : {}), choices:structuredClone(line.choices)}));
+            ...(line.variantId ? {variant_id:line.variantId} : {}), ...(line.flavors?.length?{flavors:[...line.flavors]}:{}), choices:structuredClone(line.choices)}));
     }
 }
 

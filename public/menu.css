@@ -962,3 +962,5 @@
 
 
 .bag-item-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }.bag-edit { background:transparent; color:#34613f; border:1px solid #dce4d6; font-size:11px; padding:5px 7px; }.bag-item > div:first-child { min-width:0; overflow-wrap:anywhere; }
+
+[data-flavor-choice] small { display:block; margin-top:4px; color:#6b7764; font-size:11px; } [data-flavor-choice]:has(input:disabled) { opacity:.55; }

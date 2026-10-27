@@ -22,3 +22,14 @@ test('cart limits apply across combinations and failed edits preserve previous c
     const many=new MenuCart();for(let i=1;i<=50;i++)many.save({...line(1),productId:i});
     assert.throws(()=>many.save({...line(1),productId:51}),/50 itens/);assert.equal(many.lines.length,50);
 });
+test('pizza prices use highest or equal shares rounded in cents and flavors survive item edits',()=>{
+    assert.equal(MenuCart.pizzaPrice([5000,7000],'highest'),7000);
+    assert.equal(MenuCart.pizzaPrice([5000,7000],'average'),6000);
+    assert.equal(MenuCart.pizzaPrice([5001,7000],'average'),6001);
+    assert.equal(MenuCart.pizzaPrice([5000,6000,7000],'average'),6000);
+    assert.equal(MenuCart.pizzaPrice([],'highest'),null);
+    const cart=new MenuCart(),id=cart.save({...line(1),flavors:[10,20]});
+    const payload=cart.payload();assert.deepEqual(Array.from(payload[0].flavors),[10,20]);
+    payload[0].flavors.push(30);assert.deepEqual(cart.lines[0].flavors,[10,20]);
+    cart.save({...cart.lines[0],flavors:[20]},id);assert.deepEqual(Array.from(cart.payload()[0].flavors),[20]);
+});

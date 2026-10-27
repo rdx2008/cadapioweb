@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\DeliveryCoverage;
+use App\Services\PizzaPricing;
 use App\Support\Audit;
 use App\Support\MoneyInput;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +40,14 @@ class CatalogController extends Controller
             ->when(($filters['availability'] ?? '') === 'paused', fn ($query) => $query->where('available', false))
             ->when(($filters['availability'] ?? '') === 'featured', fn ($query) => $query->where('featured', true))
             ->orderByRaw('COALESCE(catalog_categories.sort_order, 9999)')->orderBy('products.category')->orderBy('products.sort_order')->orderBy('products.name')->paginate(24)->withQueryString();
+        $pizzaIds = $products->getCollection()->where('pizza_enabled', true)->pluck('id');
+        $pizzaSizes = DB::table('product_variants')->whereIn('product_id', $pizzaIds)->where('available', true)->get()->groupBy('product_id');
+        $pizzaFlavors = DB::table('pizza_flavors')->whereIn('product_id', $pizzaIds)->where('available', true)->get()->groupBy('product_id');
+        $products->getCollection()->each(function ($product) use ($pizzaSizes, $pizzaFlavors): void {
+            if ($product->pizza_enabled) {
+                $product->variant_price = app(PizzaPricing::class)->availableVariants($pizzaSizes->get($product->id, collect()), $pizzaFlavors->get($product->id, collect()))->min('price_cents');
+            }
+        });
 
         $tenant = DB::table('tenants')->find(auth()->user()->tenant_id);
 
@@ -341,7 +350,71 @@ class CatalogController extends Controller
 
         $tenant = DB::table('tenants')->find(auth()->user()->tenant_id);
 
-        return view('catalog.product', compact('product', 'groups', 'options', 'variants', 'categories', 'tenant'));
+        $flavors = DB::table('pizza_flavors')->where('product_id', $id)->orderBy('id')->get();
+
+        return view('catalog.product', compact('product', 'groups', 'options', 'variants', 'categories', 'tenant', 'flavors'));
+    }
+
+    public function pizzaSettings(Request $request, int $id): RedirectResponse
+    {
+        $product = $this->product($id);
+        $data = $request->validate(['pizza_enabled' => 'required|boolean', 'pizza_pricing' => 'required|in:highest,average']);
+        DB::transaction(function () use ($product, $data): void {
+            DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
+            $current = DB::table('products')->find($product->id);
+            $variants = DB::table('product_variants')->where('product_id', $product->id)->where('available', true)->get();
+            $flavors = DB::table('pizza_flavors')->where('product_id', $product->id)->where('available', true)->get();
+            if ($data['pizza_enabled'] && (! $current->uses_variants || app(PizzaPricing::class)->availableVariants($variants, $flavors)->isEmpty())) {
+                throw ValidationException::withMessages(['pizza_enabled' => 'Ative tamanhos e cadastre pelo menos um sabor com preço em um tamanho disponível.']);
+            }
+            DB::table('products')->where('id', $product->id)->update($data + ['updated_at' => now()]);
+            Audit::record('product.pizza_settings', ['product_id' => $product->id], $product->tenant_id);
+        });
+
+        return back()->with('success', 'Regras da pizza atualizadas.');
+    }
+
+    public function flavor(Request $request, int $id): RedirectResponse
+    {
+        $product = $this->product($id);
+        $data = $request->validate(['flavor_id' => 'nullable|integer|min:1', 'name' => 'required|string|max:80', 'description' => 'nullable|string|max:240', 'available' => 'required|boolean', 'prices' => 'required|array|min:1|max:20', 'prices.*' => ['nullable', 'regex:/^\d{1,5}(?:[.,]\d{1,2})?$/D']]);
+        DB::transaction(function () use ($product, $data): void {
+            DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
+            $variants = DB::table('product_variants')->where('product_id', $product->id)->pluck('id')->map(fn ($id) => (string) $id)->all();
+            if (array_diff(array_map('strval', array_keys($data['prices'])), $variants)) {
+                throw ValidationException::withMessages(['prices' => 'Tamanho inválido para este produto.']);
+            }
+            $prices = [];
+            foreach ($data['prices'] as $variant => $price) {
+                if ($price === null || $price === '') {
+                    continue;
+                }
+                $parts = preg_split('/[.,]/', $price);
+                $cents = (int) $parts[0] * 100 + (int) str_pad($parts[1] ?? '', 2, '0');
+                if ($cents < 1 || $cents > 1000000) {
+                    throw ValidationException::withMessages(['prices' => 'Informe preços maiores que zero e até R$ 10.000.']);
+                }
+                $prices[$variant] = $cents;
+            }
+            if (! $prices) {
+                throw ValidationException::withMessages(['prices' => 'Informe preço para pelo menos um tamanho.']);
+            }
+            $flavorId = $data['flavor_id'] ?? null;
+            unset($data['flavor_id']);
+            $data['prices'] = json_encode($prices, JSON_THROW_ON_ERROR);
+            if ($flavorId) {
+                DB::table('pizza_flavors')->where('product_id', $product->id)->where('id', $flavorId)->firstOrFail();
+                DB::table('pizza_flavors')->where('id', $flavorId)->update($data + ['updated_at' => now()]);
+            } else {
+                if (DB::table('pizza_flavors')->where('product_id', $product->id)->count() >= 100) {
+                    throw ValidationException::withMessages(['name' => 'Limite de 100 sabores por produto. Edite um sabor existente.']);
+                }
+                $flavorId = DB::table('pizza_flavors')->insertGetId($data + ['product_id' => $product->id, 'created_at' => now(), 'updated_at' => now()]);
+            }
+            Audit::record('product.flavor.saved', ['product_id' => $product->id, 'flavor_id' => $flavorId], $product->tenant_id);
+        });
+
+        return back()->with('success', 'Sabor salvo. Preço vazio deixa o sabor indisponível naquele tamanho.');
     }
 
     public function pricingMode(Request $request, int $id): RedirectResponse
@@ -350,6 +423,9 @@ class CatalogController extends Controller
         $data = $request->validate(['uses_variants' => 'required|boolean']);
         DB::transaction(function () use ($product, $data): void {
             DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
+            if (! $data['uses_variants'] && DB::table('products')->where('id', $product->id)->value('pizza_enabled')) {
+                throw ValidationException::withMessages(['uses_variants' => 'Desative o modo pizza antes de voltar ao preço único.']);
+            }
             if ($data['uses_variants'] && ! DB::table('product_variants')->where('product_id', $product->id)->where('available', true)->exists()) {
                 throw ValidationException::withMessages(['uses_variants' => 'Cadastre pelo menos uma variação disponível antes de ativar este modo.']);
             }
@@ -364,7 +440,7 @@ class CatalogController extends Controller
     {
         $product = $this->product($id);
         MoneyInput::normalize($request, ['variant_price' => 'price_cents']);
-        $data = $request->validate(['variant_id' => 'nullable|integer', 'name' => 'required|string|max:80', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean']);
+        $data = $request->validate(['variant_id' => 'nullable|integer', 'name' => 'required|string|max:80', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'max_flavors' => 'sometimes|integer|min:1|max:4']);
         DB::transaction(function () use ($product, $data): void {
             DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
             $variantId = $data['variant_id'] ?? null;
@@ -444,10 +520,18 @@ class CatalogController extends Controller
     public function group(Request $request, int $id): RedirectResponse
     {
         $product = $this->product($id);
-        $data = $request->validate(['group_id' => 'nullable|integer', 'name' => 'required|string|max:100', 'minimum' => 'required|integer|min:0|max:20', 'maximum' => 'required|integer|min:1|max:20|gte:minimum']);
+        $data = $request->validate(['group_id' => 'nullable|integer', 'name' => 'required|string|max:100', 'minimum' => 'required|integer|min:0|max:20', 'maximum' => 'required|integer|min:1|max:20|gte:minimum', 'kind' => 'sometimes|in:addon,border']);
         DB::transaction(function () use ($product, $data) {
             DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->first();
             $groupId = $data['group_id'] ?? null;
+            $current = $groupId ? DB::table('option_groups')->where('product_id', $product->id)->where('id', $groupId)->firstOrFail() : null;
+            $data['kind'] = $data['kind'] ?? $current?->kind ?? 'addon';
+            if ($data['kind'] === 'border' && ($data['maximum'] != 1 || $data['minimum'] > 1)) {
+                throw ValidationException::withMessages(['maximum' => 'Grupo de borda permite no máximo uma escolha. Use mínimo 0 (opcional) ou 1 (obrigatória).']);
+            }
+            if ($data['kind'] === 'border' && DB::table('option_groups')->where('product_id', $product->id)->where('kind', 'border')->when($groupId, fn ($query) => $query->where('id', '!=', $groupId))->exists()) {
+                throw ValidationException::withMessages(['kind' => 'Este produto já possui um grupo de borda. Edite as opções desse grupo.']);
+            }
             unset($data['group_id']);
             if ($groupId) {
                 DB::table('option_groups')->where('product_id', $product->id)->where('id', $groupId)->firstOrFail();

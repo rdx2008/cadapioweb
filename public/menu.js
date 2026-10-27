@@ -25,6 +25,15 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
     const cart=new MenuCart();
     let editingId=null;
     const cartMessage=form.querySelector('[data-cart-message]');
+    const pizzaInfo=(product,ids,variantId)=>{
+        const names=[],prices=[];
+        product.querySelectorAll('[data-pizza-flavor]').forEach(flavor=>{
+            if(!ids.map(Number).includes(Number(flavor.value)))return;
+            const price=JSON.parse(flavor.dataset.flavorPrices)[variantId];
+            if(Number.isInteger(price)&&price>0){prices.push(price);names.push('1/'+ids.length+' '+flavor.dataset.flavorName);}
+        });
+        return {names,price:prices.length===ids.length?MenuCart.pizzaPrice(prices,product.dataset.pizzaPricing):null};
+    };
     const readLine=(product)=>{
         const selected=product.querySelector('[data-product-variant]')?.selectedOptions[0];
         const choices={},optionNames=[];
@@ -32,15 +41,19 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
             (choices[option.dataset.optionGroupId]??=[]).push(Number(option.value));optionNames.push(option.dataset.optionName);
         });
         let unit=selected?Number(selected.dataset.variantPrice):Number(product.dataset.price);
+        const flavors=Array.from(product.querySelectorAll('[data-pizza-flavor]:checked')).map(flavor=>Number(flavor.value));
+        const pizza=pizzaInfo(product,flavors,selected?.value);
+        if(product.dataset.pizza==='1'&&pizza.price!==null)unit=pizza.price;
         product.querySelectorAll('[data-option-price]:checked').forEach(option=>unit+=Number(option.dataset.optionPrice));
         return {productId:Number(product.dataset.productId),quantity:Number(product.querySelector('[data-quantity]').value),variantId:selected?Number(selected.value):null,
-            choices,name:product.dataset.name,variantName:selected?.dataset.variantName??'',optionNames,unit};
+            choices,flavors,name:product.dataset.name,variantName:selected?.dataset.variantName??'',optionNames:[...pizza.names,...optionNames],unit};
     };
     const openProduct=(product,line=null)=>{
         editingId=line?.id??null;
         product.querySelector('[data-quantity]').value=line?.quantity??1;
         const variant=product.querySelector('[data-product-variant]');
         if(variant)variant.value=line?.variantId??variant.options[0]?.value??'';
+        product.querySelectorAll('[data-pizza-flavor]').forEach(flavor=>{flavor.checked=Boolean(line?.flavors?.map(Number).includes(Number(flavor.value)));});
         product.querySelectorAll('[data-option-price]').forEach(option=>{option.checked=Boolean(line?.choices?.[option.dataset.optionGroupId]?.map(Number).includes(Number(option.value)));});
         product.querySelector('[data-product-add]').textContent=line?'Salvar item':'Adicionar à sacola';
         product.querySelector('[data-product-message]').textContent='';
@@ -51,7 +64,19 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         let subtotal=0,count=0;
         const lines=form.querySelector('[data-menu-lines]');
         lines.replaceChildren();form.querySelector('[data-cart-payload]').replaceChildren();
-        products.forEach(product=>{const variant=product.querySelector('[data-product-variant]')?.selectedOptions[0];product.querySelector('.dialog-price').textContent=menuMoney(variant?Number(variant.dataset.variantPrice):Number(product.dataset.price));});
+        products.forEach(product=>{
+            const variant=product.querySelector('[data-product-variant]')?.selectedOptions[0];
+            product.querySelectorAll('[data-pizza-flavor]').forEach(flavor=>{
+                const price=JSON.parse(flavor.dataset.flavorPrices)[variant?.value],available=Number.isInteger(price)&&price>0;
+                flavor.disabled=!available;
+                if(!available&&flavor.checked){flavor.checked=false;product.querySelector('[data-product-message]').textContent='Sabores indisponíveis neste tamanho foram desmarcados.';}
+                const label=flavor.closest('[data-flavor-choice]');label.querySelector('[data-flavor-price]').textContent=available?'Pizza inteira: '+menuMoney(price):'Indisponível neste tamanho';
+            });
+            const limit=product.querySelector('[data-flavor-limit]');if(limit)limit.textContent='Escolha de 1 a '+(variant?.dataset.maxFlavors??1)+' sabores';
+            const ids=Array.from(product.querySelectorAll('[data-pizza-flavor]:checked')).map(flavor=>Number(flavor.value));
+            const pizza=pizzaInfo(product,ids,variant?.value);
+            product.querySelector('.dialog-price').textContent=menuMoney(product.dataset.pizza==='1'&&pizza.price!==null?pizza.price:variant?Number(variant.dataset.variantPrice):Number(product.dataset.price));
+        });
         cart.lines.forEach((line,index)=>{
             count+=line.quantity;subtotal+=line.unit*line.quantity;
             const row=document.createElement('div');row.className='bag-item';
@@ -66,6 +91,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
             actions.append(edit,remove);row.append(copy,actions);lines.append(row);
             appendInput(`cart_lines[${index}][product_id]`,line.productId);appendInput(`cart_lines[${index}][quantity]`,line.quantity);
             if(line.variantId)appendInput(`cart_lines[${index}][variant_id]`,line.variantId);
+            (line.flavors??[]).forEach(id=>appendInput(`cart_lines[${index}][flavors][]`,id));
             Object.entries(line.choices).forEach(([group,ids])=>ids.forEach(id=>appendInput(`cart_lines[${index}][choices][${group}][]`,id)));
         });
         if(!count){const empty=document.createElement('div');empty.className='bag-empty';empty.textContent='Sua sacola está esperando seus favoritos.';lines.append(empty);}
@@ -91,6 +117,10 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
             try {
                 const variant=product.querySelector('[data-product-variant]');
                 if(variant&&!variant.value)throw new Error('Escolha um tamanho disponível.');
+                if(product.dataset.pizza==='1'){
+                    const count=product.querySelectorAll('[data-pizza-flavor]:checked').length,max=Number(variant.selectedOptions[0]?.dataset.maxFlavors??1);
+                    if(count<1||count>max)throw new Error('Escolha de 1 a '+max+' sabores para este tamanho.');
+                }
                 product.querySelectorAll('[data-option-group]').forEach(group=>{
                     const count=group.querySelectorAll('[data-option-price]:checked').length;
                     if(count<Number(group.dataset.min)||count>Number(group.dataset.max))throw new Error(group.querySelector('legend').textContent.trim()+': confira a quantidade de escolhas.');
@@ -172,8 +202,11 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         const choices=Object.fromEntries(Object.entries(entry.choices&&typeof entry.choices==='object'?entry.choices:{}).filter(([,ids])=>Array.isArray(ids)));
         const variant=product?Array.from(product.querySelector('[data-product-variant]')?.options??[]).find(option=>Number(option.value)===Number(entry.variant_id)):null;
         let unit=variant?Number(variant.dataset.variantPrice):Number(product?.dataset.price??0);const optionNames=[];
+        const flavors=Array.isArray(entry.flavors)?entry.flavors.map(Number):[];
+        const pizza=product?pizzaInfo(product,flavors,entry.variant_id):{names:[],price:null};
+        if(product?.dataset.pizza==='1'&&pizza.price!==null)unit=pizza.price;
         product?.querySelectorAll('[data-option-price]').forEach(option=>{if(choices[option.dataset.optionGroupId]?.map(Number).includes(Number(option.value))){unit+=Number(option.dataset.optionPrice);optionNames.push(option.dataset.optionName);}});
-        try{cart.save({productId:Number(entry.product_id),quantity:Number(entry.quantity),variantId:entry.variant_id?Number(entry.variant_id):null,choices,name:product?.dataset.name??'Produto indisponível · remova este item',variantName:variant?.dataset.variantName??'',optionNames,unit});}catch(error){cartMessage.textContent=error.message;}
+        try{cart.save({productId:Number(entry.product_id),quantity:Number(entry.quantity),variantId:entry.variant_id?Number(entry.variant_id):null,choices,flavors,name:product?.dataset.name??'Produto indisponível · remova este item',variantName:variant?.dataset.variantName??'',optionNames:[...pizza.names,...optionNames],unit});}catch(error){cartMessage.textContent=error.message;}
     });
     update();
 });
