@@ -26,6 +26,15 @@ class CheckoutQuote
             $this->require(count(array_diff(array_map('strval', array_keys($chosen)), $groups->pluck('id')->map(fn ($id) => (string) $id)->all())) === 0, 'Grupo de adicionais inválido para este produto.');
             $options = [];
             $unit = (int) $product->price_cents;
+            if ($product->uses_variants) {
+                $variantId = $draft['variants'][$product->id] ?? null;
+                $variant = DB::table('product_variants')->where('product_id', $product->id)->where('id', $variantId)->where('available', true)->first();
+                $this->require($variant !== null, 'Escolha uma variação disponível de '.$product->name.'.');
+                $unit = (int) $variant->price_cents;
+                $options[] = ['group' => 'Variação', 'name' => $variant->name, 'price_cents' => $unit, 'kind' => 'variant'];
+            } else {
+                $this->require(empty($draft['variants'][$product->id]), 'O modo de preço de '.$product->name.' mudou. Revise o carrinho.');
+            }
             foreach ($groups as $group) {
                 $ids = array_map('intval', $chosen[$group->id] ?? []);
                 $this->require(count($ids) === count(array_unique($ids)), 'Um adicional não pode ser selecionado duas vezes.');

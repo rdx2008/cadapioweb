@@ -9,7 +9,7 @@
 <div class="card">@foreach($draft['quote']['items'] as $item)<div class="review-line">
 <strong>{{ $item['quantity'] }} × {{ $item['name'] }}</strong>
 <span>R$ {{ number_format($item['quantity']*$item['unit_cents']/100,2,',','.') }}</span>
-</div>@foreach($item['options'] as $option)<div class="compact muted">{{ $option['group'] }}: {{ $option['name'] }} (+ R$ {{ number_format($option['price_cents']/100,2,',','.') }} por unidade)</div>@endforeach
+</div>@foreach($item['options'] as $option)<div class="compact muted">{{ $option['group'] }}: {{ $option['name'] }} ({{ ($option['kind']??'')==='variant' ? 'preço base R$ ' : '+ R$ ' }}{{ number_format($option['price_cents']/100,2,',','.') }} por unidade)</div>@endforeach
 @endforeach
 <hr>
 <div class="review-line">

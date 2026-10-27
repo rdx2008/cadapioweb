@@ -29,11 +29,15 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         products.forEach(product => {
             const quantity=Math.max(0,Math.min(50,Number(product.querySelector('[data-quantity]').value)||0));
             let unit=Number(product.dataset.price);
+            const variant=product.querySelector('[data-product-variant]')?.selectedOptions[0];
+            if(variant)unit=Number(variant.dataset.variantPrice);
+            const base=unit;
             product.querySelectorAll('[data-option-price]:checked').forEach(option=>unit+=Number(option.dataset.optionPrice));
+            product.querySelector('.dialog-price').textContent=menuMoney(base);
             count+=quantity; subtotal+=unit*quantity;
             if(quantity){
                 const row=document.createElement('div');row.className='bag-item';
-                const copy=document.createElement('div');copy.textContent=quantity+' × '+product.dataset.name;
+                const copy=document.createElement('div');copy.textContent=quantity+' × '+product.dataset.name+(variant?' · '+variant.dataset.variantName:'');
                 const amount=document.createElement('small');amount.textContent=menuMoney(unit*quantity);copy.append(amount);
                 const remove=document.createElement('button');remove.type='button';remove.className='bag-remove';remove.textContent='×';remove.setAttribute('aria-label','Remover '+product.dataset.name);remove.addEventListener('click',()=>{product.querySelector('[data-quantity]').value=0;update();});
                 row.append(copy,remove);lines.append(row);

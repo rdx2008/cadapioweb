@@ -31,6 +31,19 @@ class MenuController extends Controller
             $request->session()->flashInput($draft['data']);
         }
         $products = DB::table('products')->where('tenant_id', $store->tenant_id)->where('store_id', $store->id)->where('available', true)->orderBy('category')->orderBy('name')->get();
+        $variants = DB::table('product_variants')->whereIn('product_id', $products->pluck('id'))->where('available', true)->orderBy('price_cents')->orderBy('id')->get()->groupBy('product_id');
+        $products = $products->filter(function ($product) use ($variants): bool {
+            if (! $product->uses_variants) {
+                return true;
+            }
+            $available = $variants->get($product->id, collect());
+            if ($available->isEmpty()) {
+                return false;
+            }
+            $product->price_cents = $available->min('price_cents');
+
+            return true;
+        });
         $groups = DB::table('option_groups')->whereIn('product_id', $products->pluck('id'))->orderBy('id')->get();
         $options = DB::table('product_options')->whereIn('option_group_id', $groups->pluck('id'))->where('available', true)->orderBy('id')->get()->groupBy('option_group_id');
         $zones = DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)->orderBy('name')->get();
@@ -40,7 +53,7 @@ class MenuController extends Controller
             ? ($store->delivery_pricing !== 'bands' || $zones->contains(fn ($zone) => $zone->radius_meters !== null))
             : $zones->contains(fn ($zone) => $zone->radius_meters === null && $zone->city && $zone->state_code);
 
-        return view('menu', ['store' => $store, 'products' => $products, 'groups' => $groups->groupBy('product_id'), 'options' => $options, 'zones' => $zones, 'hasDelivery' => $hasDelivery, 'isOpen' => $availability->isOpen($store)]);
+        return view('menu', ['store' => $store, 'products' => $products, 'groups' => $groups->groupBy('product_id'), 'options' => $options, 'variants' => $variants, 'zones' => $zones, 'hasDelivery' => $hasDelivery, 'isOpen' => $availability->isOpen($store)]);
     }
 
     public function review(Request $request, string $slug, CheckoutQuote $calculator): RedirectResponse
@@ -59,6 +72,7 @@ class MenuController extends Controller
             'address_fields' => 'sometimes|array:street,number,neighborhood,city,state,postcode',
             'items' => 'required|array|min:1|max:500', 'items.*' => 'required|integer|min:0|max:50',
             'choices' => 'nullable|array|max:50', 'choices.*' => 'array|max:20', 'choices.*.*' => 'array|max:20', 'choices.*.*.*' => 'integer|min:1',
+            'variants' => 'nullable|array|max:500', 'variants.*' => 'nullable|integer|min:1',
             'idempotency_key' => 'required|uuid',
         ]);
         $existing = DB::table('orders')->where('store_id', $store->id)->where('idempotency_key', $data['idempotency_key'])->first();

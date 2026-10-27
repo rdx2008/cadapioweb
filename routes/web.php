@@ -79,6 +79,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/products/{id}/edit', [CatalogController::class, 'updateProduct']);
         Route::post('/products/{id}/groups', [CatalogController::class, 'group']);
         Route::post('/products/{id}/options', [CatalogController::class, 'option']);
+        Route::post('/products/{id}/variants', [CatalogController::class, 'variant'])->name('products.variants');
+        Route::post('/products/{id}/pricing-mode', [CatalogController::class, 'pricingMode'])->name('products.pricing-mode');
         Route::post('/stores', [PlatformController::class, 'createStore']);
         Route::post('/products', [PlatformController::class, 'createProduct']);
         Route::post('/products/{id}/toggle', [PlatformController::class, 'toggleProduct']);

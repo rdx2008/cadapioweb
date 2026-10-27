@@ -204,7 +204,50 @@ class CatalogController extends Controller
         $groups = DB::table('option_groups')->where('product_id', $id)->orderBy('id')->get();
         $options = DB::table('product_options')->whereIn('option_group_id', $groups->pluck('id'))->orderBy('id')->get()->groupBy('option_group_id');
 
-        return view('catalog.product', compact('product', 'groups', 'options'));
+        $variants = DB::table('product_variants')->where('product_id', $id)->orderBy('id')->get();
+
+        return view('catalog.product', compact('product', 'groups', 'options', 'variants'));
+    }
+
+    public function pricingMode(Request $request, int $id): RedirectResponse
+    {
+        $product = $this->product($id);
+        $data = $request->validate(['uses_variants' => 'required|boolean']);
+        DB::transaction(function () use ($product, $data): void {
+            DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
+            if ($data['uses_variants'] && ! DB::table('product_variants')->where('product_id', $product->id)->where('available', true)->exists()) {
+                throw ValidationException::withMessages(['uses_variants' => 'Cadastre pelo menos uma variação disponível antes de ativar este modo.']);
+            }
+            DB::table('products')->where('id', $product->id)->update($data + ['updated_at' => now()]);
+            Audit::record('product.pricing_mode', ['product_id' => $product->id, 'uses_variants' => (bool) $data['uses_variants']], $product->tenant_id);
+        });
+
+        return back()->with('success', 'Modo de preço atualizado. Pedidos anteriores mantêm os valores.');
+    }
+
+    public function variant(Request $request, int $id): RedirectResponse
+    {
+        $product = $this->product($id);
+        MoneyInput::normalize($request, ['variant_price' => 'price_cents']);
+        $data = $request->validate(['variant_id' => 'nullable|integer', 'name' => 'required|string|max:80', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean']);
+        DB::transaction(function () use ($product, $data): void {
+            DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
+            $variantId = $data['variant_id'] ?? null;
+            unset($data['variant_id']);
+            if ($variantId) {
+                DB::table('product_variants')->where('product_id', $product->id)->where('id', $variantId)->firstOrFail();
+                DB::table('product_variants')->where('id', $variantId)->update($data + ['updated_at' => now()]);
+            } else {
+                if (DB::table('product_variants')->where('product_id', $product->id)->count() >= 20) {
+                    throw ValidationException::withMessages(['name' => 'Limite de 20 variações por produto. Edite uma variação existente.']);
+                }
+                $variantId = DB::table('product_variants')->insertGetId($data + ['product_id' => $product->id, 'created_at' => now(), 'updated_at' => now()]);
+            }
+            DB::table('products')->where('id', $product->id)->update(['updated_at' => now()]);
+            Audit::record('product.variant.saved', ['product_id' => $product->id, 'variant_id' => $variantId], $product->tenant_id);
+        });
+
+        return back()->with('success', 'Variação salva. Se todas forem pausadas, o produto sai do cardápio enquanto usar preço por variação.');
     }
 
     public function updateProduct(Request $request, int $id): RedirectResponse

@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Tamanhos e variações — 27/10/2026
+
+Produto pode usar preço único ou preço por variação. Proprietário cadastra/edita/pausa até 20 variações com nome e preço completo; ativação exige uma disponível. Gestão verifica tenant e produto e trava a loja, com auditoria. Migration aditiva cria product_variants e products.uses_variants; produtos existentes permanecem com preço único. Preço base anterior fica preservado para eventual retorno ao modo único.
+
+Cardápio mostra o menor preço disponível como A partir de e permite selecionar tamanho no diálogo. A sacola usa o preço da variação mais adicionais por unidade. Uma combinação por produto por pedido, conforme estrutura atual do carrinho; múltiplos tamanhos do mesmo produto no mesmo pedido, combos e pizzas de vários sabores seguem pendentes. Sem variação disponível, o produto sai do cardápio nesse modo. Pausar produto continua bloqueando todas as variações.
+
+Revisão e confirmação buscam variação no produto/loja corretos e rejeitam ausência, pausa, modo alterado ou alteração de preço após revisão. Nome/preço da variação são preservados no snapshot do pedido e nas telas existentes de produção e acompanhamento. Preço informado pelo navegador não é aceito como autoridade. Pedidos antigos e idempotência permanecem preservados.
+
+Validação: 115 testes PHP e oito JavaScript; cinco testes novos cobrem isolamento, adulteração, preço com adicionais, indisponibilidade, alteração entre revisão/confirmação, snapshot e restauração da seleção. Chrome em 390/320 px: proprietário cadastra Pequena/Grande, ativa modo; cliente escolhe Grande de R$45, quantidade dois e revisa R$90. PostgreSQL/Coolify e piloto real pendentes. Ifood permanece sem alteração.
+
 ## Presença, fila e ofertas web do motoboy — 26/10/2026
 
 Painel do motoboy agora renova GPS a cada 30 segundos com a página visível e atualiza fila/ofertas/corridas a cada cinco segundos. Check-in continua exigindo até 150 m da loja e precisão de até 50 m. Heartbeat exige amostra de até 60 segundos, preserva horário de entrada e loja escolhida, e não reativa presença offline/vencida. Saída do raio ou módulo desativado suspendem a fila; nova entrada exige confirmação. Oferta exclusiva expirada não pode ser reativada pela renovação automática. Scheduler dispatch:tick continua necessário para reconciliar ofertas expiradas.

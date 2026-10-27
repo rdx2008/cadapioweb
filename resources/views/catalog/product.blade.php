@@ -26,6 +26,7 @@
 <button>Salvar produto</button>
 </div>
 </form>
+@include('catalog.variants')
 <section>
 <h2>Grupos e adicionais</h2>
 <p class="muted">As escolhas valem para cada unidade do produto. Exemplo: 2 lanches com queijo cobram o queijo duas vezes. Para combinações diferentes, faça pedidos separados nesta versão.</p>
