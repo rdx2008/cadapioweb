@@ -50,7 +50,7 @@ class ProductTypeTest extends TestCase
         $this->post('/products/'.$f['product'].'/edit', $this->update('pizza'))->assertRedirect();
         $this->assertDatabaseHas('products', ['id' => $f['product'], 'product_type' => 'pizza', 'available' => false, 'pizza_enabled' => false]);
         $this->get('/products/'.$f['product'].'/edit')->assertOk()->assertSee('Sabores de pizza');
-        $this->postJson('/products/'.$f['product'].'/edit', $this->update('combo'))->assertUnprocessable();
+        $this->postJson('/products/'.$f['product'].'/edit', $this->update('invalid-type'))->assertUnprocessable();
         $this->assertDatabaseHas('audit_events', ['tenant_id' => $f['tenant'], 'action' => 'product.type_changed']);
     }
 

@@ -7,11 +7,12 @@
 <h1>{{ $product->name }}</h1>
 <a href="/catalog">← Voltar ao catálogo</a>
 </div>
-<nav class="catalog-editor-steps" aria-label="Etapas do produto"><a href="#product-basics">Dados e foto</a><a href="#variants">Tamanhos e preços</a>@if($product->product_type==='pizza')<a href="#pizza">Sabores de pizza</a>@endif<a href="#product-addons">Adicionais e revisão</a></nav><p class="muted">Confira a apresentação, os tamanhos e os adicionais antes de divulgar. Os botões de cada seção salvam suas próprias alterações.</p><form id="product-basics" action="/products/{{ $product->id }}/edit" method="post" enctype="multipart/form-data" class="card">@csrf
+<nav class="catalog-editor-steps" aria-label="Etapas do produto"><a href="#product-basics">Dados e foto</a>@if($product->product_type!=='combo')<a href="#variants">Tamanhos e preços</a>@else<a href="#combo">Componentes do combo</a>@endif
+@if($product->product_type==='pizza')<a href="#pizza">Sabores de pizza</a>@endif<a href="#product-addons">Adicionais e revisão</a></nav><p class="muted">Confira a apresentação, os tamanhos e os adicionais antes de divulgar. Os botões de cada seção salvam suas próprias alterações.</p><form id="product-basics" action="/products/{{ $product->id }}/edit" method="post" enctype="multipart/form-data" class="card">@csrf
 <div class="fields">
 <label>Nome<input name="name" value="{{ old('name', $product->name) }}" required>
 </label>
-<label>Tipo de produto<select name="product_type"><option value="common" @selected(old('product_type',$product->product_type)==='common')>Produto comum</option><option value="pizza" @selected(old('product_type',$product->product_type)==='pizza')>Pizza</option></select><small>Salve para carregar as configurações do tipo escolhido. Ao mudar, o produto fica pausado para revisão.</small></label>
+<label>Tipo de produto<select name="product_type"><option value="common" @selected(old('product_type',$product->product_type)==='common')>Produto comum</option><option value="pizza" @selected(old('product_type',$product->product_type)==='pizza')>Pizza</option><option value="combo" @selected(old('product_type',$product->product_type)==='combo')>Combo</option></select><small>Salve para carregar as configurações do tipo escolhido. Ao mudar, o produto fica pausado para revisão.</small></label>
 <input type="hidden" name="category" value="{{ $product->category }}"><label>Categoria<select name="category_id"><option value="">{{ $product->category }} (atual)</option>@foreach($categories as $category)<option value="{{ $category->id }}" @selected(old('category_id',$product->category_id)==$category->id)>{{ $category->name }}</option>@endforeach</select><small><a href="{{ route('catalog.index',['store_id'=>$product->store_id]) }}#categories">Gerenciar categorias</a></small></label>
 <label>Destaque no cardápio<select name="featured"><option value="0" @selected(old('featured',$product->featured)==0)>Não</option><option value="1" @selected(old('featured',$product->featured)==1)>Sim, mostrar na vitrine</option></select></label><label>Ordem dentro da categoria<input name="sort_order" type="number" min="0" max="9999" value="{{ old('sort_order',$product->sort_order) }}"><small>Menor número aparece primeiro.</small></label>
 <label>Preço (R$)<input name="price" type="text" inputmode="decimal" value="{{ old('price', number_format($product->price_cents/100,2,',','')) }}" required>
@@ -29,7 +30,11 @@
 <button>Salvar produto</button>
 </div>
 </form>
+@if($product->product_type!=='combo')
 @include('catalog.variants')
+@else
+@include('catalog.combo')
+@endif
 @if($product->product_type==='pizza')@include('catalog.pizza')@endif
 <section id="product-addons">
 <h2>Grupos e adicionais</h2>

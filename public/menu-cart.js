@@ -19,7 +19,7 @@ class MenuCart {
     remove(id) { this.lines = this.lines.filter(item => item.id !== id); }
     payload() {
         return this.lines.map(line => ({product_id:line.productId,quantity:line.quantity,
-            ...(line.variantId ? {variant_id:line.variantId} : {}), ...(line.flavors?.length?{flavors:[...line.flavors]}:{}), choices:structuredClone(line.choices)}));
+            ...(line.variantId ? {variant_id:line.variantId} : {}), ...(line.flavors?.length?{flavors:[...line.flavors]}:{}), ...(Object.keys(line.comboChoices??{}).length?{combo_choices:structuredClone(line.comboChoices)}:{}), choices:structuredClone(line.choices)}));
     }
 }
 

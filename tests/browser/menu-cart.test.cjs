@@ -3,6 +3,17 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const MenuCart=vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../public/menu-cart.js'),'utf8')+';MenuCart',{structuredClone});
 const line=(variant,quantity=1)=>({productId:1,quantity,variantId:variant,choices:{7:[variant+10]},unit:variant*1000,name:'Pizza',optionNames:['Borda']});
+test('combo choices remain independent across lines and payload edits',()=>{
+    const cart=new MenuCart();
+    const first=cart.save({...line(1),comboChoices:{4:[10],5:[20]}});
+    const second=cart.save({...line(1),comboChoices:{4:[11],5:[21]}});
+    const payload=cart.payload();payload[0].combo_choices[4].push(99);
+    assert.deepEqual(cart.lines[0].comboChoices[4],[10]);
+    const draft=structuredClone(cart.lines[1]);draft.comboChoices[5]=[22];
+    assert.deepEqual(cart.lines[1].comboChoices[5],[21]);
+    cart.save(draft,second);cart.remove(first);
+    assert.deepEqual(cart.payload()[0].combo_choices,{4:[11],5:[22]});
+});
 test('separate combinations survive editing, cancellation and removal without sharing choices',()=>{
     const cart=new MenuCart(),small=line(1),large=line(2,2);
     const first=cart.save(small),second=cart.save(large);

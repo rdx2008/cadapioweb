@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogController;
+use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CourierController;
 use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\MenuController;
@@ -55,6 +56,9 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('access:owner')->group(function () {
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
+        Route::post('/products/{id}/combo/groups', [ComboController::class, 'group'])->name('products.combo.groups');
+        Route::post('/products/{id}/combo/options', [ComboController::class, 'option'])->name('products.combo.options');
+        Route::post('/products/{id}/combo/options/{optionId}/availability', [ComboController::class, 'availability'])->name('products.combo.availability');
         Route::get('/products/create', [CatalogController::class, 'create'])->name('products.create');
         Route::post('/catalog/categories', [CatalogController::class, 'category'])->name('catalog.categories');
         Route::get('/team', [TeamController::class, 'index'])->name('team.index');

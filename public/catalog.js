@@ -3,9 +3,12 @@ document.querySelectorAll('[data-catalog-filters]').forEach(form=>{
 });
 document.querySelectorAll('[data-catalog-create]').forEach(form=>{
     const pricing=form.querySelector('[data-catalog-pricing]'), variants=form.querySelector('[data-catalog-variants]');
+    const type=form.querySelector('[data-catalog-type]');
     const rows=form.querySelector('[data-variant-rows]');
     let nextIndex=Math.max(-1,...Array.from(rows.querySelectorAll('input[name$="[name]"]')).map(field=>Number(field.name.match(/\[(\d+)\]/)[1])))+1;
     const update=()=>{
+        if(type?.value==='combo')pricing.value='0';
+        pricing.disabled=type?.value==='combo';
         const enabled=pricing.value==='1';
         variants.hidden=!enabled;
         variants.querySelectorAll('input,button').forEach(field=>field.disabled=!enabled);
@@ -19,6 +22,7 @@ document.querySelectorAll('[data-catalog-create]').forEach(form=>{
     });
     rows.addEventListener('click',event=>{if(event.target.matches('[data-remove-variant]'))event.target.closest('[data-variant-row]').remove();});
     pricing.addEventListener('change',update);update();
+    type?.addEventListener('change',update);
     let photoUrl;
     form.querySelector('[data-catalog-photo]').addEventListener('change',event=>{
         if(photoUrl)URL.revokeObjectURL(photoUrl);

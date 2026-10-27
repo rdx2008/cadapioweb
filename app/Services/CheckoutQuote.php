@@ -53,6 +53,15 @@ class CheckoutQuote
             if (! $product->pizza_enabled) {
                 $this->require(empty($entry['flavors']), 'O modo pizza mudou. Revise as escolhas deste produto.');
             }
+            if ($product->product_type === 'combo') {
+                $this->require(! $product->uses_variants && ! $product->pizza_enabled, 'O combo está com configuração incompatível.');
+                foreach (app(ComboCatalog::class)->quote($product, $entry['combo_choices'] ?? []) as $component) {
+                    $unit += $component['price_cents'];
+                    $options[] = $component;
+                }
+            } else {
+                $this->require(empty($entry['combo_choices']), 'O tipo do produto mudou. Revise o combo.');
+            }
             foreach ($groups as $group) {
                 $ids = array_map('intval', $chosen[$group->id] ?? []);
                 $this->require(count($ids) === count(array_unique($ids)), 'Um adicional não pode ser selecionado duas vezes.');

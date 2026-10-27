@@ -37,6 +37,10 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
     const readLine=(product)=>{
         const selected=product.querySelector('[data-product-variant]')?.selectedOptions[0];
         const choices={},optionNames=[];
+        const comboChoices={},comboNames=[];
+        product.querySelectorAll('[data-combo-option]:checked').forEach(option=>{
+            (comboChoices[option.dataset.comboGroupId]??=[]).push(Number(option.value));comboNames.push(option.dataset.comboName);
+        });
         product.querySelectorAll('[data-option-price]:checked').forEach(option=>{
             (choices[option.dataset.optionGroupId]??=[]).push(Number(option.value));optionNames.push(option.dataset.optionName);
         });
@@ -44,9 +48,10 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         const flavors=Array.from(product.querySelectorAll('[data-pizza-flavor]:checked')).map(flavor=>Number(flavor.value));
         const pizza=pizzaInfo(product,flavors,selected?.value);
         if(product.dataset.pizza==='1'&&pizza.price!==null)unit=pizza.price;
+        product.querySelectorAll('[data-combo-option]:checked').forEach(option=>unit+=Number(option.dataset.comboPrice));
         product.querySelectorAll('[data-option-price]:checked').forEach(option=>unit+=Number(option.dataset.optionPrice));
         return {productId:Number(product.dataset.productId),quantity:Number(product.querySelector('[data-quantity]').value),variantId:selected?Number(selected.value):null,
-            choices,flavors,name:product.dataset.name,variantName:selected?.dataset.variantName??'',optionNames:[...pizza.names,...optionNames],unit};
+            choices,flavors,comboChoices,name:product.dataset.name,variantName:selected?.dataset.variantName??'',optionNames:[...pizza.names,...comboNames,...optionNames],unit};
     };
     const openProduct=(product,line=null)=>{
         editingId=line?.id??null;
@@ -54,6 +59,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         const variant=product.querySelector('[data-product-variant]');
         if(variant)variant.value=line?.variantId??variant.options[0]?.value??'';
         product.querySelectorAll('[data-pizza-flavor]').forEach(flavor=>{flavor.checked=Boolean(line?.flavors?.map(Number).includes(Number(flavor.value)));});
+        product.querySelectorAll('[data-combo-option]').forEach(option=>{option.checked=Boolean(line?.comboChoices?.[option.dataset.comboGroupId]?.map(Number).includes(Number(option.value)));});
         product.querySelectorAll('[data-option-price]').forEach(option=>{option.checked=Boolean(line?.choices?.[option.dataset.optionGroupId]?.map(Number).includes(Number(option.value)));});
         product.querySelector('[data-product-add]').textContent=line?'Salvar item':'Adicionar à sacola';
         product.querySelector('[data-product-message]').textContent='';
@@ -75,7 +81,9 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
             const limit=product.querySelector('[data-flavor-limit]');if(limit)limit.textContent='Escolha de 1 a '+(variant?.dataset.maxFlavors??1)+' sabores';
             const ids=Array.from(product.querySelectorAll('[data-pizza-flavor]:checked')).map(flavor=>Number(flavor.value));
             const pizza=pizzaInfo(product,ids,variant?.value);
-            product.querySelector('.dialog-price').textContent=menuMoney(product.dataset.pizza==='1'&&pizza.price!==null?pizza.price:variant?Number(variant.dataset.variantPrice):Number(product.dataset.price));
+            let displayed=product.dataset.pizza==='1'&&pizza.price!==null?pizza.price:variant?Number(variant.dataset.variantPrice):Number(product.dataset.price);
+            product.querySelectorAll('[data-combo-option]:checked').forEach(option=>displayed+=Number(option.dataset.comboPrice));
+            product.querySelector('.dialog-price').textContent=menuMoney(displayed);
         });
         cart.lines.forEach((line,index)=>{
             count+=line.quantity;subtotal+=line.unit*line.quantity;
@@ -93,6 +101,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
             if(line.variantId)appendInput(`cart_lines[${index}][variant_id]`,line.variantId);
             (line.flavors??[]).forEach(id=>appendInput(`cart_lines[${index}][flavors][]`,id));
             Object.entries(line.choices).forEach(([group,ids])=>ids.forEach(id=>appendInput(`cart_lines[${index}][choices][${group}][]`,id)));
+            Object.entries(line.comboChoices??{}).forEach(([group,ids])=>ids.forEach(id=>appendInput(`cart_lines[${index}][combo_choices][${group}][]`,id)));
         });
         if(!count){const empty=document.createElement('div');empty.className='bag-empty';empty.textContent='Sua sacola está esperando seus favoritos.';lines.append(empty);}
         const delivery=mode.value==='delivery';
@@ -124,6 +133,10 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
                 product.querySelectorAll('[data-option-group]').forEach(group=>{
                     const count=group.querySelectorAll('[data-option-price]:checked').length;
                     if(count<Number(group.dataset.min)||count>Number(group.dataset.max))throw new Error(group.querySelector('legend').textContent.trim()+': confira a quantidade de escolhas.');
+                });
+                product.querySelectorAll('[data-combo-group]').forEach(group=>{
+                    const count=group.querySelectorAll('[data-combo-option]:checked').length;
+                    if(count<Number(group.dataset.min)||count>Number(group.dataset.max))throw new Error(group.querySelector('legend').textContent.trim()+': confira as escolhas do combo.');
                 });
                 cart.save(readLine(product),editingId);editingId=null;cartMessage.textContent='Sacola atualizada.';dialog.close();update();
             }catch(error){message.textContent=error.message;}
@@ -200,13 +213,15 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         if(!entry||typeof entry!=='object')return;
         const product=products.find(product=>Number(product.dataset.productId)===Number(entry.product_id));
         const choices=Object.fromEntries(Object.entries(entry.choices&&typeof entry.choices==='object'?entry.choices:{}).filter(([,ids])=>Array.isArray(ids)));
+        const comboChoices=Object.fromEntries(Object.entries(entry.combo_choices&&typeof entry.combo_choices==='object'?entry.combo_choices:{}).filter(([,ids])=>Array.isArray(ids)));
         const variant=product?Array.from(product.querySelector('[data-product-variant]')?.options??[]).find(option=>Number(option.value)===Number(entry.variant_id)):null;
         let unit=variant?Number(variant.dataset.variantPrice):Number(product?.dataset.price??0);const optionNames=[];
         const flavors=Array.isArray(entry.flavors)?entry.flavors.map(Number):[];
         const pizza=product?pizzaInfo(product,flavors,entry.variant_id):{names:[],price:null};
         if(product?.dataset.pizza==='1'&&pizza.price!==null)unit=pizza.price;
+        product?.querySelectorAll('[data-combo-option]').forEach(option=>{if(comboChoices[option.dataset.comboGroupId]?.map(Number).includes(Number(option.value))){unit+=Number(option.dataset.comboPrice);optionNames.push(option.dataset.comboName);}});
         product?.querySelectorAll('[data-option-price]').forEach(option=>{if(choices[option.dataset.optionGroupId]?.map(Number).includes(Number(option.value))){unit+=Number(option.dataset.optionPrice);optionNames.push(option.dataset.optionName);}});
-        try{cart.save({productId:Number(entry.product_id),quantity:Number(entry.quantity),variantId:entry.variant_id?Number(entry.variant_id):null,choices,flavors,name:product?.dataset.name??'Produto indisponível · remova este item',variantName:variant?.dataset.variantName??'',optionNames:[...pizza.names,...optionNames],unit});}catch(error){cartMessage.textContent=error.message;}
+        try{cart.save({productId:Number(entry.product_id),quantity:Number(entry.quantity),variantId:entry.variant_id?Number(entry.variant_id):null,choices,flavors,comboChoices,name:product?.dataset.name??'Produto indisponível · remova este item',variantName:variant?.dataset.variantName??'',optionNames:[...pizza.names,...optionNames],unit});}catch(error){cartMessage.textContent=error.message;}
     });
     update();
 });

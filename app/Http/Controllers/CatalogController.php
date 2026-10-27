@@ -113,9 +113,12 @@ class CatalogController extends Controller
     public function createProduct(Request $request): RedirectResponse
     {
         MoneyInput::normalize($request, ['price' => 'price_cents']);
-        $data = $request->validate(['store_id' => 'required|integer', 'name' => 'required|string|max:120', 'product_type' => 'sometimes|in:common,pizza', 'category_id' => 'nullable|integer|min:1', 'category' => 'nullable|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'nullable|required_unless:uses_variants,1|integer|min:1|max:1000000', 'available' => 'sometimes|boolean', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'uses_variants' => 'sometimes|boolean', 'new_variants' => 'nullable|array|max:20', 'new_variants.*' => 'array:name,price', 'new_variants.*.name' => 'required|string|max:80', 'new_variants.*.price' => ['required', 'regex:/^\d{1,5}(?:[.,]\d{1,2})?$/D'], 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
+        $data = $request->validate(['store_id' => 'required|integer', 'name' => 'required|string|max:120', 'product_type' => 'sometimes|in:common,pizza,combo', 'category_id' => 'nullable|integer|min:1', 'category' => 'nullable|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'nullable|required_unless:uses_variants,1|integer|min:1|max:1000000', 'available' => 'sometimes|boolean', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'uses_variants' => 'sometimes|boolean', 'new_variants' => 'nullable|array|max:20', 'new_variants.*' => 'array:name,price', 'new_variants.*.name' => 'required|string|max:80', 'new_variants.*.price' => ['required', 'regex:/^\d{1,5}(?:[.,]\d{1,2})?$/D'], 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
         $store = $this->store($data['store_id']);
         $variants = $data['new_variants'] ?? [];
+        if (($data['product_type'] ?? 'common') === 'combo' && (($data['uses_variants'] ?? false) || count($variants))) {
+            throw ValidationException::withMessages(['uses_variants' => 'Combo utiliza preço base único. Configure componentes no editor após salvar.']);
+        }
         if (($data['uses_variants'] ?? false) && ! count($variants)) {
             throw ValidationException::withMessages(['new_variants' => 'Adicione pelo menos um tamanho com preço.']);
         }
@@ -351,8 +354,26 @@ class CatalogController extends Controller
         $tenant = DB::table('tenants')->find(auth()->user()->tenant_id);
 
         $flavors = DB::table('pizza_flavors')->where('product_id', $id)->orderBy('id')->get();
+        $comboGroups = DB::table('combo_groups')->where('product_id', $id)->orderBy('id')->get();
+        $comboOptions = DB::table('combo_options')->join('products', 'products.id', '=', 'combo_options.component_product_id')->leftJoin('product_variants', 'product_variants.id', '=', 'combo_options.component_variant_id')->where('products.tenant_id', $product->tenant_id)->where('products.store_id', $product->store_id)->whereIn('combo_group_id', $comboGroups->pluck('id'))->select('combo_options.*', 'products.name as component_name', 'product_variants.name as variant_name')->orderBy('combo_options.id')->get()->groupBy('combo_group_id');
+        $components = [];
+        if ($product->product_type === 'combo') {
+            $candidates = DB::table('products')->where('tenant_id', $product->tenant_id)->where('store_id', $product->store_id)->where('product_type', 'common')->whereNotExists(function ($query) {
+                $query->selectRaw('1')->from('option_groups')->whereColumn('option_groups.product_id', 'products.id')->where('kind', 'addon')->where('minimum', '>', 0);
+            })->orderBy('name')->get();
+            $candidateVariants = DB::table('product_variants')->whereIn('product_id', $candidates->pluck('id'))->orderBy('id')->get()->groupBy('product_id');
+            foreach ($candidates as $candidate) {
+                if ($candidate->uses_variants) {
+                    foreach ($candidateVariants->get($candidate->id, collect()) as $size) {
+                        $components[$candidate->id.':'.$size->id] = $candidate->name.' · '.$size->name.(! $candidate->available || ! $size->available ? ' (pausado)' : '');
+                    }
+                } else {
+                    $components[$candidate->id.':0'] = $candidate->name.(! $candidate->available ? ' (pausado)' : '');
+                }
+            }
+        }
 
-        return view('catalog.product', compact('product', 'groups', 'options', 'variants', 'categories', 'tenant', 'flavors'));
+        return view('catalog.product', compact('product', 'groups', 'options', 'variants', 'categories', 'tenant', 'flavors', 'comboGroups', 'comboOptions', 'components'));
     }
 
     public function pizzaSettings(Request $request, int $id): RedirectResponse
@@ -429,6 +450,9 @@ class CatalogController extends Controller
         $data = $request->validate(['uses_variants' => 'required|boolean']);
         DB::transaction(function () use ($product, $data): void {
             DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
+            if ($data['uses_variants'] && DB::table('products')->where('id', $product->id)->value('product_type') === 'combo') {
+                throw ValidationException::withMessages(['uses_variants' => 'Combo utiliza preço base único.']);
+            }
             if (! $data['uses_variants'] && DB::table('products')->where('id', $product->id)->value('pizza_enabled')) {
                 throw ValidationException::withMessages(['uses_variants' => 'Desative o modo pizza antes de voltar ao preço único.']);
             }
@@ -471,7 +495,7 @@ class CatalogController extends Controller
     {
         $product = $this->product($id);
         MoneyInput::normalize($request, ['price' => 'price_cents']);
-        $data = $request->validate(['name' => 'required|string|max:120', 'product_type' => 'sometimes|in:common,pizza', 'category' => 'nullable|string|max:80', 'category_id' => 'nullable|integer|min:1', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
+        $data = $request->validate(['name' => 'required|string|max:120', 'product_type' => 'sometimes|in:common,pizza,combo', 'category' => 'nullable|string|max:80', 'category_id' => 'nullable|integer|min:1', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
         unset($data['photo']);
         $path = null;
         if ($request->hasFile('photo')) {
@@ -485,6 +509,9 @@ class CatalogController extends Controller
                 if (isset($data['product_type']) && $data['product_type'] !== $current->product_type) {
                     $data['pizza_enabled'] = false;
                     $data['available'] = false;
+                    if ($data['product_type'] === 'combo') {
+                        $data['uses_variants'] = false;
+                    }
                     Audit::record('product.type_changed', ['product_id' => $product->id, 'from' => $current->product_type, 'to' => $data['product_type']], $product->tenant_id);
                 }
                 $category = $this->resolveCategory($product->store_id, $data);

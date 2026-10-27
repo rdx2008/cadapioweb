@@ -2,9 +2,17 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Combos — 27/10/2026
+
+Tipo Combo disponível no cadastro e editor, com preço base fixo e grupos de componentes da mesma loja. Cada opção referencia produto comum, com tamanho fixo quando houver variações, quantidade e acréscimo por unidade do componente. Preço avulso do componente não entra no cálculo. Até 10 grupos, 20 opções por grupo e 10 escolhas por grupo; pelo menos um grupo deve ser obrigatório.
+
+Cardápio e checkout verificam componentes/tamanhos ativos e limites de escolha. Grupos obrigatórios sem opções suficientes retiram o combo da vitrine. Cada linha da sacola mantém suas próprias escolhas; servidor recalcula preços, exige nova revisão se houver alteração e grava componentes no histórico do pedido. Configurações isoladas por tenant/loja, com auditoria e bloqueio da loja durante alterações. Produtos com adicionais obrigatórios, pizzas e outros combos não podem ser componentes nesta etapa; não há montagem interna do componente nem baixa de estoque.
+
+Validação: 144 testes PHP e 12 JavaScript aprovados, incluindo sete casos de combos e isolamento de escolhas da sacola. Templates e rotas compilados. Migração aditiva cria combo_groups e combo_options; executar migrate --force no deploy. Publicação Coolify e validação visual em produção pendentes.
+
 ## Tipo de produto e configurações específicas — 27/10/2026
 
-Cadastro/edição incluem Tipo de produto: Produto comum ou Pizza. Combos não aparecem como opção enquanto o módulo não estiver implementado. Editor comum mostra dados, preços/variações e adicionais; sabores, bordas e máximo de sabores ficam exclusivos do editor Pizza. Alterar o seletor requer salvar para carregar as seções do novo tipo. Listagem identifica o tipo.
+Cadastro/edição incluem Tipo de produto: Produto comum ou Pizza. Combos foram acrescentados na etapa seguinte descrita acima. Editor comum mostra dados, preços/variações e adicionais; sabores, bordas e máximo de sabores ficam exclusivos do editor Pizza. Alterar o seletor requer salvar para carregar as seções do novo tipo. Listagem identifica o tipo.
 
 Migration adiciona product_type com padrão common e identifica como pizza os produtos já habilitados no modo pizza, com sabores cadastrados ou grupo do tipo border. Não altera disponibilidade nem preços na migração. Novos endpoints de sabores/regras e cadastro de grupos Borda recusam produtos comuns no servidor.
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\CheckoutQuote;
+use App\Services\ComboCatalog;
 use App\Services\DeliveryCoverage;
 use App\Services\PizzaPricing;
 use App\Services\StoreAvailability;
@@ -36,7 +37,13 @@ class MenuController extends Controller
         })->where('products.tenant_id', $store->tenant_id)->where('products.store_id', $store->id)->where('products.available', true)->select('products.*')->orderByRaw('COALESCE(catalog_categories.sort_order, 9999)')->orderBy('products.category')->orderBy('products.sort_order')->orderBy('products.name')->get();
         $variants = DB::table('product_variants')->whereIn('product_id', $products->pluck('id'))->where('available', true)->orderBy('price_cents')->orderBy('id')->get()->groupBy('product_id');
         $flavors = DB::table('pizza_flavors')->whereIn('product_id', $products->pluck('id'))->where('available', true)->orderBy('name')->get()->groupBy('product_id');
-        $products = $products->filter(function ($product) use ($variants, $flavors): bool {
+        $combos = [];
+        $products = $products->filter(function ($product) use ($variants, $flavors, &$combos): bool {
+            if ($product->product_type === 'combo') {
+                $combos[$product->id] = app(ComboCatalog::class)->data($product);
+
+                return ! $product->uses_variants && ! $product->pizza_enabled && $combos[$product->id]['ready'];
+            }
             if (! $product->uses_variants) {
                 return true;
             }
@@ -62,7 +69,7 @@ class MenuController extends Controller
             ? ($store->delivery_pricing !== 'bands' || $zones->contains(fn ($zone) => $zone->radius_meters !== null))
             : $zones->contains(fn ($zone) => $zone->radius_meters === null && $zone->city && $zone->state_code);
 
-        return view('menu', ['store' => $store, 'products' => $products, 'groups' => $groups->groupBy('product_id'), 'options' => $options, 'variants' => $variants, 'flavors' => $flavors, 'zones' => $zones, 'hasDelivery' => $hasDelivery, 'isOpen' => $availability->isOpen($store)]);
+        return view('menu', ['store' => $store, 'products' => $products, 'groups' => $groups->groupBy('product_id'), 'options' => $options, 'variants' => $variants, 'flavors' => $flavors, 'combos' => $combos, 'zones' => $zones, 'hasDelivery' => $hasDelivery, 'isOpen' => $availability->isOpen($store)]);
     }
 
     public function review(Request $request, string $slug, CheckoutQuote $calculator): RedirectResponse
@@ -84,12 +91,15 @@ class MenuController extends Controller
             'address_fields' => 'sometimes|array:street,number,neighborhood,city,state,postcode',
             'items' => 'nullable|required_without:cart_lines|array|min:1|max:500', 'items.*' => 'required|integer|min:0|max:50',
             'cart_lines' => 'nullable|required_without:items|array|min:1|max:50',
-            'cart_lines.*' => 'array:product_id,quantity,variant_id,choices,flavors',
+            'cart_lines.*' => 'array:product_id,quantity,variant_id,choices,flavors,combo_choices',
             'cart_lines.*.product_id' => 'required|integer|min:1',
             'cart_lines.*.quantity' => 'required|integer|min:1|max:50',
             'cart_lines.*.variant_id' => 'nullable|integer|min:1',
             'cart_lines.*.flavors' => 'sometimes|array|max:4',
             'cart_lines.*.flavors.*' => 'integer|min:1',
+            'cart_lines.*.combo_choices' => 'sometimes|array|max:10',
+            'cart_lines.*.combo_choices.*' => 'array|max:10',
+            'cart_lines.*.combo_choices.*.*' => 'integer|min:1',
             'cart_lines.*.choices' => 'sometimes|array|max:20',
             'cart_lines.*.choices.*' => 'array|max:20',
             'cart_lines.*.choices.*.*' => 'integer|min:1',
