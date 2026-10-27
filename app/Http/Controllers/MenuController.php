@@ -61,6 +61,9 @@ class MenuController extends Controller
     public function review(Request $request, string $slug, CheckoutQuote $calculator): RedirectResponse
     {
         $store = $this->store($slug);
+        if ($request->has('cart_lines') && ($request->has('items') || $request->has('choices') || $request->has('variants'))) {
+            throw ValidationException::withMessages(['cart' => 'Formato de sacola inválido. Recarregue o cardápio e revise os itens.']);
+        }
         if ($request->input('mode') === 'delivery' && $request->has('address_fields')) {
             $fields = $this->addressFields($request);
             $request->merge(['address' => $this->formatAddress($fields)]);
@@ -72,7 +75,15 @@ class MenuController extends Controller
             'delivery_token' => 'nullable|string|max:5000',
             'address_complement' => 'nullable|string|max:120',
             'address_fields' => 'sometimes|array:street,number,neighborhood,city,state,postcode',
-            'items' => 'required|array|min:1|max:500', 'items.*' => 'required|integer|min:0|max:50',
+            'items' => 'nullable|required_without:cart_lines|array|min:1|max:500', 'items.*' => 'required|integer|min:0|max:50',
+            'cart_lines' => 'nullable|required_without:items|array|min:1|max:50',
+            'cart_lines.*' => 'array:product_id,quantity,variant_id,choices',
+            'cart_lines.*.product_id' => 'required|integer|min:1',
+            'cart_lines.*.quantity' => 'required|integer|min:1|max:50',
+            'cart_lines.*.variant_id' => 'nullable|integer|min:1',
+            'cart_lines.*.choices' => 'sometimes|array|max:20',
+            'cart_lines.*.choices.*' => 'array|max:20',
+            'cart_lines.*.choices.*.*' => 'integer|min:1',
             'choices' => 'nullable|array|max:50', 'choices.*' => 'array|max:20', 'choices.*.*' => 'array|max:20', 'choices.*.*.*' => 'integer|min:1',
             'variants' => 'nullable|array|max:500', 'variants.*' => 'nullable|integer|min:1',
             'idempotency_key' => 'required|uuid',

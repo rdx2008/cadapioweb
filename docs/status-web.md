@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Várias combinações do mesmo produto — 27/10/2026
+
+Sacola permite adicionar o mesmo produto em linhas independentes, com tamanho, adicionais e quantidade próprios. Cada linha mostra as escolhas e permite editar/remover. Abrir diálogo prepara uma nova combinação; fechar ou cancelar não altera a sacola. Salvar item substitui somente a linha em edição. Limites: até 50 itens e 50 unidades somadas do mesmo produto. Itens iguais podem permanecer em linhas separadas.
+
+Novo formato cart_lines é validado por linha no servidor; não aceita formato misturado nem preço por linha enviado pelo cliente. Produto deve pertencer à loja/tenant, tamanho ao produto e adicionais aos grupos corretos, respeitando limites de escolha. Revisão e confirmação recalculam todas as combinações e cobram um único frete para o pedido. Snapshots de itens preservam nomes, tamanhos, adicionais, quantidades e valores. Idempotência permanece por pedido. Formato anterior e revisões já abertas continuam compatíveis.
+
+Edição do carrinho restaura todas as combinações a partir da revisão. Disponibilidade ou preço alterado exige nova revisão; uma linha inválida bloqueia o pedido inteiro. Quantidade no diálogo é rascunho e só entra no pedido ao adicionar/salvar, evitando alterações acidentais ao cancelar. Não inclui ainda pizzas de múltiplos sabores, combos ou observações por item.
+
+Validação: 126 testes PHP e dez JavaScript, incluindo cinco casos novos de checkout e dois de estado da sacola. Chrome desktop e celular 390/320 px: dois tamanhos no mesmo pedido, edição, cancelamento de edição, remoção, retorno da revisão e confirmação final com duas linhas. Sem migration nesta etapa; publicação e piloto PostgreSQL/Coolify continuam pendentes.
+
 ## Gerenciador de cardápio — 27/10/2026
 
 Nova área /catalog substitui o cadastro simples embutido no dashboard. Menu e atalhos apontam para o gerenciador; o painel antigo mantém um link de compatibilidade. Proprietário escolhe loja, pesquisa por nome e filtra por categoria, habilitados/pausados/destaques; lista paginada de 24 produtos mostra foto, descrição, preço único ou mínimo ativo, quantidade de grupos e pausa rápida. Estados vazios distinguem loja ausente, primeiro produto e filtro sem resultado.

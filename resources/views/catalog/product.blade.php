@@ -31,7 +31,7 @@
 @include('catalog.variants')
 <section id="product-addons">
 <h2>Grupos e adicionais</h2>
-<p class="muted">As escolhas valem para cada unidade do produto. Exemplo: 2 lanches com queijo cobram o queijo duas vezes. Para combinações diferentes, faça pedidos separados nesta versão.</p>
+<p class="muted">As escolhas valem para cada unidade do produto. Exemplo: 2 lanches com queijo cobram o queijo duas vezes. Para combinações diferentes, o cliente pode adicionar outro item do mesmo produto na sacola.</p>
 @foreach($groups as $group)<article class="card" style="margin-bottom:20px">
 <form action="/products/{{ $product->id }}/groups" method="post" class="fields">@csrf<input type="hidden" name="group_id" value="{{ $group->id }}">
 <label>Nome do grupo<input name="name" value="{{ $group->name }}" required>

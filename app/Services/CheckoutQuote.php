@@ -14,26 +14,32 @@ class CheckoutQuote
         $this->require($this->availability->isOpen($store), 'Esta loja está fechada ou pausada.');
         $lines = [];
         $subtotal = 0;
-        foreach ($draft['items'] as $productId => $quantity) {
+        $entries = $draft['cart_lines'] ?? collect($draft['items'])->map(fn ($quantity, $id) => ['product_id' => $id, 'quantity' => $quantity, 'variant_id' => $draft['variants'][$id] ?? null, 'choices' => $draft['choices'][$id] ?? []])->values()->all();
+        $quantities = [];
+        foreach ($entries as $entry) {
+            $productId = $entry['product_id'];
+            $quantity = $entry['quantity'];
             $this->require(ctype_digit((string) $productId) && (int) $productId > 0, 'Identificador de produto inválido.');
             if (! $quantity) {
                 continue;
             }
+            $quantities[$productId] = ($quantities[$productId] ?? 0) + $quantity;
+            $this->require($quantities[$productId] <= 50, 'O limite é de 50 unidades do mesmo produto, somando suas combinações.');
             $product = DB::table('products')->where('tenant_id', $store->tenant_id)->where('store_id', $store->id)->where('id', $productId)->where('available', true)->first();
             $this->require($product !== null, 'Um produto não está mais disponível. Revise o carrinho.');
             $groups = DB::table('option_groups')->where('product_id', $product->id)->orderBy('id')->get();
-            $chosen = $draft['choices'][$product->id] ?? [];
+            $chosen = $entry['choices'] ?? [];
             $this->require(count(array_diff(array_map('strval', array_keys($chosen)), $groups->pluck('id')->map(fn ($id) => (string) $id)->all())) === 0, 'Grupo de adicionais inválido para este produto.');
             $options = [];
             $unit = (int) $product->price_cents;
             if ($product->uses_variants) {
-                $variantId = $draft['variants'][$product->id] ?? null;
+                $variantId = $entry['variant_id'] ?? null;
                 $variant = DB::table('product_variants')->where('product_id', $product->id)->where('id', $variantId)->where('available', true)->first();
                 $this->require($variant !== null, 'Escolha uma variação disponível de '.$product->name.'.');
                 $unit = (int) $variant->price_cents;
                 $options[] = ['group' => 'Variação', 'name' => $variant->name, 'price_cents' => $unit, 'kind' => 'variant'];
             } else {
-                $this->require(empty($draft['variants'][$product->id]), 'O modo de preço de '.$product->name.' mudou. Revise o carrinho.');
+                $this->require(empty($entry['variant_id']), 'O modo de preço de '.$product->name.' mudou. Revise o carrinho.');
             }
             foreach ($groups as $group) {
                 $ids = array_map('intval', $chosen[$group->id] ?? []);
@@ -48,7 +54,7 @@ class CheckoutQuote
             }
             $lines[] = ['name' => $product->name, 'quantity' => (int) $quantity, 'unit_cents' => $unit, 'options' => $options];
             $subtotal += $unit * $quantity;
-            $this->require(count($lines) <= 50 && $subtotal <= 100000000, 'O pedido excede o limite de 50 produtos distintos ou o valor máximo permitido.');
+            $this->require(count($lines) <= 50 && $subtotal <= 100000000, 'O pedido excede o limite de 50 itens ou o valor máximo permitido.');
         }
         $this->require(count($lines) > 0, 'Selecione pelo menos um produto.');
         $this->require($subtotal >= $store->minimum_order_cents, 'O pedido mínimo em produtos é R$ '.number_format($store->minimum_order_cents / 100, 2, ',', '.').'.');
