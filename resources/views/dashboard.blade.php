@@ -1,7 +1,12 @@
 @extends('layout')
 @section('content')
 <div data-workspace-overview>
-<div class="page-heading"><div><h1>Sua operação, em tempo real.</h1><p>Acompanhe os pedidos e mantenha a cozinha no ritmo.</p></div><span class="date-label">@include('partials.icon',['name'=>'calendar']) Hoje, {{ now()->timezone($selectedStore->timezone??'America/Sao_Paulo')->format('d/m/Y') }}</span></div>
+<div class="page-heading"><div><span class="dashboard-eyebrow">PAINEL DO RESTAURANTE</span><h1>Sua operação, em tempo real.</h1><p>Acompanhe os pedidos e mantenha a cozinha no ritmo.</p></div><span class="date-label">@include('partials.icon',['name'=>'calendar']) Hoje, {{ now()->timezone($selectedStore->timezone??'America/Sao_Paulo')->format('d/m/Y') }}</span></div>
+<section class="tenant-welcome" aria-label="Atalhos da operação">
+<div><span class="welcome-label">Tudo pronto para um bom serviço</span><h2>Seu restaurante.<br>Seu próximo grande dia.</h2><p>Do primeiro pedido à última entrega, acompanhe tudo por aqui.</p><a class="button" href="#pedidos">Acompanhar pedidos @include('partials.icon',['name'=>'arrow'])</a></div>
+<div class="welcome-art" aria-hidden="true"><span class="art-orbit"></span><span class="art-plate">@include('partials.icon',['name'=>'chef'])</span><span class="art-chip chip-one">@include('partials.icon',['name'=>'orders']) Pedidos</span><span class="art-chip chip-two">@include('partials.icon',['name'=>'truck']) Entregas</span></div>
+</section>
+<div class="tenant-shortcuts"><a href="#cardapio">@include('partials.icon',['name'=>'menu'])<span>Meu cardápio<small>Produtos e disponibilidade</small></span>@include('partials.icon',['name'=>'arrow'])</a><a href="#lojas">@include('partials.icon',['name'=>'store'])<span>Minhas lojas<small>Horários e configurações</small></span>@include('partials.icon',['name'=>'arrow'])</a><a href="/team">@include('partials.icon',['name'=>'users'])<span>Minha equipe<small>Pessoas e acessos</small></span>@include('partials.icon',['name'=>'arrow'])</a></div>
 <div class="stats metric-grid">
 @foreach([['today_orders','orders','Pedidos de hoje',null,'Todos os status'],['preparing','chef','Em preparo',null,'Pedidos em andamento'],['paid_cents','money','Vendas confirmadas','money','Pedidos de hoje com recebimento'],['average_cents','chart','Ticket médio','money','Pedidos de hoje com recebimento']] as [$key,$icon,$label,$format,$hint])
 <div class="stat metric"><span class="metric-icon {{ $icon }}">@include('partials.icon',['name'=>$icon])</span><div><span class="metric-label">{{ $label }}</span><strong class="value" data-summary="{{ $key }}" data-format="{{ $format }}">{{ $format==='money'?'R$ '.number_format($summary[$key]/100,2,',','.'): $summary[$key] }}</strong><small>{{ $hint }}</small></div></div>
