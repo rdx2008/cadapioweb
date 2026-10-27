@@ -2,6 +2,12 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Recuperação de senha — 26/10/2026
+
+Implementados link no login, solicitação neutra por e-mail, mensagem em português e formulário de redefinição. Broker Laravel utiliza token hasheado, expiração de 60 minutos, limitação de solicitação e consumo único. Reset serializa o acesso ao token em transação, troca senha e remember_token, encerra sessões do usuário em banco e registra auditoria sem senha/token. Outras contas e sessões permanecem preservadas. URL de e-mail utiliza APP_URL confiável; formulário usa no-store/no-referrer e dados sensíveis não são gravados no old input.
+
+Envio real depende de SMTP no Coolify. Drivers de log/array mantêm recuperação indisponível e não geram links no log. Testes usam notificações simuladas; ainda é necessário testar recebimento real. Validação: 92 testes PHP, quatro JavaScript e Chrome em 1280/390/320 px. Recuperação concluída no código; equipe e permissões por loja permanecem como próxima entrega.
+
 ## CEP primeiro e preenchimento automático — 25/10/2026
 
 Fluxo atual do cliente: escolher entrega → informar CEP obrigatório e buscar endereço → revelar rua/bairro/cidade/UF preenchidos → informar número e complemento → consultar e confirmar frete → revisar pedido. ViaCEP no servidor preenche dados postais, com cache por sete dias, timeout e limite de requisições. Não exige nova chave. CEP genérico libera campos faltantes; erro/inexistência oferece nova tentativa ou preenchimento manual com CEP no formato válido. CEP alterado limpa endereço, número, complemento e comprovante do frete; respostas antigas são ignoradas. Retirada não exige endereço. Campos antigos são restaurados na edição do carrinho.
@@ -80,7 +86,7 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 
 | Área | Estado confirmado |
 |---|---|
-| Empresas e acesso | Login, perfis e isolamento das operações existentes; faltam usuários/permissões por loja e recuperação de senha |
+| Empresas e acesso | Login, perfis e isolamento das operações existentes; recuperação de senha implementada, pendente de SMTP real; faltam usuários/permissões por loja |
 | Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; faltam variações, combos, feriados e mais de dois períodos diários |
 | Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; validação geográfica por raio implementada com API configurável, pendente de piloto; faltam agendamento e pagamento online |
 | Pedidos e cozinha | Aceite, preparo, pronto, conclusão, filtros, paginação, detalhes privados, atualização automática e som ativável; faltam estações e ocorrências completas |

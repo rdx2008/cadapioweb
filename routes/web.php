@@ -6,6 +6,7 @@ use App\Http\Controllers\CourierController;
 use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderBoardController;
+use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\WhatsappController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,10 @@ Route::get('/', fn () => view('welcome'));
 Route::middleware('guest')->group(function () {
     Route::view('/login', 'auth.login')->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
+    Route::get('/forgot-password', [PasswordRecoveryController::class, 'requestForm'])->name('password.request');
+    Route::post('/forgot-password', [PasswordRecoveryController::class, 'send'])->middleware('throttle:5,1')->name('password.email');
+    Route::get('/reset-password/{token}', [PasswordRecoveryController::class, 'resetForm'])->name('password.reset');
+    Route::post('/reset-password', [PasswordRecoveryController::class, 'reset'])->middleware('throttle:6,1')->name('password.update');
     Route::view('/entregadores/cadastro', 'auth.register');
     Route::post('/entregadores/cadastro', [AuthController::class, 'register'])->middleware('throttle:5,1');
 });

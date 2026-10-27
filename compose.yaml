@@ -26,6 +26,14 @@ x-app: &app
         RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
         GEOAPIFY_API_KEY: ${GEOAPIFY_API_KEY:-}
         GEOCODING_DAILY_LIMIT: ${GEOCODING_DAILY_LIMIT:-2800}
+        MAIL_MAILER: ${MAIL_MAILER:-log}
+        MAIL_HOST: ${MAIL_HOST:-}
+        MAIL_PORT: ${MAIL_PORT:-587}
+        MAIL_USERNAME: ${MAIL_USERNAME:-}
+        MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+        MAIL_SCHEME: ${MAIL_SCHEME:-smtp}
+        MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-hello@example.com}
+        MAIL_FROM_NAME: ${MAIL_FROM_NAME:-CadapioWeb}
     volumes:
         - app_storage:/var/www/html/storage
     depends_on:

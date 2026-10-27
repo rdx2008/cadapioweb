@@ -12,5 +12,5 @@ return Application::configure(basePath: dirname(__DIR__))
         $m->preventRequestForgery(except: ['webhooks/evolution/*']);
     })
     ->withExceptions(function (Exceptions $e): void {
-        $e->dontFlash(['client_secret']);
+        $e->dontFlash(['client_secret', 'token']);
     })->create();
