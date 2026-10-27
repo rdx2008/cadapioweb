@@ -31,6 +31,6 @@ class CheckoutPayment
 
         $account = str_starts_with($method, 'online_') ? app(OnlinePayment::class)->accounts($store->id)->firstWhere('provider', substr($method, 7)) : null;
 
-        return ['payment_method' => $method, 'change_for_cents' => $change, 'payment_account_revision' => $account ? hash('sha256', $account->credential.'|'.$account->handle.'|'.$account->environment) : null];
+        return ['payment_method' => $method, 'change_for_cents' => $change, 'payment_account_revision' => $account ? hash('sha256', ($account->provider === 'pagbank' ? $account->credential : '').'|'.$account->handle.'|'.$account->environment) : null];
     }
 }

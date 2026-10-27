@@ -19,7 +19,10 @@ class PaymentController extends Controller
     {
         abort_unless(in_array($provider, ['infinitepay', 'pagbank'], true), 404);
         $store = DB::table('stores')->where('tenant_id', $request->user()->tenant_id)->where('id', $id)->firstOrFail();
-        $data = $request->validate(['enabled' => 'required|boolean', 'environment' => $provider === 'infinitepay' ? 'required|in:production' : 'required|in:sandbox,production', 'credential' => ['nullable', 'string', 'max:4096', 'regex:/^[!-~]{8,4096}$/D'], 'handle' => $provider === 'infinitepay' ? ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/D'] : 'nullable|string|max:100']);
+        if ($provider === 'infinitepay') {
+            $request->merge(['environment' => 'production']);
+        }
+        $data = $request->validate(['enabled' => 'required|boolean', 'environment' => $provider === 'infinitepay' ? 'required|in:production' : 'required|in:sandbox,production', 'credential' => $provider === 'pagbank' ? ['nullable', 'string', 'max:4096', 'regex:/^[!-~]{8,4096}$/D'] : 'exclude', 'handle' => $provider === 'infinitepay' ? ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/D'] : 'nullable|string|max:100']);
         if ($data['enabled']) {
             $root = config('app.url');
             $parts = parse_url($root);
@@ -33,14 +36,16 @@ class PaymentController extends Controller
             if (! $data['enabled'] && ! $store->accepts_cash && ! $store->accepts_card && ! $store->accepts_pix && app(OnlinePayment::class)->accounts($store->id)->where('provider', '!=', $provider)->isEmpty()) {
                 throw ValidationException::withMessages(['enabled' => 'Habilite outra forma de pagamento antes de desligar este provedor.']);
             }
-            if (empty($data['credential']) && ! $existing) {
+            if ($provider === 'pagbank' && empty($data['credential']) && ! $existing) {
                 throw ValidationException::withMessages(['credential' => 'Cadastre a credencial desta loja diretamente neste campo.']);
             }
-            if ($existing && $existing->environment !== $data['environment'] && empty($data['credential'])) {
+            if ($provider === 'pagbank' && $existing && $existing->environment !== $data['environment'] && empty($data['credential'])) {
                 throw ValidationException::withMessages(['credential' => 'Ao trocar de ambiente, informe a credencial correspondente.']);
             }
             $values = ['enabled' => (bool) $data['enabled'], 'environment' => $data['environment'], 'handle' => $provider === 'infinitepay' ? $data['handle'] : null, 'updated_at' => now()];
-            if (! empty($data['credential'])) {
+            if ($provider === 'infinitepay') {
+                $values['credential'] = Crypt::encryptString('');
+            } elseif (! empty($data['credential'])) {
                 $values['credential'] = Crypt::encryptString($data['credential']);
             }
             if ($existing) {

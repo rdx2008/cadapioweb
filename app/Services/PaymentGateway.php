@@ -20,9 +20,11 @@ class PaymentGateway
     private function request(object $attempt): PendingRequest
     {
         $http = Http::acceptJson()->asJson()->connectTimeout(4)->timeout(12)->withoutRedirecting();
-        $key = Crypt::decryptString($attempt->credential);
+        if ($attempt->provider === 'infinitepay') {
+            return $http;
+        }
 
-        return $attempt->provider === 'infinitepay' ? $http->withHeaders(['X-Api-Key' => $key]) : $http->withToken($key);
+        return $http->withToken(Crypt::decryptString($attempt->credential));
     }
 
     private function body(Response $response): array
@@ -37,7 +39,7 @@ class PaymentGateway
     public function validUrl(string $url, object $attempt): bool
     {
         $parts = parse_url($url);
-        $hosts = $attempt->provider === 'infinitepay' ? ['checkout.infinitepay.io'] : ($attempt->environment === 'sandbox' ? ['sandbox.pagamento.pagseguro.uol.com.br', 'sandbox.pagamento.pagbank.com.br'] : ['pagamento.pagbank.com.br', 'pagamento.pagseguro.uol.com.br']);
+        $hosts = $attempt->provider === 'infinitepay' ? ['checkout.infinitepay.io', 'buy.infinitepay.io'] : ($attempt->environment === 'sandbox' ? ['sandbox.pagamento.pagseguro.uol.com.br', 'sandbox.pagamento.pagbank.com.br'] : ['pagamento.pagbank.com.br', 'pagamento.pagseguro.uol.com.br']);
 
         return strlen($url) <= 2000 && ($parts['scheme'] ?? '') === 'https' && in_array($parts['host'] ?? '', $hosts, true) && ! isset($parts['user']) && ! isset($parts['pass']) && ! isset($parts['port']);
     }
@@ -49,7 +51,7 @@ class PaymentGateway
             throw new RuntimeException('Configure o endereço público HTTPS antes de criar cobranças.');
         }
         if ($attempt->provider === 'infinitepay') {
-            $payload = ['order_nsu' => $attempt->reference, 'redirect_url' => $return, 'items' => [['quantity' => 1, 'price' => $attempt->amount_cents, 'description' => 'Pedido #'.$order->id]], 'options' => ['single_payment' => true, 'require_delivery_address' => false, 'valid_until' => Carbon::parse($attempt->expires_at, 'UTC')->toIso8601String(), 'payment_methods_enabled' => ['credit_card', 'pix']], 'webhook' => ['url' => rtrim(config('app.url'), '/').'/wp/i/'.$account->webhook_secret, 'events' => ['paid', 'refunded', 'canceled']]];
+            $payload = ['handle' => $attempt->handle, 'order_nsu' => $attempt->reference, 'redirect_url' => $return, 'items' => [['quantity' => 1, 'price' => $attempt->amount_cents, 'description' => 'Pedido #'.$order->id]], 'webhook_url' => rtrim(config('app.url'), '/').'/wp/i/'.$account->webhook_secret];
             $data = $this->body($this->request($attempt)->post($this->base($attempt).'/links', $payload));
             $url = $data['url'] ?? $data['link'] ?? $data['checkout_url'] ?? $data['checkouturl'] ?? null;
             $external = $data['slug'] ?? null;

@@ -41,7 +41,7 @@ class OnlinePaymentTest extends TestCase
         $store = $this->store($tenant);
         $key = 'fake-checkout-key-not-real';
         $secret = Str::random(32);
-        $account = DB::table('store_payment_accounts')->insertGetId(['store_id' => $store, 'provider' => $provider, 'environment' => $provider === 'pagbank' ? 'sandbox' : 'production', 'credential' => Crypt::encryptString($key), 'handle' => 'loja-teste', 'webhook_secret' => $secret, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $account = DB::table('store_payment_accounts')->insertGetId(['store_id' => $store, 'provider' => $provider, 'environment' => $provider === 'pagbank' ? 'sandbox' : 'production', 'credential' => Crypt::encryptString($provider === 'pagbank' ? $key : ''), 'handle' => 'loja-teste', 'webhook_secret' => $secret, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()]);
         $product = DB::table('products')->insertGetId(['tenant_id' => $tenant, 'store_id' => $store, 'name' => 'Lanche', 'category' => 'Lanches', 'price_cents' => 3000]);
         $cart = ['customer_name' => 'Ana', 'phone' => '11999999999', 'mode' => 'pickup', 'items' => [$product => 1], 'payment_method' => 'online_'.$provider, 'idempotency_key' => (string) Str::uuid()];
 
@@ -54,7 +54,12 @@ class OnlinePaymentTest extends TestCase
             $this->assertDatabaseHas('payment_attempts', ['state' => 'creating']);
             if ($provider === 'infinitepay') {
                 $this->assertSame(3000, $request['items'][0]['price']);
-                $this->assertTrue($request['options']['single_payment']);
+                $this->assertSame('loja-teste', $request['handle']);
+                $this->assertStringStartsWith('https://menu.example.test/wp/i/', $request['webhook_url']);
+                $this->assertArrayNotHasKey('options', $request->data());
+                $this->assertArrayNotHasKey('webhook', $request->data());
+                $this->assertFalse($request->hasHeader('X-Api-Key'));
+                $this->assertFalse($request->hasHeader('Authorization'));
 
                 return Http::response(['link' => 'https://checkout.infinitepay.io/loja/invoice', 'slug' => 'invoice-test']);
             }
@@ -83,7 +88,7 @@ class OnlinePaymentTest extends TestCase
         $f = $this->fixture();
         $attempt = $this->create($f);
         $this->assertSame('waiting', $attempt->state);
-        $this->assertSame($f['key'], Crypt::decryptString($attempt->credential));
+        $this->assertSame('', Crypt::decryptString($attempt->credential));
         $this->post('/cardapio/loja', ['draft_id' => $f['cart']['idempotency_key']])->assertRedirect('https://checkout.infinitepay.io/loja/invoice');
         Http::assertSentCount(1);
         $this->assertDatabaseCount('orders', 1);
@@ -93,6 +98,7 @@ class OnlinePaymentTest extends TestCase
         $this->fakeHttp(['*/payment_check' => Http::response(['success' => true, 'paid' => true, 'amount' => 3000, 'paid_amount' => 3000, 'capture_method' => 'pix'])]);
         $this->artisan('payments:sync')->assertExitCode(0);
         $this->assertDatabaseHas('orders', ['payment_status' => 'paid', 'status' => 'pending']);
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/payment_check') && $request['handle'] === 'loja-teste' && ! $request->hasHeader('X-Api-Key') && ! $request->hasHeader('Authorization'));
         $this->assertDatabaseHas('payment_attempts', ['id' => $attempt->id, 'transaction_id' => 'transaction-test', 'needs_review' => false]);
         $this->infiniteNotice($f, DB::table('payment_attempts')->first());
         $this->travel(31)->seconds();
@@ -150,6 +156,7 @@ class OnlinePaymentTest extends TestCase
         $this->assertFalse(app(PaymentGateway::class)->validUrl('https://checkout.infinitepay.io.evil.test/pay', $attempt));
         $this->assertFalse(app(PaymentGateway::class)->validUrl('https://checkout.infinitepay.io@evil.test/pay', $attempt));
         $this->assertFalse(app(PaymentGateway::class)->validUrl('http://checkout.infinitepay.io/pay', $attempt));
+        $this->assertTrue(app(PaymentGateway::class)->validUrl('https://buy.infinitepay.io/loja/invoice', $attempt));
     }
 
     public function test_pagbank_signed_webhook_is_verified_again_against_order_api(): void
@@ -221,7 +228,7 @@ class OnlinePaymentTest extends TestCase
         $tenant = $this->tenant();
         $store = $this->store($tenant);
         $this->actingAs($this->owner($tenant));
-        $this->post('/stores/'.$store.'/payments/infinitepay', ['enabled' => 1, 'environment' => 'production', 'handle' => 'minha-loja', 'credential' => 'my-fake-secret-key'])->assertRedirect();
+        $this->post('/stores/'.$store.'/payments/pagbank', ['enabled' => 1, 'environment' => 'sandbox', 'credential' => 'my-fake-secret-key'])->assertRedirect();
         $account = DB::table('store_payment_accounts')->first();
         $this->assertNotSame('my-fake-secret-key', $account->credential);
         $this->assertSame('my-fake-secret-key', Crypt::decryptString($account->credential));
@@ -234,7 +241,7 @@ class OnlinePaymentTest extends TestCase
     {
         $f = $this->fixture();
         $this->post('/cardapio/loja/review', $f['cart'])->assertRedirect();
-        DB::table('store_payment_accounts')->where('id', $f['account'])->update(['credential' => Crypt::encryptString('new-fake-credential')]);
+        DB::table('store_payment_accounts')->where('id', $f['account'])->update(['handle' => 'outra-tag']);
         $this->postJson('/cardapio/loja', ['draft_id' => $f['cart']['idempotency_key']])->assertUnprocessable();
         DB::table('store_payment_accounts')->where('id', $f['account'])->update(['enabled' => false]);
         $this->postJson('/cardapio/loja/review', $f['cart'])->assertUnprocessable();
@@ -328,5 +335,30 @@ class OnlinePaymentTest extends TestCase
         app(OnlinePayment::class)->sync($attempt->id);
         $this->assertDatabaseHas('orders', ['payment_status' => 'review']);
         $this->assertDatabaseHas('payment_attempts', ['transaction_id' => 'transaction-test', 'needs_review' => true]);
+    }
+
+    public function test_infinitepay_configuration_only_requires_tag_and_discards_obsolete_key(): void
+    {
+        $tenant = $this->tenant();
+        $store = $this->store($tenant);
+        $this->actingAs($this->owner($tenant));
+        $this->post('/stores/'.$store.'/payments/infinitepay', ['enabled' => 1, 'handle' => 'minha-tag'])->assertRedirect();
+        $account = DB::table('store_payment_accounts')->first();
+        $this->assertSame('minha-tag', $account->handle);
+        $this->assertSame('', Crypt::decryptString($account->credential));
+        DB::table('store_payment_accounts')->where('id', $account->id)->update(['credential' => Crypt::encryptString('obsolete-key')]);
+        $this->post('/stores/'.$store.'/payments/infinitepay', ['enabled' => 1, 'handle' => 'minha-tag'])->assertRedirect();
+        $this->assertSame('', Crypt::decryptString(DB::table('store_payment_accounts')->first()->credential));
+        $this->get('/stores/'.$store.'/edit')->assertOk()->assertSee('InfiniteTag')->assertDontSee('API Key do Checkout Integrado')->assertDontSee('obsolete-key');
+        Http::assertNothingSent();
+    }
+
+    public function test_existing_infinitepay_attempt_ignores_stored_key_and_uses_external_checkout(): void
+    {
+        $f = $this->fixture();
+        DB::table('store_payment_accounts')->where('id', $f['account'])->update(['credential' => 'obsolete-non-decryptable-value']);
+        $attempt = $this->create($f);
+        $this->assertSame('waiting', $attempt->state);
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/links') && $request['handle'] === 'loja-teste' && ! $request->hasHeader('X-Api-Key') && ! $request->hasHeader('Authorization'));
     }
 }
