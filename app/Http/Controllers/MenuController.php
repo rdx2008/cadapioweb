@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\CheckoutQuote;
 use App\Services\ComboCatalog;
 use App\Services\DeliveryCoverage;
+use App\Services\OnlinePayment;
 use App\Services\PizzaPricing;
 use App\Services\StoreAvailability;
 use App\Support\MoneyInput;
@@ -87,7 +88,7 @@ class MenuController extends Controller
         $data = $request->validate([
             'customer_name' => 'required|string|max:120', 'phone' => 'required|string|min:8|max:25',
             'scheduled_for' => 'nullable|string|date_format:Y-m-d\TH:i',
-            'payment_method' => 'sometimes|required|in:cash,card,pix',
+            'payment_method' => 'sometimes|required|in:cash,card,pix,online_infinitepay,online_pagbank',
             'change_for_cents' => 'nullable|integer|min:1|max:100000000',
             'mode' => 'required|in:pickup,delivery', 'address' => 'required_if:mode,delivery|nullable|string|max:500',
             'delivery_zone_id' => 'nullable|integer',
@@ -232,12 +233,21 @@ class MenuController extends Controller
                     $item['options'] = json_encode($item['options'], JSON_THROW_ON_ERROR);
                     DB::table('order_items')->insert($item + ['order_id' => $id]);
                 }
+                app(OnlinePayment::class)->reserve(DB::table('orders')->where('id', $id)->firstOrFail());
 
                 return $public;
             }, 3);
         } catch (ValidationException $exception) {
             $request->session()->flashInput($draft['data']);
             throw $exception->redirectTo('/cardapio/'.$slug);
+        }
+
+        $order = DB::table('orders')->where('public_id', $public)->firstOrFail();
+        if (app(OnlinePayment::class)->isOnline($order)) {
+            $url = app(OnlinePayment::class)->start($order);
+            if ($url) {
+                return redirect()->away($url);
+            }
         }
 
         return redirect('/pedido/'.$public);
@@ -255,6 +265,6 @@ class MenuController extends Controller
         $order = DB::table('orders')->where('public_id', $id)->firstOrFail();
         $ride = DB::table('rides')->where('order_id', $order->id)->value('status');
 
-        return response()->json(['status' => $order->status, 'payment_status' => $order->payment_status, 'ride_status' => $ride, 'cancellation_reason' => $order->cancellation_reason])->header('Cache-Control', 'no-store');
+        return response()->json(['status' => $order->status, 'payment_status' => $order->payment_status, 'payment_online' => app(OnlinePayment::class)->isOnline($order), 'ride_status' => $ride, 'cancellation_reason' => $order->cancellation_reason])->header('Cache-Control', 'no-store');
     }
 }

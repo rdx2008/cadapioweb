@@ -144,6 +144,22 @@ test('hidden page pauses requests and customer tracking writes messages as text'
     assert.equal(fields['[data-cancel-reason]'].innerHTML, undefined);
 });
 
+test('online payment tracking reflects verified state and hides payment actions after confirmation', async () => {
+    const fields=Object.fromEntries(['[data-tracking-status]','[data-tracking-payment]','[data-tracking-ride]','[data-cancel-reason]','[data-tracking-connection]','[data-online-actions]','[data-online-message]','[data-online-pay]'].map(key=>[key,{}]));
+    let status='pending';
+    const panel={dataset:{trackingUrl:'/pedido/test/status'},querySelector:key=>fields[key]};
+    const runtime=environment({'[data-tracking-url]':[panel]}, {}, async()=>jsonResponse({status:'pending',payment_status:status,payment_online:true}));
+    await runtime.tick();
+    assert.equal(fields['[data-tracking-payment]'].textContent,'Aguardando pagamento online');
+    assert.equal(fields['[data-online-actions]'].hidden,false);
+    status='paid';await runtime.tick();
+    assert.equal(fields['[data-tracking-payment]'].textContent,'Recebido');
+    assert.equal(fields['[data-online-actions]'].hidden,true);
+    status='review';await runtime.tick();
+    assert.equal(fields['[data-tracking-payment]'].textContent,'Em conferência');
+    assert.equal(fields['[data-online-pay]'].hidden,true);
+});
+
 test('ifood list pauses in hidden pages and preserves the last view on network failure', async () => {
     const message = {};
     const feed = {dataset: {url: '/integrations/ifood/orders/live'}, contains: () => false, querySelector: () => null, innerHTML: 'Initial'};

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\DispatchService;
+use App\Services\OnlinePayment;
 use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -174,6 +175,7 @@ class CourierController extends Controller
             $ride = DB::table('rides')->where('id', $id)->where('driver_id', $driver->id)->lockForUpdate()->firstOrFail();
             abort_unless(($ride->status === 'assigned' && $r->status === 'collected') || ($ride->status === 'collected' && $r->status === 'completed'), 409);
             $order = DB::table('orders')->where('id', $ride->order_id)->lockForUpdate()->firstOrFail();
+            app(OnlinePayment::class)->requirePaid($order);
             abort_if($r->status === 'completed' && $order->payment_method !== 'cash' && $order->payment_status !== 'paid', 409, 'A loja precisa confirmar o recebimento do Pix ou cartão antes de concluir a entrega.');
             DB::table('rides')->where('id', $id)->update(['status' => $r->status, 'completed_at' => $r->status === 'completed' ? now() : null, 'updated_at' => now()]);
             if ($r->status === 'completed') {

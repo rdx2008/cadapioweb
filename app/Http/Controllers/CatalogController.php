@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\DeliveryCoverage;
+use App\Services\OnlinePayment;
 use App\Services\PizzaPricing;
 use App\Support\Audit;
 use App\Support\MoneyInput;
@@ -204,7 +205,7 @@ class CatalogController extends Controller
             throw ValidationException::withMessages(['scheduling_lead_minutes' => 'A antecedência mínima deve ser igual ou maior que o tempo de preparo.']);
         }
         ksort($data['hours']);
-        if (! ($data['accepts_cash'] ?? $store->accepts_cash) && ! ($data['accepts_card'] ?? $store->accepts_card) && ! ($data['accepts_pix'] ?? $store->accepts_pix)) {
+        if (! ($data['accepts_cash'] ?? $store->accepts_cash) && ! ($data['accepts_card'] ?? $store->accepts_card) && ! ($data['accepts_pix'] ?? $store->accepts_pix) && app(OnlinePayment::class)->accounts($store->id)->isEmpty()) {
             throw ValidationException::withMessages(['accepts_cash' => 'Mantenha pelo menos uma forma de pagamento disponível.']);
         }
         $data['weekly_hours'] = $data['use_hours'] ? json_encode(array_values($data['hours']), JSON_THROW_ON_ERROR) : null;

@@ -8,6 +8,7 @@
 <a href="/dashboard#pedidos">← Voltar aos pedidos</a>
 </div>
 <div class="two">
+@include('partials.online-payment',['owner'=>true])
 <section class="card">
 <h2>Cliente e atendimento</h2>
 <span class="badge">{{ $order->status }}</span>

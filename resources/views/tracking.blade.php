@@ -9,6 +9,7 @@
 <p class="muted">Guarde este link. O andamento é atualizado automaticamente enquanto esta página estiver aberta.</p>
 </div>
 <div class="card">
+@include('partials.online-payment')
 <span class="badge" data-tracking-status>{{ ['pending'=>'Aguardando aceite','accepted'=>'Aceito','preparing'=>'Em preparo','ready'=>'Pronto','completed'=>'Concluído','cancelled'=>'Cancelado'][$order->status]??$order->status }}</span>
 @foreach($items as $item)<div class="review-line">
 <strong>{{ $item->quantity }} × {{ $item->name }}</strong>
@@ -17,7 +18,7 @@
 @endforeach<hr>
 <p class="freight-row">@include('partials.motoboy') Frete: R$ {{ number_format($order->fee_cents/100,2,',','.') }}</p>
 <h2>Total: R$ {{ number_format($order->total_cents/100,2,',','.') }}</h2>
-<p>Pagamento: <span data-tracking-payment>{{ $order->payment_status==='paid'?'Recebido':'Na entrega ou retirada' }}</span>
+<p>Pagamento: <span data-tracking-payment>{{ $order->payment_status==='paid'?'Recebido':($order->payment_status==='review'?'Em conferência':(app(App\Services\OnlinePayment::class)->isOnline($order)?'Aguardando pagamento online':'Na entrega ou retirada')) }}</span>
 </p>
 <p>Entrega: <span data-tracking-ride>{{ $ride->status??'Aguardando despacho ou retirada' }}</span>
 </p>

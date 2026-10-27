@@ -30,10 +30,10 @@
 <strong>{{ $draft['data']['customer_name'] }}</strong>
 <br>{{ $draft['data']['phone'] }}</p>
 @if($draft['data']['mode']==='delivery')<p>Entrega em {{ $draft['quote']['delivery_zone_name'] }}<br>{{ $draft['quote']['delivery_address'] ?? $draft['data']['address'] }}</p>@else<p>Retirada na loja: {{ $store->address }}</p>@endif
-<p class="muted">Pagamento presencial, na entrega ou retirada. Revisão válida por 15 minutos.</p>
+<p class="muted">{{ str_starts_with($draft['quote']['payment_method']??'','online_')?'Após confirmar, conclua o pagamento no ambiente seguro do provedor. O preparo depende da confirmação do pagamento.':'Pagamento presencial, na entrega ou retirada.' }} Revisão válida por 15 minutos.</p>
 <form method="post" action="/cardapio/{{ $store->slug }}">@csrf<input type="hidden" name="draft_id" value="{{ $draftId }}">
 <div class="actions">
-<button class="orange">Confirmar e enviar pedido</button>
+<button class="orange">{{ str_starts_with($draft['quote']['payment_method']??'','online_')?'Confirmar e ir para pagamento':'Confirmar e enviar pedido' }}</button>
 <a class="button secondary" href="/cardapio/{{ $store->slug }}?edit={{ $draftId }}">Editar carrinho</a>
 </div>
 </form>

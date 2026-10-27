@@ -234,7 +234,7 @@ O portal global do entregador continua existindo para atender outros tenants ati
 - Fluxo para pagamento recebido após expiração ou cancelamento do pedido.
 - Fiado opcional, com limite, vencimento, permissões e recebimento posterior.
 
-No lançamento, integrar um gateway. O projeto deve permitir outros por adaptadores, sem exigir implementação simultânea. Cada loja recebe em sua conta de provedor; intermediação e split ficam fora do lançamento inicial.
+Provedores priorizados pelo usuário: InfinitePay e PagSeguro/PagBank, inicialmente por checkout hospedado com confirmação pela API. O projeto deve permitir outros provedores por adaptadores. Cada loja recebe em sua conta de provedor; intermediação e split ficam fora do lançamento inicial.
 
 ### 4.9. Estoque, compras e ficha técnica
 

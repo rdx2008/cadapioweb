@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -12,6 +13,7 @@ class CheckoutQuote
     public function calculate(object $store, array $draft): array
     {
         $schedule = app(OrderScheduling::class)->quote($store, $draft['scheduled_for'] ?? null);
+        $this->require(! str_starts_with($draft['payment_method'] ?? '', 'online_') || ! $schedule['prepare_at'] || Carbon::parse($schedule['prepare_at'], 'UTC')->gte(now()->addMinutes(10)), 'Escolha um horário que permita pelo menos 10 minutos para o pagamento online antes do preparo.');
         $lines = [];
         $subtotal = 0;
         $entries = $draft['cart_lines'] ?? collect($draft['items'])->map(fn ($quantity, $id) => ['product_id' => $id, 'quantity' => $quantity, 'variant_id' => $draft['variants'][$id] ?? null, 'choices' => $draft['choices'][$id] ?? []])->values()->all();

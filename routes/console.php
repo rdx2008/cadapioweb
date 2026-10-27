@@ -28,5 +28,6 @@ Artisan::command('dispatch:tick', function (DispatchService $s) {
     $this->info('Despacho reconciliado.');
 });
 Schedule::command('dispatch:tick')->everyTenSeconds()->withoutOverlapping();
+Schedule::command('payments:sync')->everyThirtySeconds()->withoutOverlapping(5)->runInBackground();
 Schedule::command('ifood:sync')->everyThirtySeconds()->withoutOverlapping(10)->runInBackground();
 Schedule::command('ifood:send-commands')->everyTenSeconds()->withoutOverlapping(5)->runInBackground();

@@ -8,6 +8,7 @@ use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderBoardController;
 use App\Http\Controllers\PasswordRecoveryController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\StaffOperationController;
 use App\Http\Controllers\TeamController;
@@ -32,6 +33,10 @@ Route::post('/cardapio/{slug}/review', [MenuController::class, 'review'])->middl
 Route::get('/cardapio/{slug}/review/{draftId}', [MenuController::class, 'reviewPage']);
 Route::post('/cardapio/{slug}', [MenuController::class, 'checkout'])->middleware('throttle:20,1');
 Route::get('/pedido/{id}', [MenuController::class, 'tracking']);
+Route::get('/pr/{reference}', [PaymentController::class, 'returned'])->middleware('throttle:20,1');
+Route::post('/wp/{provider}/{secret?}', [PaymentController::class, 'webhook'])->whereIn('provider', ['i', 'p'])->middleware('throttle:120,1');
+Route::post('/pedido/{id}/pagar', [PaymentController::class, 'pay'])->middleware('throttle:8,1');
+Route::post('/pedido/{id}/consultar-pagamento', [PaymentController::class, 'check'])->middleware('throttle:8,1');
 Route::get('/pedido/{id}/status', [MenuController::class, 'status'])->middleware('throttle:60,1');
 Route::get('/media/products/{id}', [CatalogController::class, 'photo']);
 Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])->whereIn('kind', ['logo', 'cover']);
@@ -56,6 +61,8 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('access:owner')->group(function () {
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
+        Route::post('/stores/{id}/payments/{provider}', [PaymentController::class, 'configure'])->middleware('throttle:10,1')->name('payments.configure');
+        Route::post('/orders/{id}/payment/check', [PaymentController::class, 'ownerCheck'])->middleware('throttle:10,1')->name('payments.check');
         Route::post('/products/{id}/combo/groups', [ComboController::class, 'group'])->name('products.combo.groups');
         Route::post('/products/{id}/combo/options', [ComboController::class, 'option'])->name('products.combo.options');
         Route::post('/products/{id}/combo/options/{optionId}/availability', [ComboController::class, 'availability'])->name('products.combo.availability');

@@ -326,7 +326,13 @@ document.querySelectorAll("[data-tracking-url]").forEach((panel) => {
             panel.querySelector("[data-tracking-payment]").textContent =
                 data.payment_status === "paid"
                     ? "Recebido"
-                    : "Na entrega ou retirada";
+                    : data.payment_status === "review" ? "Em conferência" : data.payment_online ? "Aguardando pagamento online" : "Na entrega ou retirada";
+            const onlineActions = panel.querySelector('[data-online-actions]');
+            if (onlineActions) onlineActions.hidden = data.payment_status === 'paid' || data.status === 'cancelled';
+            const onlinePay = panel.querySelector('[data-online-pay]');
+            if (onlinePay) onlinePay.hidden = data.payment_status !== 'pending' || data.status === 'cancelled';
+            const onlineMessage = panel.querySelector('[data-online-message]');
+            if (onlineMessage) onlineMessage.textContent = data.payment_status === 'paid' ? 'Pagamento confirmado pelo provedor.' : data.payment_status === 'review' ? 'Pagamento exige conferência da loja.' : 'Aguardando confirmação do provedor; o preparo só será liberado após confirmação.';
             panel.querySelector("[data-tracking-ride]").textContent =
                 rideLabels[data.ride_status] ||
                 "Aguardando despacho ou retirada";

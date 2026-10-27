@@ -10,7 +10,12 @@ class CheckoutPayment
 
     public function methods(object $store): array
     {
-        return array_filter(self::LABELS, fn ($key) => (bool) $store->{'accepts_'.$key}, ARRAY_FILTER_USE_KEY);
+        $methods = array_filter(self::LABELS, fn ($key) => (bool) $store->{'accepts_'.$key}, ARRAY_FILTER_USE_KEY);
+        foreach (app(OnlinePayment::class)->accounts($store->id) as $account) {
+            $methods['online_'.$account->provider] = OnlinePayment::LABELS['online_'.$account->provider];
+        }
+
+        return $methods;
     }
 
     public function quote(object $store, array $draft, int $total): array
@@ -24,6 +29,8 @@ class CheckoutPayment
             throw ValidationException::withMessages(['change_for' => 'Troco é permitido somente para dinheiro. Informe um valor igual ou maior que o total do pedido.']);
         }
 
-        return ['payment_method' => $method, 'change_for_cents' => $change];
+        $account = str_starts_with($method, 'online_') ? app(OnlinePayment::class)->accounts($store->id)->firstWhere('provider', substr($method, 7)) : null;
+
+        return ['payment_method' => $method, 'change_for_cents' => $change, 'payment_account_revision' => $account ? hash('sha256', $account->credential.'|'.$account->handle.'|'.$account->environment) : null];
     }
 }

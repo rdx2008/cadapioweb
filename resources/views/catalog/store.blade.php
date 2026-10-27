@@ -102,4 +102,5 @@
 </form>
 @include('catalog.special-hours')
 @include('catalog.delivery-settings')
+@include('catalog.online-payments')
 @endsection

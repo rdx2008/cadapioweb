@@ -48,6 +48,6 @@ class OrderBoardController extends Controller
     {
         $order = DB::table('orders')->where('tenant_id', $request->user()->tenant_id)->where('id', $id)->firstOrFail();
 
-        return view('order-detail', ['order' => $order, 'items' => DB::table('order_items')->where('order_id', $id)->get()]);
+        return view('order-detail', ['store' => DB::table('stores')->where('id', $order->store_id)->firstOrFail(), 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $id)->get()]);
     }
 }
