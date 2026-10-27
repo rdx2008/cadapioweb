@@ -4,6 +4,7 @@
 <div class="heading">
 <div class="eyebrow">{{ $store->name }}</div>
 <h1>Confira seu pedido.</h1>
+@include('partials.payment-details',['payment'=>(object)$draft['quote']])
 @if($scheduleLabel=app(App\Services\OrderScheduling::class)->label((object)$draft['quote']))<p class="badge">Agendado: {{ $scheduleLabel }}<br>Preparo a partir de {{ Illuminate\Support\Carbon::parse($draft['quote']['prepare_at'],'UTC')->timezone($draft['quote']['scheduled_timezone'])->format('d/m H:i') }}</p>@endif
 <p class="muted">Seu pedido só será enviado após a confirmação abaixo.</p>
 </div>

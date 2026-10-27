@@ -162,7 +162,7 @@ class PlatformController extends Controller
         DB::transaction(function () use ($id) {
             DB::table('tenants')->where('id', $this->tid())->lockForUpdate()->firstOrFail();
             $o = DB::table('orders')->where('tenant_id', $this->tid())->where('id', $id)->lockForUpdate()->firstOrFail();
-            abort_if(DB::table('rides')->where('order_id', $id)->whereNotIn('status', ['completed', 'cancelled'])->exists(), 409, 'Recebimento já integra a proposta de corrida. Trate o acerto da entrega antes de alterar.');
+            abort_if($o->payment_method === 'cash' && DB::table('rides')->where('order_id', $id)->whereNotIn('status', ['completed', 'cancelled'])->exists(), 409, 'Recebimento já integra a proposta de corrida. Trate o acerto da entrega antes de alterar.');
             abort_if($o->status === 'cancelled', 409);
             DB::table('orders')->where('id', $id)->update(['payment_status' => 'paid']);
             Audit::record('payment.manual', ['order_id' => $id, 'amount' => $o->total_cents], $this->tid());
@@ -191,7 +191,7 @@ class PlatformController extends Controller
             }$s = $this->store($o->store_id);
             $fare = $calculator->quote($s, $d['route_meters'] ?? null, $d['fare_cents'] ?? null);
 
-            return DB::table('rides')->insertGetId(['tenant_id' => $this->tid(), 'store_id' => $s->id, 'order_id' => $id, 'status' => 'searching', 'rate_mode' => $s->rate_mode, 'fare_cents' => $fare, 'route_meters' => $d['route_meters'] ?? null, 'cash_cents' => $o->payment_status === 'paid' ? 0 : $o->total_cents, 'created_at' => now(), 'updated_at' => now()]);
+            return DB::table('rides')->insertGetId(['tenant_id' => $this->tid(), 'store_id' => $s->id, 'order_id' => $id, 'status' => 'searching', 'rate_mode' => $s->rate_mode, 'fare_cents' => $fare, 'route_meters' => $d['route_meters'] ?? null, 'cash_cents' => $o->payment_status === 'paid' || $o->payment_method !== 'cash' ? 0 : $o->total_cents, 'created_at' => now(), 'updated_at' => now()]);
         });
         $service->dispatch($rideId);
 

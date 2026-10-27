@@ -117,6 +117,12 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         form.querySelector('[data-menu-total]').textContent=menuMoney(subtotal+(fee||0));
         form.querySelector('[data-mobile-total]').textContent=menuMoney(subtotal+(fee||0));
     }
+
+    const paymentMethod=form.querySelector('[data-payment-method]'),cashChange=form.querySelector('[data-cash-change]');
+    if(paymentMethod&&cashChange){
+        const updatePayment=()=>{const cash=paymentMethod.value==='cash';cashChange.hidden=!cash;cashChange.querySelector('input').disabled=!cash;};
+        paymentMethod.addEventListener('change',updatePayment);updatePayment();
+    }
     products.forEach(product=>{
         const dialog=product.querySelector('dialog');
         product.querySelector('[data-product-open]').addEventListener('click',()=>openProduct(product));

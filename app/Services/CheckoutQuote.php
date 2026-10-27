@@ -93,7 +93,7 @@ class CheckoutQuote
             }
         }
 
-        return $schedule + ['items' => $lines, 'subtotal_cents' => $subtotal, 'fee_cents' => $fee, 'total_cents' => $subtotal + $fee, 'delivery_zone_name' => $zoneName, 'delivery_address' => $deliveryAddress];
+        return $schedule + app(CheckoutPayment::class)->quote($store, $draft, $subtotal + $fee) + ['items' => $lines, 'subtotal_cents' => $subtotal, 'fee_cents' => $fee, 'total_cents' => $subtotal + $fee, 'delivery_zone_name' => $zoneName, 'delivery_address' => $deliveryAddress];
     }
 
     public function fingerprint(array $quote): string

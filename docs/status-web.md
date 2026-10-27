@@ -2,6 +2,14 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Pagamento na entrega/retirada e troco — 27/10/2026
+
+Loja configura Dinheiro, Cartão e Pix em Lojas > Editar > Formas de pagamento. Pelo menos uma forma deve permanecer ativa. Migration preserva dinheiro como padrão, cartão e Pix desativados. Escolha do cliente é validada novamente na confirmação e gravada no pedido. Troco opcional só para dinheiro, em centavos, cobrindo produtos mais frete. Não altera total da venda nem dinheiro líquido a prestar contas. Campo fica oculto/desabilitado para Pix/cartão; revisão e retorno à edição preservam a informação. Informações aparecem ao cliente, proprietário, operação e motoboy; perfil Cozinha não recebe informações financeiras adicionais.
+
+São pagamentos presenciais, sem gateway, QR Pix, chave Pix, tokenização de cartão ou confirmação por webhook. Loja deve providenciar maquininha na entrega e confirmar manualmente Pix/cartão após conferir recebimento. Escolher forma não marca pedido como pago. Motoboy só conclui entrega com Pix/cartão depois dessa confirmação, que pode ser feita pela loja durante corrida ativa. Numerário da corrida inclui apenas dinheiro ainda a receber; Pix/cartão têm cash_cents zero e não viram dívida do motoboy. Dinheiro mantém confirmação de recebimento pelo entregador e restrição de alteração pela loja durante a corrida. Ofertas identificam necessidade de cartão/maquininha; troco e dados do cliente aparecem após aceite. Pedidos históricos e corridas existentes mantêm valores anteriores.
+
+Validação: 157 testes PHP e 12 JavaScript aprovados. Sete novos casos cobrem troco/frete, métodos inválidos/desativados, alteração entre revisão e confirmação, snapshot/idempotência, configurações/isolamento e ciclo de entrega Pix/cartão sem numerário. Chrome em 1440/390/320 px: configuração persistida, três métodos, campo condicional, revisão e retorno à edição, troca de dinheiro para Pix sem envio de troco antigo. Migration aplicada somente na prévia SQLite; deploy e piloto PostgreSQL/Coolify pendentes.
+
 ## Pedidos agendados — 27/10/2026
 
 Configuração por loja, desligada por padrão, com antecedência mínima de 15 a 1440 minutos, preparo de 15 a 240 minutos e horizonte de 1 a 7 dias. Antecedência não pode ser menor que o preparo. Para entrega, a loja deve incluir margem de deslocamento. Cliente seleciona horário desejado de entrega/retirada em intervalos de 15 minutos, no fuso da loja; somente horários válidos aparecem. Loja fora do expediente atual pode receber agendamentos futuros, mas pausa manual bloqueia ambos os fluxos. Todo o intervalo de preparo precisa caber no atendimento, respeitando intervalos, horários especiais e passagem da meia-noite.

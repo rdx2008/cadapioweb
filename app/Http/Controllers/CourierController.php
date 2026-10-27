@@ -34,13 +34,13 @@ class CourierController extends Controller
 
     private function board(object $driver): array
     {
-        $offers = DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->join('stores', 'stores.id', '=', 'rides.store_id')->join('tenants', 'tenants.id', '=', 'rides.tenant_id')
+        $offers = DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->join('orders', 'orders.id', '=', 'rides.order_id')->join('stores', 'stores.id', '=', 'rides.store_id')->join('tenants', 'tenants.id', '=', 'rides.tenant_id')
             ->where('offers.driver_id', $driver->id)->where('offers.status', 'open')->where('offers.expires_at', '>', now())->whereIn('rides.status', ['offered', 'broadcast'])->where('tenants.courier_module', 'active')
-            ->select('offers.id', 'offers.expires_at', 'rides.fare_cents', 'rides.route_meters', 'rides.cash_cents', 'stores.name', 'stores.address')->orderBy('offers.id')->get();
+            ->select('offers.id', 'offers.expires_at', 'rides.fare_cents', 'rides.route_meters', 'rides.cash_cents', 'stores.name', 'stores.address', 'orders.payment_method')->orderBy('offers.id')->get();
         if ($driver->status !== 'approved' || ! $driver->available || ! $driver->heartbeat_at || now()->subSeconds(90)->gt($driver->heartbeat_at)) {
             $offers = collect();
         }
-        $rides = DB::table('rides')->join('orders', 'orders.id', '=', 'rides.order_id')->where('rides.driver_id', $driver->id)->select('rides.*', 'orders.address', 'orders.phone', 'orders.customer_name')->orderByDesc('rides.id')->limit(30)->get();
+        $rides = DB::table('rides')->join('orders', 'orders.id', '=', 'rides.order_id')->where('rides.driver_id', $driver->id)->select('rides.*', 'orders.address', 'orders.phone', 'orders.customer_name', 'orders.payment_method', 'orders.payment_status', 'orders.change_for_cents', 'orders.total_cents')->orderByDesc('rides.id')->limit(30)->get();
 
         return compact('offers', 'rides');
     }
@@ -173,6 +173,8 @@ class CourierController extends Controller
             DB::table('tenants')->where('id', $tenantId)->lockForUpdate()->firstOrFail();
             $ride = DB::table('rides')->where('id', $id)->where('driver_id', $driver->id)->lockForUpdate()->firstOrFail();
             abort_unless(($ride->status === 'assigned' && $r->status === 'collected') || ($ride->status === 'collected' && $r->status === 'completed'), 409);
+            $order = DB::table('orders')->where('id', $ride->order_id)->lockForUpdate()->firstOrFail();
+            abort_if($r->status === 'completed' && $order->payment_method !== 'cash' && $order->payment_status !== 'paid', 409, 'A loja precisa confirmar o recebimento do Pix ou cartão antes de concluir a entrega.');
             DB::table('rides')->where('id', $id)->update(['status' => $r->status, 'completed_at' => $r->status === 'completed' ? now() : null, 'updated_at' => now()]);
             if ($r->status === 'completed') {
                 DB::table('orders')->where('id', $ride->order_id)->update(['status' => 'completed', 'payment_status' => 'paid', 'updated_at' => now()]);

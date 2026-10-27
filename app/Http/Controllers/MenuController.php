@@ -7,6 +7,7 @@ use App\Services\ComboCatalog;
 use App\Services\DeliveryCoverage;
 use App\Services\PizzaPricing;
 use App\Services\StoreAvailability;
+use App\Support\MoneyInput;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -74,6 +75,7 @@ class MenuController extends Controller
 
     public function review(Request $request, string $slug, CheckoutQuote $calculator): RedirectResponse
     {
+        MoneyInput::normalize($request, ['change_for' => 'change_for_cents']);
         $store = $this->store($slug);
         if ($request->has('cart_lines') && ($request->has('items') || $request->has('choices') || $request->has('variants'))) {
             throw ValidationException::withMessages(['cart' => 'Formato de sacola inválido. Recarregue o cardápio e revise os itens.']);
@@ -85,6 +87,8 @@ class MenuController extends Controller
         $data = $request->validate([
             'customer_name' => 'required|string|max:120', 'phone' => 'required|string|min:8|max:25',
             'scheduled_for' => 'nullable|string|date_format:Y-m-d\TH:i',
+            'payment_method' => 'sometimes|required|in:cash,card,pix',
+            'change_for_cents' => 'nullable|integer|min:1|max:100000000',
             'mode' => 'required|in:pickup,delivery', 'address' => 'required_if:mode,delivery|nullable|string|max:500',
             'delivery_zone_id' => 'nullable|integer',
             'delivery_token' => 'nullable|string|max:5000',
@@ -218,6 +222,7 @@ class MenuController extends Controller
                 $id = DB::table('orders')->insertGetId([
                     'public_id' => $public, 'tenant_id' => $store->tenant_id, 'store_id' => $store->id, 'idempotency_key' => $data['draft_id'],
                     'scheduled_at' => $quote['scheduled_at'], 'prepare_at' => $quote['prepare_at'], 'scheduled_timezone' => $quote['scheduled_timezone'],
+                    'payment_method' => $quote['payment_method'], 'change_for_cents' => $quote['change_for_cents'],
                     'customer_name' => $draft['data']['customer_name'], 'phone' => $draft['data']['phone'], 'mode' => $draft['data']['mode'],
                     'address' => $quote['delivery_address'],
                     'delivery_zone_name' => $quote['delivery_zone_name'], 'subtotal_cents' => $quote['subtotal_cents'],

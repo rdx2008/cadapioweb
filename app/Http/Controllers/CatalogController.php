@@ -191,6 +191,7 @@ class CatalogController extends Controller
             'hours.*.second_closes_at' => 'nullable|required_with:hours.*.second_opens_at|date_format:H:i',
             'delivery_by_radius' => 'sometimes|boolean',
             'scheduling_enabled' => 'sometimes|boolean',
+            'accepts_cash' => 'sometimes|boolean', 'accepts_card' => 'sometimes|boolean', 'accepts_pix' => 'sometimes|boolean',
             'scheduling_lead_minutes' => 'sometimes|integer|min:15|max:1440|gte:scheduling_prep_minutes',
             'scheduling_prep_minutes' => 'sometimes|integer|min:15|max:240',
             'scheduling_days' => 'sometimes|integer|min:1|max:7',
@@ -203,6 +204,9 @@ class CatalogController extends Controller
             throw ValidationException::withMessages(['scheduling_lead_minutes' => 'A antecedência mínima deve ser igual ou maior que o tempo de preparo.']);
         }
         ksort($data['hours']);
+        if (! ($data['accepts_cash'] ?? $store->accepts_cash) && ! ($data['accepts_card'] ?? $store->accepts_card) && ! ($data['accepts_pix'] ?? $store->accepts_pix)) {
+            throw ValidationException::withMessages(['accepts_cash' => 'Mantenha pelo menos uma forma de pagamento disponível.']);
+        }
         $data['weekly_hours'] = $data['use_hours'] ? json_encode(array_values($data['hours']), JSON_THROW_ON_ERROR) : null;
         unset($data['hours'], $data['use_hours']);
         unset($data['logo'], $data['cover']);
