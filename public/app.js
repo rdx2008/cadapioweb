@@ -281,7 +281,7 @@ if (workspaceOverview) {
 } else {
     const matches = Array.from(document.querySelectorAll('[data-nav-link]')).filter((link) => {
         const destination = new URL(link.href);
-        return !destination.hash && (destination.pathname === window.location.pathname || window.location.pathname.startsWith(destination.pathname + '/'));
+        return !destination.hash && (destination.pathname === window.location.pathname || window.location.pathname.startsWith(destination.pathname + '/') || (destination.pathname === '/catalog' && window.location.pathname.startsWith('/products/')));
     }).sort((a, b) => new URL(b.href).pathname.length - new URL(a.href).pathname.length);
     if (matches[0]) {
         matches[0].classList.add('is-active');

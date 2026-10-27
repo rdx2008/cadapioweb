@@ -17,6 +17,137 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CatalogController extends Controller
 {
+    public function index(Request $request): View
+    {
+        $filters = $request->validate(['store_id' => 'nullable|integer|min:1', 'category_id' => 'nullable|integer|min:1', 'q' => 'nullable|string|max:100', 'availability' => 'nullable|in:all,active,paused,featured']);
+        $stores = DB::table('stores')->where('tenant_id', auth()->user()->tenant_id)->orderBy('name')->get();
+        $selectedStore = ! empty($filters['store_id']) ? $this->store((int) $filters['store_id']) : $stores->first();
+        $categories = DB::table('catalog_categories')->where('store_id', $selectedStore?->id ?? 0)->orderBy('sort_order')->orderBy('name')->get();
+        if (! empty($filters['category_id'])) {
+            abort_unless($categories->contains('id', (int) $filters['category_id']), 404);
+        }
+        $all = DB::table('products')->where('products.tenant_id', auth()->user()->tenant_id)->where('products.store_id', $selectedStore?->id ?? 0);
+        $counts = ['total' => (clone $all)->count(), 'active' => (clone $all)->where('available', true)->count(), 'paused' => (clone $all)->where('available', false)->count()];
+        $products = (clone $all)->leftJoin('catalog_categories', function ($join) {
+            $join->on('catalog_categories.id', '=', 'products.category_id')->on('catalog_categories.store_id', '=', 'products.store_id');
+        })->select('products.*')
+            ->selectSub(DB::table('product_variants')->selectRaw('min(price_cents)')->whereColumn('product_id', 'products.id')->where('available', true), 'variant_price')
+            ->selectSub(DB::table('option_groups')->selectRaw('count(*)')->whereColumn('product_id', 'products.id'), 'group_count')
+            ->when(! empty($filters['category_id']), fn ($query) => $query->where('category_id', $filters['category_id']))
+            ->when(! empty($filters['q']), fn ($query) => $query->where('products.name', 'like', '%'.$filters['q'].'%'))
+            ->when(($filters['availability'] ?? '') === 'active', fn ($query) => $query->where('available', true))
+            ->when(($filters['availability'] ?? '') === 'paused', fn ($query) => $query->where('available', false))
+            ->when(($filters['availability'] ?? '') === 'featured', fn ($query) => $query->where('featured', true))
+            ->orderByRaw('COALESCE(catalog_categories.sort_order, 9999)')->orderBy('products.category')->orderBy('products.sort_order')->orderBy('products.name')->paginate(24)->withQueryString();
+
+        $tenant = DB::table('tenants')->find(auth()->user()->tenant_id);
+
+        return view('catalog.index', compact('stores', 'selectedStore', 'categories', 'counts', 'products', 'filters', 'tenant'));
+    }
+
+    public function create(Request $request): View
+    {
+        $request->validate(['store_id' => 'nullable|integer|min:1']);
+        $stores = DB::table('stores')->where('tenant_id', auth()->user()->tenant_id)->orderBy('name')->get();
+        $selectedStore = $request->filled('store_id') ? $this->store((int) $request->store_id) : $stores->first();
+        $categories = DB::table('catalog_categories')->where('store_id', $selectedStore?->id ?? 0)->orderBy('sort_order')->orderBy('name')->get();
+
+        $tenant = DB::table('tenants')->find(auth()->user()->tenant_id);
+
+        return view('catalog.create', compact('stores', 'selectedStore', 'categories', 'tenant'));
+    }
+
+    public function category(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['store_id' => 'required|integer', 'category_id' => 'nullable|integer|min:1', 'name' => 'required|string|max:80', 'sort_order' => 'required|integer|min:0|max:9999']);
+        $store = $this->store($data['store_id']);
+        DB::transaction(function () use ($store, $data): void {
+            DB::table('stores')->where('id', $store->id)->lockForUpdate()->firstOrFail();
+            $id = $data['category_id'] ?? null;
+            if ($id) {
+                DB::table('catalog_categories')->where('store_id', $store->id)->where('id', $id)->firstOrFail();
+            }
+            if (DB::table('catalog_categories')->where('store_id', $store->id)->where('name', $data['name'])->when($id, fn ($query) => $query->where('id', '!=', $id))->exists()) {
+                throw ValidationException::withMessages(['name' => 'Esta loja já possui uma categoria com esse nome.']);
+            }
+            $values = ['name' => $data['name'], 'sort_order' => $data['sort_order'], 'updated_at' => now()];
+            if ($id) {
+                DB::table('catalog_categories')->where('id', $id)->update($values);
+                DB::table('products')->where('store_id', $store->id)->where('category_id', $id)->update(['category' => $data['name'], 'updated_at' => now()]);
+            } else {
+                $id = DB::table('catalog_categories')->insertGetId($values + ['store_id' => $store->id, 'created_at' => now()]);
+            }
+            Audit::record('catalog.category.saved', ['store_id' => $store->id, 'category_id' => $id], $store->tenant_id);
+        });
+
+        return redirect(route('catalog.index', ['store_id' => $store->id]).'#categories')->with('success', 'Categoria salva. A ordem vale também no cardápio do cliente.');
+    }
+
+    private function resolveCategory(int $storeId, array $data): object
+    {
+        if (! empty($data['category_id'])) {
+            return DB::table('catalog_categories')->where('store_id', $storeId)->where('id', $data['category_id'])->firstOrFail();
+        }
+        $name = trim($data['category'] ?? '');
+        if ($name === '') {
+            throw ValidationException::withMessages(['category_id' => 'Selecione ou cadastre uma categoria.']);
+        }
+        $category = DB::table('catalog_categories')->where('store_id', $storeId)->where('name', $name)->first();
+        if ($category) {
+            return $category;
+        }
+        $id = DB::table('catalog_categories')->insertGetId(['store_id' => $storeId, 'name' => $name, 'sort_order' => 0, 'created_at' => now(), 'updated_at' => now()]);
+
+        return DB::table('catalog_categories')->find($id);
+    }
+
+    public function createProduct(Request $request): RedirectResponse
+    {
+        MoneyInput::normalize($request, ['price' => 'price_cents']);
+        $data = $request->validate(['store_id' => 'required|integer', 'name' => 'required|string|max:120', 'category_id' => 'nullable|integer|min:1', 'category' => 'nullable|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'nullable|required_unless:uses_variants,1|integer|min:1|max:1000000', 'available' => 'sometimes|boolean', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'uses_variants' => 'sometimes|boolean', 'new_variants' => 'nullable|array|max:20', 'new_variants.*' => 'array:name,price', 'new_variants.*.name' => 'required|string|max:80', 'new_variants.*.price' => ['required', 'regex:/^\d{1,5}(?:[.,]\d{1,2})?$/D'], 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
+        $store = $this->store($data['store_id']);
+        $variants = $data['new_variants'] ?? [];
+        if (($data['uses_variants'] ?? false) && ! count($variants)) {
+            throw ValidationException::withMessages(['new_variants' => 'Adicione pelo menos um tamanho com preço.']);
+        }
+        foreach ($variants as &$variant) {
+            $parts = preg_split('/[.,]/', $variant['price']);
+            $variant['price_cents'] = (int) $parts[0] * 100 + (int) str_pad($parts[1] ?? '', 2, '0');
+            if ($variant['price_cents'] < 1 || $variant['price_cents'] > 1000000) {
+                throw ValidationException::withMessages(['new_variants' => 'O preço de cada tamanho deve ser maior que zero e até R$ 10.000.']);
+            }
+            unset($variant['price']);
+        }
+        unset($variant);
+        if ($data['uses_variants'] ?? false) {
+            $data['price_cents'] = min(array_column($variants, 'price_cents'));
+        }
+        $path = $request->hasFile('photo') ? $request->file('photo')->store('tenants/'.$store->tenant_id.'/products', 'local') : null;
+        unset($data['new_variants'], $data['photo']);
+        try {
+            $id = DB::transaction(function () use ($store, $data, $variants, $path): int {
+                DB::table('stores')->where('id', $store->id)->lockForUpdate()->firstOrFail();
+                $category = $this->resolveCategory($store->id, $data);
+                $data['category_id'] = $category->id;
+                $data['category'] = $category->name;
+                $id = DB::table('products')->insertGetId($data + ['tenant_id' => $store->tenant_id, 'photo_path' => $path, 'created_at' => now(), 'updated_at' => now()]);
+                foreach ($variants as $variant) {
+                    DB::table('product_variants')->insert($variant + ['product_id' => $id, 'available' => true, 'created_at' => now(), 'updated_at' => now()]);
+                }
+                Audit::record('product.created', ['product_id' => $id, 'store_id' => $store->id], $store->tenant_id);
+
+                return $id;
+            });
+        } catch (\Throwable $exception) {
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
+            throw $exception;
+        }
+
+        return $request->boolean('editor_flow') ? redirect('/products/'.$id.'/edit')->with('success', 'Produto salvo. Confira tamanhos e configure os adicionais abaixo.') : back()->with('success', 'Produto cadastrado.');
+    }
+
     private function store(int $id): object
     {
         return DB::table('stores')->where('tenant_id', auth()->user()->tenant_id)->where('id', $id)->firstOrFail();
@@ -206,7 +337,11 @@ class CatalogController extends Controller
 
         $variants = DB::table('product_variants')->where('product_id', $id)->orderBy('id')->get();
 
-        return view('catalog.product', compact('product', 'groups', 'options', 'variants'));
+        $categories = DB::table('catalog_categories')->where('store_id', $product->store_id)->orderBy('sort_order')->orderBy('name')->get();
+
+        $tenant = DB::table('tenants')->find(auth()->user()->tenant_id);
+
+        return view('catalog.product', compact('product', 'groups', 'options', 'variants', 'categories', 'tenant'));
     }
 
     public function pricingMode(Request $request, int $id): RedirectResponse
@@ -254,7 +389,7 @@ class CatalogController extends Controller
     {
         $product = $this->product($id);
         MoneyInput::normalize($request, ['price' => 'price_cents']);
-        $data = $request->validate(['name' => 'required|string|max:120', 'category' => 'required|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
+        $data = $request->validate(['name' => 'required|string|max:120', 'category' => 'nullable|string|max:80', 'category_id' => 'nullable|integer|min:1', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
         unset($data['photo']);
         $path = null;
         if ($request->hasFile('photo')) {
@@ -264,6 +399,9 @@ class CatalogController extends Controller
         try {
             DB::transaction(function () use ($product, $data) {
                 DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->first();
+                $category = $this->resolveCategory($product->store_id, $data);
+                $data['category_id'] = $category->id;
+                $data['category'] = $category->name;
                 DB::table('products')->where('id', $product->id)->update($data + ['updated_at' => now()]);
                 Audit::record('product.updated', ['product_id' => $product->id], $product->tenant_id);
             });

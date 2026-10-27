@@ -120,16 +120,6 @@ class PlatformController extends Controller
         return back()->with('success', 'Loja criada.');
     }
 
-    public function createProduct(Request $r)
-    {
-        MoneyInput::normalize($r, ['price' => 'price_cents']);
-        $d = $r->validate(['store_id' => 'required|integer', 'name' => 'required|string|max:120', 'category' => 'required|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000']);
-        $this->store($d['store_id']);
-        DB::table('products')->insert($d + ['tenant_id' => $this->tid(), 'created_at' => now(), 'updated_at' => now()]);
-
-        return back()->with('success', 'Produto cadastrado.');
-    }
-
     public function toggleProduct(int $id)
     {
         $p = DB::table('products')->where('tenant_id', $this->tid())->where('id', $id)->firstOrFail();

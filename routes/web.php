@@ -54,6 +54,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
+        Route::get('/products/create', [CatalogController::class, 'create'])->name('products.create');
+        Route::post('/catalog/categories', [CatalogController::class, 'category'])->name('catalog.categories');
         Route::get('/team', [TeamController::class, 'index'])->name('team.index');
         Route::post('/team', [TeamController::class, 'create'])->middleware('throttle:10,1');
         Route::post('/team/{id}', [TeamController::class, 'update']);
@@ -82,7 +85,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/products/{id}/variants', [CatalogController::class, 'variant'])->name('products.variants');
         Route::post('/products/{id}/pricing-mode', [CatalogController::class, 'pricingMode'])->name('products.pricing-mode');
         Route::post('/stores', [PlatformController::class, 'createStore']);
-        Route::post('/products', [PlatformController::class, 'createProduct']);
+        Route::post('/products', [CatalogController::class, 'createProduct'])->name('products.store');
         Route::post('/products/{id}/toggle', [PlatformController::class, 'toggleProduct']);
         Route::post('/orders/{id}/status', [PlatformController::class, 'orderStatus']);
         Route::post('/orders/{id}/paid', [PlatformController::class, 'markPaid']);

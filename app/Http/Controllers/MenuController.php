@@ -30,7 +30,9 @@ class MenuController extends Controller
             $draft = $this->draft($request, $store, $request->string('edit')->toString());
             $request->session()->flashInput($draft['data']);
         }
-        $products = DB::table('products')->where('tenant_id', $store->tenant_id)->where('store_id', $store->id)->where('available', true)->orderBy('category')->orderBy('name')->get();
+        $products = DB::table('products')->leftJoin('catalog_categories', function ($join) {
+            $join->on('catalog_categories.id', '=', 'products.category_id')->on('catalog_categories.store_id', '=', 'products.store_id');
+        })->where('products.tenant_id', $store->tenant_id)->where('products.store_id', $store->id)->where('products.available', true)->select('products.*')->orderByRaw('COALESCE(catalog_categories.sort_order, 9999)')->orderBy('products.category')->orderBy('products.sort_order')->orderBy('products.name')->get();
         $variants = DB::table('product_variants')->whereIn('product_id', $products->pluck('id'))->where('available', true)->orderBy('price_cents')->orderBy('id')->get()->groupBy('product_id');
         $products = $products->filter(function ($product) use ($variants): bool {
             if (! $product->uses_variants) {

@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Gerenciador de cardápio — 27/10/2026
+
+Nova área /catalog substitui o cadastro simples embutido no dashboard. Menu e atalhos apontam para o gerenciador; o painel antigo mantém um link de compatibilidade. Proprietário escolhe loja, pesquisa por nome e filtra por categoria, habilitados/pausados/destaques; lista paginada de 24 produtos mostra foto, descrição, preço único ou mínimo ativo, quantidade de grupos e pausa rápida. Estados vazios distinguem loja ausente, primeiro produto e filtro sem resultado.
+
+Categorias próprias por loja permitem criar, renomear e definir ordem. Migration preserva os nomes existentes e vincula produtos, com chave estrangeira composta categoria/loja. Renomear atualiza apenas produtos vinculados da mesma loja, sem alterar snapshots de pedidos. Produto tem ordem dentro da categoria e destaque para a vitrine pública. Cardápio respeita a ordem de categorias/produtos; vitrine prioriza os destaques habilitados, com fallback para produtos do cardápio quando nenhum foi marcado.
+
+Cadastro guiado: foto com prévia, categoria existente ou nova, descrição, disponibilidade, destaque, ordem, preço único ou até 20 tamanhos já na criação. Novo formulário começa pausado; após salvar, abre editor com navegação visível entre dados/foto, tamanhos/preços e adicionais/revisão. Adicionais são configurados no editor após o primeiro salvamento; não há salvamento único de todos os grupos no cadastro inicial. Dados, tamanhos e foto são criados de forma transacional e falha remove arquivo órfão. Edição segue com salvamento por seção. Produtos antigos e endpoint de cadastro anterior permanecem compatíveis.
+
+Validação: 121 testes PHP e oito JavaScript. Seis novos casos cobrem loja vazia, filtros/paginação, isolamento, categorias, cadastro com foto e tamanhos, rollback e ordem/vitrine públicas. Chrome desktop 1440 px e celular 390/320 px: categoria, cadastro de tamanhos, rascunho pausado, publicação, busca e pausa rápida. Migração aplicada somente em banco local de prévia com produtos existentes; PostgreSQL/Coolify e piloto real pendentes. Combos, vários sabores e múltiplas combinações do mesmo produto por pedido continuam pendentes.
+
 ## Tamanhos e variações — 27/10/2026
 
 Produto pode usar preço único ou preço por variação. Proprietário cadastra/edita/pausa até 20 variações com nome e preço completo; ativação exige uma disponível. Gestão verifica tenant e produto e trava a loja, com auditoria. Migration aditiva cria product_variants e products.uses_variants; produtos existentes permanecem com preço único. Preço base anterior fica preservado para eventual retorno ao modo único.

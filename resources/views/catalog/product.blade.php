@@ -1,16 +1,18 @@
 @extends('layout')
+@section('page-label','Cardápio')
 @section('content')
+<link rel="stylesheet" href="/catalog.css?v=1">
 <div class="heading">
 <div class="eyebrow">Catálogo da loja</div>
 <h1>{{ $product->name }}</h1>
-<a href="/dashboard#cardapio">← Voltar ao catálogo</a>
+<a href="/catalog">← Voltar ao catálogo</a>
 </div>
-<form action="/products/{{ $product->id }}/edit" method="post" enctype="multipart/form-data" class="card">@csrf
+<nav class="catalog-editor-steps" aria-label="Etapas do produto"><a href="#product-basics">Dados e foto</a><a href="#variants">Tamanhos e preços</a><a href="#product-addons">Adicionais e revisão</a></nav><p class="muted">Confira a apresentação, os tamanhos e os adicionais antes de divulgar. Os botões de cada seção salvam suas próprias alterações.</p><form id="product-basics" action="/products/{{ $product->id }}/edit" method="post" enctype="multipart/form-data" class="card">@csrf
 <div class="fields">
 <label>Nome<input name="name" value="{{ old('name', $product->name) }}" required>
 </label>
-<label>Categoria<input name="category" value="{{ old('category', $product->category) }}" required>
-</label>
+<input type="hidden" name="category" value="{{ $product->category }}"><label>Categoria<select name="category_id"><option value="">{{ $product->category }} (atual)</option>@foreach($categories as $category)<option value="{{ $category->id }}" @selected(old('category_id',$product->category_id)==$category->id)>{{ $category->name }}</option>@endforeach</select><small><a href="{{ route('catalog.index',['store_id'=>$product->store_id]) }}#categories">Gerenciar categorias</a></small></label>
+<label>Destaque no cardápio<select name="featured"><option value="0" @selected(old('featured',$product->featured)==0)>Não</option><option value="1" @selected(old('featured',$product->featured)==1)>Sim, mostrar na vitrine</option></select></label><label>Ordem dentro da categoria<input name="sort_order" type="number" min="0" max="9999" value="{{ old('sort_order',$product->sort_order) }}"><small>Menor número aparece primeiro.</small></label>
 <label>Preço (R$)<input name="price" type="text" inputmode="decimal" value="{{ old('price', number_format($product->price_cents/100,2,',','')) }}" required>
 </label>
 <label>Disponibilidade<select name="available">
@@ -27,7 +29,7 @@
 </div>
 </form>
 @include('catalog.variants')
-<section>
+<section id="product-addons">
 <h2>Grupos e adicionais</h2>
 <p class="muted">As escolhas valem para cada unidade do produto. Exemplo: 2 lanches com queijo cobram o queijo duas vezes. Para combinações diferentes, faça pedidos separados nesta versão.</p>
 @foreach($groups as $group)<article class="card" style="margin-bottom:20px">
