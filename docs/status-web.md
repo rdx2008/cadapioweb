@@ -2,6 +2,14 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Pedidos agendados — 27/10/2026
+
+Configuração por loja, desligada por padrão, com antecedência mínima de 15 a 1440 minutos, preparo de 15 a 240 minutos e horizonte de 1 a 7 dias. Antecedência não pode ser menor que o preparo. Para entrega, a loja deve incluir margem de deslocamento. Cliente seleciona horário desejado de entrega/retirada em intervalos de 15 minutos, no fuso da loja; somente horários válidos aparecem. Loja fora do expediente atual pode receber agendamentos futuros, mas pausa manual bloqueia ambos os fluxos. Todo o intervalo de preparo precisa caber no atendimento, respeitando intervalos, horários especiais e passagem da meia-noite.
+
+Checkout recalcula elegibilidade na revisão e confirmação; horário vencido, pausa ou mudança da configuração/valores exige revisão. Instantes de atendimento e início do preparo são gravados em UTC com fuso original. Confirmações repetidas não duplicam pedido. Revisão, acompanhamento público, painel, detalhes e operação/cozinha destacam agendamento e início previsto. Aceite antecipado permitido; preparo antecipado bloqueado no servidor e nos botões, liberados pela atualização do painel. Cancelamento continua permitido. Sem aceite/preparo/despacho automático, reserva de capacidade, reagendamento ou garantia de pontualidade. Catálogo, cobertura e preços validados no momento de contratar, sem nova geocodificação no dia do atendimento.
+
+Validação: 150 testes PHP e 12 JavaScript aprovados. Seis novos testes cobrem horários inválidos, loja fechada/pausada, fuso/UTC, virada de dia, interrupção no preparo, mudanças após revisão, idempotência e liberação do preparo. Chrome: configuração persistida, lista de horários e ausência de rolagem horizontal em 1440/390/320 px. Migration aplicada somente na prévia SQLite; deploy Coolify/PostgreSQL pendente.
+
 ## Combos — 27/10/2026
 
 Tipo Combo disponível no cadastro e editor, com preço base fixo e grupos de componentes da mesma loja. Cada opção referencia produto comum, com tamanho fixo quando houver variações, quantidade e acréscimo por unidade do componente. Preço avulso do componente não entra no cálculo. Até 10 grupos, 20 opções por grupo e 10 escolhas por grupo; pelo menos um grupo deve ser obrigatório.
@@ -173,8 +181,8 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 | Área | Estado confirmado |
 |---|---|
 | Empresas e acesso | Login, perfis e isolamento das operações existentes; recuperação de senha implementada, pendente de SMTP real; equipe por loja implementada com Operação/Cozinha; permissões personalizadas pendentes |
-| Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; faltam variações, combos, feriados e mais de dois períodos diários |
-| Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; validação geográfica por raio implementada com API configurável, pendente de piloto; faltam agendamento e pagamento online |
+| Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; variações, combos e feriados implementados nas etapas acima; mais de dois períodos diários pendentes |
+| Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; validação geográfica por raio implementada com API configurável, pendente de piloto; agendamento implementado; pagamento online pendente |
 | Pedidos e cozinha | Aceite, preparo, pronto, conclusão, filtros, paginação, detalhes privados, atualização automática e som ativável; faltam estações e ocorrências completas |
 | Freelancers | Cadastro global, aprovação, check-in, FIFO, oferta regional, aceite, coleta e conclusão; faltam presença web automática, posição da fila visível, alertas, regras editáveis e ocorrências |
 | Tarifação e acerto | Três modos de cálculo e registro manual; distância de rota ainda é informada pela loja, sem mapas ou repasse automático |

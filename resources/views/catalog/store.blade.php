@@ -7,6 +7,11 @@
 </div>
 <form action="/stores/{{ $store->id }}/edit" method="post" enctype="multipart/form-data" class="card">@csrf
     <h2>Identidade e operação</h2>
+<details class="card"><summary>Pedidos agendados</summary><p>O cliente escolhe o horário desejado de entrega ou retirada, sujeito ao aceite da loja. O preparo precisa caber integralmente no horário de atendimento. A pausa manual também bloqueia agendamentos. Não há reserva de capacidade ou despacho automático.</p><div class="fields">
+<label>Permitir agendamento<select name="scheduling_enabled"><option value="0" @selected(!old('scheduling_enabled',$store->scheduling_enabled))>Não</option><option value="1" @selected(old('scheduling_enabled',$store->scheduling_enabled))>Sim</option></select></label>
+<label>Antecedência mínima (minutos)<input type="number" name="scheduling_lead_minutes" min="15" max="1440" value="{{ old('scheduling_lead_minutes',$store->scheduling_lead_minutes) }}" required></label>
+<label>Tempo reservado para preparo (minutos)<input type="number" name="scheduling_prep_minutes" min="15" max="240" value="{{ old('scheduling_prep_minutes',$store->scheduling_prep_minutes) }}" required><small>Para entregas, inclua também uma margem de deslocamento do motoboy.</small></label>
+<label>Quantos dias à frente<input type="number" name="scheduling_days" min="1" max="7" value="{{ old('scheduling_days',$store->scheduling_days) }}" required></label></div><small>A antecedência mínima deve ser igual ou maior que o tempo de preparo. Horários apresentados em intervalos de 15 minutos, no fuso da loja.</small></details>
 <div class="fields">
     <label>Nome<input name="name" value="{{ old('name', $store->name) }}" required maxlength="100">
 </label>

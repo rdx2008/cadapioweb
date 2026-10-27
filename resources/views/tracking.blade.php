@@ -4,6 +4,7 @@
 <div class="heading">
 <div class="eyebrow">Acompanhe seu pedido</div>
 <h1>Pedido #{{ $order->id }}</h1>
+@if($scheduleLabel=app(App\Services\OrderScheduling::class)->label($order))<p class="badge">Agendado: {{ $scheduleLabel }}<br>Preparo a partir de {{ Illuminate\Support\Carbon::parse($order->prepare_at,'UTC')->timezone($order->scheduled_timezone)->format('d/m H:i') }}</p>@endif
 <p class="muted">Guarde este link. O andamento é atualizado automaticamente enquanto esta página estiver aberta.</p>
 </div>
 <div class="card">

@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\DashboardSummary;
 use App\Services\DispatchService;
 use App\Services\FareCalculator;
+use App\Services\OrderScheduling;
 use App\Support\Audit;
 use App\Support\MoneyInput;
 use Illuminate\Http\Request;
@@ -139,6 +140,7 @@ class PlatformController extends Controller
             DB::table('tenants')->where('id', $this->tid())->lockForUpdate()->firstOrFail();
             $o = DB::table('orders')->where('tenant_id', $this->tid())->where('id', $id)->lockForUpdate()->firstOrFail();
             $allowed = ['pending' => ['accepted', 'cancelled'], 'accepted' => ['preparing', 'cancelled'], 'preparing' => ['ready', 'cancelled'], 'ready' => ['completed', 'cancelled']];
+            abort_if($r->status === 'preparing' && ! app(OrderScheduling::class)->canPrepare($o), 409, 'Aguarde o horário previsto para iniciar o preparo deste pedido agendado.');
             abort_unless(in_array($r->status, $allowed[$o->status] ?? []), 409, 'Transição inválida.');
             abort_if(DB::table('rides')->where('order_id', $id)->whereIn('status', ['assigned', 'collected'])->exists(), 409, 'Trate a corrida atribuída antes de alterar o pedido.');
             DB::table('orders')->where('id', $id)->update(['status' => $r->status, 'cancellation_reason' => $r->status === 'cancelled' ? $r->cancellation_reason : null, 'updated_at' => now()]);

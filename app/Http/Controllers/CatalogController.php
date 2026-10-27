@@ -190,11 +190,18 @@ class CatalogController extends Controller
             'hours.*.second_opens_at' => 'nullable|required_with:hours.*.second_closes_at|date_format:H:i',
             'hours.*.second_closes_at' => 'nullable|required_with:hours.*.second_opens_at|date_format:H:i',
             'delivery_by_radius' => 'sometimes|boolean',
+            'scheduling_enabled' => 'sometimes|boolean',
+            'scheduling_lead_minutes' => 'sometimes|integer|min:15|max:1440|gte:scheduling_prep_minutes',
+            'scheduling_prep_minutes' => 'sometimes|integer|min:15|max:240',
+            'scheduling_days' => 'sometimes|integer|min:1|max:7',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'cover' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'rate_mode' => 'required|in:fixed,per_km,per_ride', 'base_cents' => 'required|integer|min:0|max:100000',
             'per_km_cents' => 'required|integer|min:0|max:100000', 'minimum_cents' => 'required|integer|min:0|max:100000',
         ]);
+        if (($data['scheduling_prep_minutes'] ?? $store->scheduling_prep_minutes) > ($data['scheduling_lead_minutes'] ?? $store->scheduling_lead_minutes)) {
+            throw ValidationException::withMessages(['scheduling_lead_minutes' => 'A antecedência mínima deve ser igual ou maior que o tempo de preparo.']);
+        }
         ksort($data['hours']);
         $data['weekly_hours'] = $data['use_hours'] ? json_encode(array_values($data['hours']), JSON_THROW_ON_ERROR) : null;
         unset($data['hours'], $data['use_hours']);

@@ -11,7 +11,7 @@ class CheckoutQuote
 
     public function calculate(object $store, array $draft): array
     {
-        $this->require($this->availability->isOpen($store), 'Esta loja está fechada ou pausada.');
+        $schedule = app(OrderScheduling::class)->quote($store, $draft['scheduled_for'] ?? null);
         $lines = [];
         $subtotal = 0;
         $entries = $draft['cart_lines'] ?? collect($draft['items'])->map(fn ($quantity, $id) => ['product_id' => $id, 'quantity' => $quantity, 'variant_id' => $draft['variants'][$id] ?? null, 'choices' => $draft['choices'][$id] ?? []])->values()->all();
@@ -93,7 +93,7 @@ class CheckoutQuote
             }
         }
 
-        return ['items' => $lines, 'subtotal_cents' => $subtotal, 'fee_cents' => $fee, 'total_cents' => $subtotal + $fee, 'delivery_zone_name' => $zoneName, 'delivery_address' => $deliveryAddress];
+        return $schedule + ['items' => $lines, 'subtotal_cents' => $subtotal, 'fee_cents' => $fee, 'total_cents' => $subtotal + $fee, 'delivery_zone_name' => $zoneName, 'delivery_address' => $deliveryAddress];
     }
 
     public function fingerprint(array $quote): string

@@ -84,6 +84,7 @@ class MenuController extends Controller
         }
         $data = $request->validate([
             'customer_name' => 'required|string|max:120', 'phone' => 'required|string|min:8|max:25',
+            'scheduled_for' => 'nullable|string|date_format:Y-m-d\TH:i',
             'mode' => 'required|in:pickup,delivery', 'address' => 'required_if:mode,delivery|nullable|string|max:500',
             'delivery_zone_id' => 'nullable|integer',
             'delivery_token' => 'nullable|string|max:5000',
@@ -216,6 +217,7 @@ class MenuController extends Controller
                 $public = (string) Str::uuid();
                 $id = DB::table('orders')->insertGetId([
                     'public_id' => $public, 'tenant_id' => $store->tenant_id, 'store_id' => $store->id, 'idempotency_key' => $data['draft_id'],
+                    'scheduled_at' => $quote['scheduled_at'], 'prepare_at' => $quote['prepare_at'], 'scheduled_timezone' => $quote['scheduled_timezone'],
                     'customer_name' => $draft['data']['customer_name'], 'phone' => $draft['data']['phone'], 'mode' => $draft['data']['mode'],
                     'address' => $quote['delivery_address'],
                     'delivery_zone_name' => $quote['delivery_zone_name'], 'subtotal_cents' => $quote['subtotal_cents'],
