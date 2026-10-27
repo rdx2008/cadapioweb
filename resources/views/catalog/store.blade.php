@@ -94,5 +94,6 @@
 <a class="button secondary" href="/cardapio/{{ $store->slug }}">Ver cardápio</a>
 </div>
 </form>
+@include('catalog.special-hours')
 @include('catalog.delivery-settings')
 @endsection

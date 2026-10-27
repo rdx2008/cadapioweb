@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -86,6 +87,51 @@ class CatalogController extends Controller
         });
 
         return back()->with('success', $data['open'] ? 'Pedidos habilitados conforme os horários da loja.' : 'Loja pausada para novos pedidos.');
+    }
+
+    public function specialHours(Request $request, int $id): RedirectResponse
+    {
+        $store = $this->store($id);
+        $data = $request->validate([
+            'special_date' => 'required|date_format:Y-m-d',
+            'enabled' => 'required|boolean',
+            'opens_at' => 'nullable|required_if:enabled,1|date_format:H:i',
+            'closes_at' => 'nullable|required_if:enabled,1|date_format:H:i',
+            'second_opens_at' => 'nullable|required_with:second_closes_at|date_format:H:i',
+            'second_closes_at' => 'nullable|required_with:second_opens_at|date_format:H:i',
+        ]);
+        DB::transaction(function () use ($store, $data): void {
+            $locked = DB::table('stores')->where('id', $store->id)->lockForUpdate()->firstOrFail();
+            $exceptions = json_decode($locked->special_hours ?? '{}', true);
+            $date = $data['special_date'];
+            if (! isset($exceptions[$date]) && count($exceptions) >= 366) {
+                throw ValidationException::withMessages(['special_date' => 'Limite de 366 datas especiais. Remova datas antigas para cadastrar outras.']);
+            }
+            $exceptions[$date] = $data['enabled'] ? [
+                'enabled' => true, 'opens_at' => $data['opens_at'], 'closes_at' => $data['closes_at'],
+                'second_opens_at' => $data['second_opens_at'] ?? null, 'second_closes_at' => $data['second_closes_at'] ?? null,
+            ] : ['enabled' => false];
+            ksort($exceptions);
+            DB::table('stores')->where('id', $store->id)->update(['special_hours' => json_encode($exceptions, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
+            Audit::record('store.special_hours.saved', ['store_id' => $store->id, 'date' => $date, 'enabled' => (bool) $data['enabled']], $store->tenant_id);
+        });
+
+        return redirect(route('stores.edit', $id).'#special-hours')->with('success', 'Data especial salva. A pausa manual continua prevalecendo.');
+    }
+
+    public function removeSpecialHours(Request $request, int $id): RedirectResponse
+    {
+        $store = $this->store($id);
+        $data = $request->validate(['special_date' => 'required|date_format:Y-m-d']);
+        DB::transaction(function () use ($store, $data): void {
+            $locked = DB::table('stores')->where('id', $store->id)->lockForUpdate()->firstOrFail();
+            $exceptions = json_decode($locked->special_hours ?? '{}', true);
+            unset($exceptions[$data['special_date']]);
+            DB::table('stores')->where('id', $store->id)->update(['special_hours' => $exceptions ? json_encode($exceptions, JSON_THROW_ON_ERROR) : null, 'updated_at' => now()]);
+            Audit::record('store.special_hours.removed', ['store_id' => $store->id, 'date' => $data['special_date']], $store->tenant_id);
+        });
+
+        return redirect(route('stores.edit', $id).'#special-hours')->with('success', 'Exceção removida. A data volta a seguir a configuração semanal.');
     }
 
     public function zone(Request $request, int $storeId): RedirectResponse

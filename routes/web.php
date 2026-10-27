@@ -67,7 +67,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/dashboard', [PlatformController::class, 'dashboard']);
         Route::get('/orders/live', [OrderBoardController::class, 'live'])->middleware('throttle:60,1');
         Route::get('/orders/{id}', [OrderBoardController::class, 'show']);
-        Route::get('/stores/{id}/edit', [CatalogController::class, 'editStore']);
+        Route::get('/stores/{id}/edit', [CatalogController::class, 'editStore'])->name('stores.edit');
+        Route::post('/stores/{id}/special-hours', [CatalogController::class, 'specialHours'])->name('stores.special-hours');
+        Route::post('/stores/{id}/special-hours/remove', [CatalogController::class, 'removeSpecialHours'])->name('stores.special-hours.remove');
         Route::post('/stores/{id}/edit', [CatalogController::class, 'updateStore']);
         Route::post('/stores/{id}/delivery-settings', [CatalogController::class, 'deliverySettings']);
         Route::post('/stores/{id}/locate', [CatalogController::class, 'locate'])->middleware('throttle:10,1');

@@ -2,6 +2,14 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Feriados e horários especiais — 26/10/2026
+
+Configurar loja permite cadastrar/substituir uma data de fechamento ou abertura em até dois períodos e remover a exceção para restaurar o padrão semanal. Cada loja armazena suas datas; gestão exclusiva do proprietário, isolamento por tenant, trava da loja e auditoria nas alterações. Migration aditiva inclui special_hours, sem alterar horários existentes. Feriados não são importados automaticamente; máximo de 366 exceções cadastradas por loja.
+
+A exceção usa a data no fuso da loja, prevalece sobre a semana e o modo manual de horários; pausa manual continua bloqueando atendimento. Uma data especial interrompe à meia-noite o período anterior. Período especial pode atravessar a madrugada, salvo outra exceção na data seguinte. Cardápio exibe o horário especial; revisão e confirmação do checkout revalidam disponibilidade, inclusive quando fecha entre as duas etapas. Pedidos existentes continuam na operação.
+
+Validação: suíte de 103 testes PHP e cinco JavaScript; teste direcionado de cinco casos/64 verificações após acrescentar fechamento entre revisão e confirmação. Chrome em desktop e 390/320 px, cadastro de fechamento, dois períodos com madrugada e remoção. Testes locais SQLite; publicação e validação PostgreSQL/Coolify pendentes.
+
 ## Equipe por loja — 26/10/2026
 
 Proprietário cria acessos em Equipe e acessos com e-mail, senha inicial de 12 caracteres, perfil Operação/Cozinha e lojas permitidas. Operação vê atendimento/valores e pode aceitar, preparar, concluir, cancelar com motivo e registrar recebimento manual nas lojas liberadas. Cozinha recebe somente itens/adicionais, modalidade e situação; não recebe telefone, endereço ou valores, e só pode iniciar preparo e marcar pronto. Configurações, catálogo, equipe, relatórios do proprietário, despacho/acerto e integrações iFood/WhatsApp permanecem exclusivos do proprietário. Perfis personalizados e gerência delegada não estão incluídos nesta etapa.
