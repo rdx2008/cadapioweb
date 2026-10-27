@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Presença, fila e ofertas web do motoboy — 26/10/2026
+
+Painel do motoboy agora renova GPS a cada 30 segundos com a página visível e atualiza fila/ofertas/corridas a cada cinco segundos. Check-in continua exigindo até 150 m da loja e precisão de até 50 m. Heartbeat exige amostra de até 60 segundos, preserva horário de entrada e loja escolhida, e não reativa presença offline/vencida. Saída do raio ou módulo desativado suspendem a fila; nova entrada exige confirmação. Oferta exclusiva expirada não pode ser reativada pela renovação automática. Scheduler dispatch:tick continua necessário para reconciliar ofertas expiradas.
+
+Posição FIFO mostra somente posição/total, sem nomes ou dados de outros entregadores. Desconsidera presenças vencidas, bloqueados, localizações fora do raio e reservas/corridas vigentes. Ofertas incluem contagem regressiva pelo horário do servidor, aviso visual e som liberado por clique; expiração desabilita ações na tela e o servidor continua decidindo o aceite. Feed mantém apenas ofertas e corridas do usuário autenticado; destino e contato do cliente não aparecem antes do aceite. Rotas novas são privadas, limitadas por frequência e retornam no-store. Desconexão mantém o último quadro com aviso, sem confirmar ações. Revogação de sessão limpa o quadro.
+
+Em corrida atribuída, GPS pode atualizar o último ponto sem marcar disponibilidade, recriar check-in ou cancelar corrida, inclusive durante encerramento do módulo. Não inclui mapa, histórico de trajeto, rastreamento com navegador fechado ou entrega garantida de notificação. Permissão negada, precisão ruim, página oculta e falha de rede aparecem no painel. A presença expira após 90 segundos sem renovação válida; voltar à página depois disso exige confirmação.
+
+Validação: 110 testes PHP e oito JavaScript, incluindo sete cenários novos de backend e três de navegador simulado. Chrome com GPS simulado: check-in, posição, renovação real após 30 segundos, saída offline e telas 1440/390/320 px. Nenhuma API iFood alterada. Concorrência PostgreSQL e piloto em dispositivos reais permanecem pendentes.
+
 ## Feriados e horários especiais — 26/10/2026
 
 Configurar loja permite cadastrar/substituir uma data de fechamento ou abertura em até dois períodos e remover a exceção para restaurar o padrão semanal. Cada loja armazena suas datas; gestão exclusiva do proprietário, isolamento por tenant, trava da loja e auditoria nas alterações. Migration aditiva inclui special_hours, sem alterar horários existentes. Feriados não são importados automaticamente; máximo de 366 exceções cadastradas por loja.

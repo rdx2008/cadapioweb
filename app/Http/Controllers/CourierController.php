@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Services\DispatchService;
 use App\Support\Audit;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class CourierController extends Controller
 {
@@ -14,11 +16,105 @@ class CourierController extends Controller
         return DB::table('drivers')->where('user_id', auth()->id())->firstOrFail();
     }
 
-    public function index()
+    public function index(): View
     {
         $d = $this->driver();
 
-        return view('courier', ['driver' => $d, 'stores' => DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('tenants.courier_module', 'active')->select('stores.id', 'stores.name', 'stores.address')->get(), 'offers' => DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->join('stores', 'stores.id', '=', 'rides.store_id')->where('offers.driver_id', $d->id)->where('offers.status', 'open')->where('offers.expires_at', '>', now())->whereIn('rides.status', ['offered', 'broadcast'])->select('offers.id', 'offers.expires_at', 'rides.fare_cents', 'rides.route_meters', 'rides.cash_cents', 'stores.name', 'stores.address')->get(), 'rides' => DB::table('rides')->join('orders', 'orders.id', '=', 'rides.order_id')->where('rides.driver_id', $d->id)->select('rides.*', 'orders.address', 'orders.phone', 'orders.customer_name')->orderByDesc('rides.id')->limit(30)->get()]);
+        return view('courier', $this->board($d) + ['driver' => $d, 'presence' => $this->presenceState($d), 'stores' => DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('tenants.courier_module', 'active')->select('stores.id', 'stores.name', 'stores.address')->get()]);
+    }
+
+    public function live(): JsonResponse
+    {
+        $driver = $this->driver();
+        $board = $this->board($driver);
+        $html = view('partials.courier-board', $board)->render();
+
+        return response()->json(['html' => $html, 'signature' => hash('sha256', $html), 'presence' => $this->presenceState($driver), 'server_time' => now()->timestamp * 1000])->header('Cache-Control', 'no-store');
+    }
+
+    private function board(object $driver): array
+    {
+        $offers = DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->join('stores', 'stores.id', '=', 'rides.store_id')->join('tenants', 'tenants.id', '=', 'rides.tenant_id')
+            ->where('offers.driver_id', $driver->id)->where('offers.status', 'open')->where('offers.expires_at', '>', now())->whereIn('rides.status', ['offered', 'broadcast'])->where('tenants.courier_module', 'active')
+            ->select('offers.id', 'offers.expires_at', 'rides.fare_cents', 'rides.route_meters', 'rides.cash_cents', 'stores.name', 'stores.address')->orderBy('offers.id')->get();
+        if ($driver->status !== 'approved' || ! $driver->available || ! $driver->heartbeat_at || now()->subSeconds(90)->gt($driver->heartbeat_at)) {
+            $offers = collect();
+        }
+        $rides = DB::table('rides')->join('orders', 'orders.id', '=', 'rides.order_id')->where('rides.driver_id', $driver->id)->select('rides.*', 'orders.address', 'orders.phone', 'orders.customer_name')->orderByDesc('rides.id')->limit(30)->get();
+
+        return compact('offers', 'rides');
+    }
+
+    private function presenceState(object $driver): array
+    {
+        $base = ['renew' => false, 'queue_position' => null, 'queue_total' => null];
+        if ($driver->status !== 'approved') {
+            return $base + ['label' => 'Cadastro pendente ou bloqueado'];
+        }
+        if (DB::table('rides')->where('driver_id', $driver->id)->whereIn('status', ['assigned', 'collected'])->exists()) {
+            return array_replace($base, ['label' => 'Em corrida · novas ofertas suspensas', 'renew' => true]);
+        }
+        if ($this->expiredExclusiveOffer($driver->id)) {
+            return $base + ['label' => 'Oferta sem resposta · confirme para voltar após a reconciliação'];
+        }
+        if (! $driver->available) {
+            return $base + ['label' => 'Offline · confirme para ficar disponível'];
+        }
+        if (! $driver->heartbeat_at || now()->subSeconds(90)->gt($driver->heartbeat_at)) {
+            return $base + ['label' => 'Presença expirada · confirme para voltar'];
+        }
+        $base['renew'] = true;
+        if (! $driver->checkin_store_id) {
+            return $base + ['label' => 'Disponível para ofertas da região'];
+        }
+        $store = DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('stores.id', $driver->checkin_store_id)->where('tenants.courier_module', 'active')->select('stores.*')->first();
+        if (! $store || $driver->accuracy === null || $driver->accuracy > 50 || $driver->latitude === null || $driver->longitude === null || DispatchService::distance($driver->latitude, $driver->longitude, $store->latitude, $store->longitude) > 150) {
+            return array_replace($base, ['label' => 'Fora da fila · confirme a localização na loja', 'renew' => false]);
+        }
+        $claims = DB::table('driver_claims')->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->pluck('driver_id');
+        if ($claims->contains($driver->id)) {
+            return $base + ['label' => 'Oferta reservada · responda antes do prazo'];
+        }
+        $queue = DB::table('drivers')->where('checkin_store_id', $store->id)->where('status', 'approved')->where('available', true)->where('heartbeat_at', '>=', now()->subSeconds(90))->where('accuracy', '<=', 50)->whereNotIn('id', $claims)->orderBy('checked_in_at')->orderBy('id')->get()
+            ->filter(fn ($candidate) => $candidate->latitude !== null && $candidate->longitude !== null && DispatchService::distance($candidate->latitude, $candidate->longitude, $store->latitude, $store->longitude) <= 150)->values();
+        $position = $queue->search(fn ($candidate) => $candidate->id === $driver->id);
+
+        return array_replace($base, ['label' => $store->name.' · fila de espera', 'queue_position' => $position === false ? null : $position + 1, 'queue_total' => $queue->count()]);
+    }
+
+    public function heartbeat(Request $request): JsonResponse
+    {
+        $data = $request->validate(['latitude' => 'required|numeric|between:-90,90', 'longitude' => 'required|numeric|between:-180,180', 'accuracy' => 'required|numeric|min:0|max:50', 'captured_at' => ['required', 'numeric', 'min:'.now()->subSeconds(60)->timestamp, 'max:'.now()->addSeconds(5)->timestamp]]);
+        $driver = $this->driver();
+        $accepted = DB::transaction(function () use ($driver, $data): bool {
+            $locked = DB::table('drivers')->where('id', $driver->id)->lockForUpdate()->firstOrFail();
+            abort_unless($locked->status === 'approved', 403, 'Cadastro não aprovado.');
+            $busy = DB::table('rides')->where('driver_id', $driver->id)->whereIn('status', ['assigned', 'collected'])->exists();
+            $expiredOffer = $this->expiredExclusiveOffer($driver->id);
+            if (! $busy && ($expiredOffer || ! $locked->available || ! $locked->heartbeat_at || now()->subSeconds(90)->gt($locked->heartbeat_at))) {
+                DB::table('drivers')->where('id', $driver->id)->update(['available' => false, 'checkin_store_id' => null, 'checked_in_at' => null]);
+
+                return false;
+            }
+            if (! $busy && $locked->checkin_store_id) {
+                $store = DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('stores.id', $locked->checkin_store_id)->where('tenants.courier_module', 'active')->select('stores.*')->first();
+                if (! $store || DispatchService::distance($data['latitude'], $data['longitude'], $store->latitude, $store->longitude) > 150) {
+                    DB::table('drivers')->where('id', $driver->id)->update(['available' => false, 'checkin_store_id' => null, 'checked_in_at' => null]);
+
+                    return false;
+                }
+            }
+            DB::table('drivers')->where('id', $driver->id)->update(['latitude' => $data['latitude'], 'longitude' => $data['longitude'], 'accuracy' => $data['accuracy'], 'heartbeat_at' => now()]);
+
+            return true;
+        });
+
+        return response()->json(['presence' => $this->presenceState($this->driver()), 'message' => $accepted ? 'Localização atualizada.' : 'Disponibilidade suspensa. Confirme para voltar à fila.'], $accepted ? 200 : 409)->header('Cache-Control', 'no-store');
+    }
+
+    private function expiredExclusiveOffer(int $driverId): bool
+    {
+        return DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->where('offers.driver_id', $driverId)->where('offers.status', 'open')->where('offers.expires_at', '<=', now())->where('rides.status', 'offered')->exists();
     }
 
     public function presence(Request $r)
@@ -28,6 +124,7 @@ class CourierController extends Controller
         DB::transaction(function () use ($driver, $d) {
             $locked = DB::table('drivers')->where('id', $driver->id)->lockForUpdate()->first();
             abort_unless($locked->status === 'approved', 403, 'Cadastro aguardando aprovação.');
+            abort_if($this->expiredExclusiveOffer($driver->id), 409, 'Aguarde a reconciliação da oferta expirada e confirme novamente.');
             abort_if(DB::table('driver_claims')->where('driver_id', $driver->id)->whereNull('expires_at')->exists(), 409, 'Finalize sua corrida antes de ficar disponível.');
             $storeId = null;
             $checkin = null;
@@ -39,12 +136,15 @@ class CourierController extends Controller
             }DB::table('drivers')->where('id', $driver->id)->update(['latitude' => $d['latitude'], 'longitude' => $d['longitude'], 'accuracy' => $d['accuracy'], 'available' => true, 'heartbeat_at' => now(), 'checkin_store_id' => $storeId, 'checked_in_at' => $checkin]);
         });
 
-        return back()->with('success', 'Presença atualizada. Nesta versão web, renove a localização antes de 90 segundos.');
+        return back()->with('success', 'Presença confirmada. Mantenha esta página visível para renovar a localização automaticamente.');
     }
 
     public function offline()
     {
-        DB::table('drivers')->where('id', $this->driver()->id)->update(['available' => false, 'checkin_store_id' => null, 'checked_in_at' => null]);
+        DB::transaction(function (): void {
+            $driver = DB::table('drivers')->where('id', $this->driver()->id)->lockForUpdate()->firstOrFail();
+            DB::table('drivers')->where('id', $driver->id)->update(['available' => false, 'checkin_store_id' => null, 'checked_in_at' => null]);
+        });
 
         return back();
     }

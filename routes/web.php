@@ -90,6 +90,8 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('access:courier')->group(function () {
         Route::get('/courier', [CourierController::class, 'index']);
+        Route::get('/courier/live', [CourierController::class, 'live'])->middleware('throttle:60,1')->name('courier.live');
+        Route::post('/courier/heartbeat', [CourierController::class, 'heartbeat'])->middleware('throttle:6,1')->name('courier.heartbeat');
         Route::post('/courier/presence', [CourierController::class, 'presence']);
         Route::post('/courier/offline', [CourierController::class, 'offline']);
         Route::post('/courier/offers/{id}/accept', [CourierController::class, 'accept']);
