@@ -1,7 +1,12 @@
 @extends('layout')
 @section('content')
 <div data-workspace-overview>
-<div class="page-heading"><div><h1>Sua plataforma, sob controle.</h1><p>Acompanhe as empresas e mantenha sua rede conectada.</p></div><a class="button" href="#nova-empresa">+ Nova empresa</a></div>
+<div class="page-heading"><div><span class="dashboard-eyebrow">ADMINISTRAÇÃO DA PLATAFORMA</span><h1>Sua plataforma, sob controle.</h1><p>Acompanhe as empresas e mantenha sua rede conectada.</p></div><a class="button" href="#nova-empresa">+ Nova empresa</a></div>
+<section class="tenant-welcome" aria-label="Atalhos da plataforma">
+<div><span class="welcome-label">Uma visão completa do seu negócio</span><h2>Restaurantes conectados.<br>Gestão no mesmo lugar.</h2><p>Acompanhe as empresas, organize os acessos e configure as integrações da plataforma.</p><a class="button" href="#nova-empresa">Cadastrar empresa @include('partials.icon',['name'=>'arrow'])</a></div>
+<div class="welcome-art" aria-hidden="true"><span class="art-orbit"></span><span class="art-plate">@include('partials.icon',['name'=>'store'])</span><span class="art-chip chip-one">@include('partials.icon',['name'=>'users']) Empresas</span><span class="art-chip chip-two">@include('partials.icon',['name'=>'chat']) Integrações</span></div>
+</section>
+<div class="tenant-shortcuts"><a href="#empresas">@include('partials.icon',['name'=>'users'])<span>Empresas<small>Restaurantes e proprietários</small></span>@include('partials.icon',['name'=>'arrow'])</a><a href="#entregadores">@include('partials.icon',['name'=>'truck'])<span>Motoboys freelancers<small>Cadastros e aprovações</small></span>@include('partials.icon',['name'=>'arrow'])</a><a href="/admin/ifood">@include('partials.icon',['name'=>'store'])<span>Integração iFood<small>Aplicativo e conexões</small></span>@include('partials.icon',['name'=>'arrow'])</a></div>
 <div class="stats metric-grid">
 @foreach([['users','Empresas cadastradas',$tenants->count(),'Tenants na plataforma'],['store','Lojas',$storeCount,'Unidades cadastradas'],['truck','Freelancer ativo',$tenants->where('courier_module','active')->count(),'Empresas com o módulo ativo'],['orders','Aguardando análise',$drivers->where('status','pending')->count(),'Cadastros de entregadores']] as [$icon,$label,$value,$hint])<div class="stat metric"><span class="metric-icon {{ $icon }}">@include('partials.icon',['name'=>$icon])</span><div><span class="metric-label">{{ $label }}</span><strong class="value">{{ $value }}</strong><small>{{ $hint }}</small></div></div>@endforeach
 </div>
