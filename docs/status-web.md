@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Tipo de produto e configurações específicas — 27/10/2026
+
+Cadastro/edição incluem Tipo de produto: Produto comum ou Pizza. Combos não aparecem como opção enquanto o módulo não estiver implementado. Editor comum mostra dados, preços/variações e adicionais; sabores, bordas e máximo de sabores ficam exclusivos do editor Pizza. Alterar o seletor requer salvar para carregar as seções do novo tipo. Listagem identifica o tipo.
+
+Migration adiciona product_type com padrão common e identifica como pizza os produtos já habilitados no modo pizza, com sabores cadastrados ou grupo do tipo border. Não altera disponibilidade nem preços na migração. Novos endpoints de sabores/regras e cadastro de grupos Borda recusam produtos comuns no servidor.
+
+Mudança de tipo desliga pizza_enabled e pausa produto para revisão, em transação e com auditoria. Sabores e bordas antigos permanecem armazenados. Em produto comum, bordas preservadas não aparecem no editor/cardápio e não são exigidas/cobradas no checkout. Voltar ao tipo Pizza mostra os dados preservados, sem reativar automaticamente venda ou montagem de sabores. Produto comum continua podendo ter variações de tamanho e adicionais normais.
+
+Validação: 137 testes PHP e 11 JavaScript; quatro novos casos cobrem exibição, requisições forjadas, criação/troca de tipo, pausa, preservação, checkout e isolamento. Chrome: migração de pizza já configurada, editor comum sem seções de pizza, mudança entre tipos e telas 390/320 px. Migration aplicada somente em banco local de prévia; publicação e piloto PostgreSQL/Coolify pendentes.
+
 ## Pizzas com sabores e bordas — 27/10/2026
 
 Editor permite ativar modo pizza após habilitar tamanhos e cadastrar sabores com preço em tamanho disponível. Cada tamanho aceita de 1 a 4 sabores distintos, em partes iguais. Regra por produto: maior preço entre sabores ou média aritmética com arredondamento em centavos. Preços são da pizza inteira de cada sabor/tamanho e substituem o preço padrão da variação neste modo. Campo vazio deixa sabor indisponível naquele tamanho; sabor pode ser pausado. Tamanhos sem qualquer sabor ativo/preço não aparecem no cardápio, e produto sem tamanho vendável sai da vitrine.

@@ -53,6 +53,7 @@ class MenuController extends Controller
             return true;
         });
         $groups = DB::table('option_groups')->whereIn('product_id', $products->pluck('id'))->orderBy('id')->get();
+        $groups = $groups->filter(fn ($group) => $group->kind !== 'border' || $products->firstWhere('id', $group->product_id)?->product_type === 'pizza');
         $options = DB::table('product_options')->whereIn('option_group_id', $groups->pluck('id'))->where('available', true)->orderBy('id')->get()->groupBy('option_group_id');
         $zones = DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)->orderBy('name')->get();
 

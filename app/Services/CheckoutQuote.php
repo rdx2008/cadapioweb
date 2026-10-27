@@ -27,7 +27,7 @@ class CheckoutQuote
             $this->require($quantities[$productId] <= 50, 'O limite é de 50 unidades do mesmo produto, somando suas combinações.');
             $product = DB::table('products')->where('tenant_id', $store->tenant_id)->where('store_id', $store->id)->where('id', $productId)->where('available', true)->first();
             $this->require($product !== null, 'Um produto não está mais disponível. Revise o carrinho.');
-            $groups = DB::table('option_groups')->where('product_id', $product->id)->orderBy('id')->get();
+            $groups = DB::table('option_groups')->where('product_id', $product->id)->when($product->product_type !== 'pizza', fn ($query) => $query->where('kind', '!=', 'border'))->orderBy('id')->get();
             $chosen = $entry['choices'] ?? [];
             $this->require(count(array_diff(array_map('strval', array_keys($chosen)), $groups->pluck('id')->map(fn ($id) => (string) $id)->all())) === 0, 'Grupo de adicionais inválido para este produto.');
             $options = [];

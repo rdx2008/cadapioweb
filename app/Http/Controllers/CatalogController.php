@@ -113,7 +113,7 @@ class CatalogController extends Controller
     public function createProduct(Request $request): RedirectResponse
     {
         MoneyInput::normalize($request, ['price' => 'price_cents']);
-        $data = $request->validate(['store_id' => 'required|integer', 'name' => 'required|string|max:120', 'category_id' => 'nullable|integer|min:1', 'category' => 'nullable|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'nullable|required_unless:uses_variants,1|integer|min:1|max:1000000', 'available' => 'sometimes|boolean', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'uses_variants' => 'sometimes|boolean', 'new_variants' => 'nullable|array|max:20', 'new_variants.*' => 'array:name,price', 'new_variants.*.name' => 'required|string|max:80', 'new_variants.*.price' => ['required', 'regex:/^\d{1,5}(?:[.,]\d{1,2})?$/D'], 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
+        $data = $request->validate(['store_id' => 'required|integer', 'name' => 'required|string|max:120', 'product_type' => 'sometimes|in:common,pizza', 'category_id' => 'nullable|integer|min:1', 'category' => 'nullable|string|max:80', 'description' => 'nullable|string|max:1000', 'price_cents' => 'nullable|required_unless:uses_variants,1|integer|min:1|max:1000000', 'available' => 'sometimes|boolean', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'uses_variants' => 'sometimes|boolean', 'new_variants' => 'nullable|array|max:20', 'new_variants.*' => 'array:name,price', 'new_variants.*.name' => 'required|string|max:80', 'new_variants.*.price' => ['required', 'regex:/^\d{1,5}(?:[.,]\d{1,2})?$/D'], 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
         $store = $this->store($data['store_id']);
         $variants = $data['new_variants'] ?? [];
         if (($data['uses_variants'] ?? false) && ! count($variants)) {
@@ -341,7 +341,7 @@ class CatalogController extends Controller
     public function editProduct(int $id): View
     {
         $product = $this->product($id);
-        $groups = DB::table('option_groups')->where('product_id', $id)->orderBy('id')->get();
+        $groups = DB::table('option_groups')->where('product_id', $id)->when($product->product_type !== 'pizza', fn ($query) => $query->where('kind', '!=', 'border'))->orderBy('id')->get();
         $options = DB::table('product_options')->whereIn('option_group_id', $groups->pluck('id'))->orderBy('id')->get()->groupBy('option_group_id');
 
         $variants = DB::table('product_variants')->where('product_id', $id)->orderBy('id')->get();
@@ -362,6 +362,9 @@ class CatalogController extends Controller
         DB::transaction(function () use ($product, $data): void {
             DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
             $current = DB::table('products')->find($product->id);
+            if ($current->product_type !== 'pizza') {
+                throw ValidationException::withMessages(['product_type' => 'Selecione o tipo Pizza e salve o produto antes de configurar sabores.']);
+            }
             $variants = DB::table('product_variants')->where('product_id', $product->id)->where('available', true)->get();
             $flavors = DB::table('pizza_flavors')->where('product_id', $product->id)->where('available', true)->get();
             if ($data['pizza_enabled'] && (! $current->uses_variants || app(PizzaPricing::class)->availableVariants($variants, $flavors)->isEmpty())) {
@@ -380,6 +383,9 @@ class CatalogController extends Controller
         $data = $request->validate(['flavor_id' => 'nullable|integer|min:1', 'name' => 'required|string|max:80', 'description' => 'nullable|string|max:240', 'available' => 'required|boolean', 'prices' => 'required|array|min:1|max:20', 'prices.*' => ['nullable', 'regex:/^\d{1,5}(?:[.,]\d{1,2})?$/D']]);
         DB::transaction(function () use ($product, $data): void {
             DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->firstOrFail();
+            if (DB::table('products')->where('id', $product->id)->value('product_type') !== 'pizza') {
+                throw ValidationException::withMessages(['product_type' => 'Sabores são configurados apenas em produtos do tipo Pizza.']);
+            }
             $variants = DB::table('product_variants')->where('product_id', $product->id)->pluck('id')->map(fn ($id) => (string) $id)->all();
             if (array_diff(array_map('strval', array_keys($data['prices'])), $variants)) {
                 throw ValidationException::withMessages(['prices' => 'Tamanho inválido para este produto.']);
@@ -465,7 +471,7 @@ class CatalogController extends Controller
     {
         $product = $this->product($id);
         MoneyInput::normalize($request, ['price' => 'price_cents']);
-        $data = $request->validate(['name' => 'required|string|max:120', 'category' => 'nullable|string|max:80', 'category_id' => 'nullable|integer|min:1', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
+        $data = $request->validate(['name' => 'required|string|max:120', 'product_type' => 'sometimes|in:common,pizza', 'category' => 'nullable|string|max:80', 'category_id' => 'nullable|integer|min:1', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
         unset($data['photo']);
         $path = null;
         if ($request->hasFile('photo')) {
@@ -475,6 +481,12 @@ class CatalogController extends Controller
         try {
             DB::transaction(function () use ($product, $data) {
                 DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->first();
+                $current = DB::table('products')->where('id', $product->id)->firstOrFail();
+                if (isset($data['product_type']) && $data['product_type'] !== $current->product_type) {
+                    $data['pizza_enabled'] = false;
+                    $data['available'] = false;
+                    Audit::record('product.type_changed', ['product_id' => $product->id, 'from' => $current->product_type, 'to' => $data['product_type']], $product->tenant_id);
+                }
                 $category = $this->resolveCategory($product->store_id, $data);
                 $data['category_id'] = $category->id;
                 $data['category'] = $category->name;
@@ -488,7 +500,7 @@ class CatalogController extends Controller
             throw $exception;
         }
 
-        return back()->with('success', 'Produto atualizado. Os pedidos anteriores mantêm seus valores.');
+        return back()->with('success', 'Produto atualizado. Se mudou o tipo, o produto foi pausado para revisão. Pedidos anteriores mantêm seus valores.');
     }
 
     public function photo(int $id): StreamedResponse
@@ -526,6 +538,9 @@ class CatalogController extends Controller
             $groupId = $data['group_id'] ?? null;
             $current = $groupId ? DB::table('option_groups')->where('product_id', $product->id)->where('id', $groupId)->firstOrFail() : null;
             $data['kind'] = $data['kind'] ?? $current?->kind ?? 'addon';
+            if ($data['kind'] === 'border' && DB::table('products')->where('id', $product->id)->value('product_type') !== 'pizza') {
+                throw ValidationException::withMessages(['kind' => 'Bordas são configuradas apenas em produtos do tipo Pizza.']);
+            }
             if ($data['kind'] === 'border' && ($data['maximum'] != 1 || $data['minimum'] > 1)) {
                 throw ValidationException::withMessages(['maximum' => 'Grupo de borda permite no máximo uma escolha. Use mínimo 0 (opcional) ou 1 (obrigatória).']);
             }

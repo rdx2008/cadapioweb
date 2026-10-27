@@ -17,7 +17,7 @@ class PizzaOrderingTest extends TestCase
     {
         $tenant = $this->tenant();
         $store = $this->store($tenant);
-        $product = DB::table('products')->insertGetId(['tenant_id' => $tenant, 'store_id' => $store, 'name' => 'Monte sua pizza', 'category' => 'Pizzas', 'price_cents' => 100, 'uses_variants' => true, 'pizza_enabled' => true]);
+        $product = DB::table('products')->insertGetId(['tenant_id' => $tenant, 'store_id' => $store, 'name' => 'Monte sua pizza', 'category' => 'Pizzas', 'price_cents' => 100, 'uses_variants' => true, 'pizza_enabled' => true, 'product_type' => 'pizza']);
         $small = DB::table('product_variants')->insertGetId(['product_id' => $product, 'name' => 'Pequena', 'price_cents' => 100, 'max_flavors' => 1]);
         $large = DB::table('product_variants')->insertGetId(['product_id' => $product, 'name' => 'Grande', 'price_cents' => 100, 'max_flavors' => 4]);
         $a = DB::table('pizza_flavors')->insertGetId(['product_id' => $product, 'name' => 'Calabresa', 'prices' => json_encode([$small => 3000, $large => 5000])]);
