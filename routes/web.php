@@ -8,6 +8,8 @@ use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderBoardController;
 use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PlatformController;
+use App\Http\Controllers\StaffOperationController;
+use App\Http\Controllers\TeamController;
 use App\Http\Controllers\WhatsappController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,6 +54,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/team', [TeamController::class, 'index'])->name('team.index');
+        Route::post('/team', [TeamController::class, 'create'])->middleware('throttle:10,1');
+        Route::post('/team/{id}', [TeamController::class, 'update']);
         Route::get('/integrations/ifood', [IfoodController::class, 'owner'])->name('ifood.owner');
         Route::get('/integrations/ifood/orders/live', [IfoodController::class, 'ordersLive'])->middleware('throttle:60,1')->name('ifood.orders.live');
         Route::get('/integrations/ifood/orders/{id}', [IfoodController::class, 'showOrder'])->name('ifood.orders.show');
@@ -88,5 +93,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/courier/offers/{id}/accept', [CourierController::class, 'accept']);
         Route::post('/courier/offers/{id}/decline', [CourierController::class, 'decline']);
         Route::post('/courier/rides/{id}', [CourierController::class, 'progress']);
+    });
+    Route::middleware('access:staff')->group(function () {
+        Route::get('/operation', [StaffOperationController::class, 'index'])->name('staff.operation');
+        Route::get('/operation/live', [StaffOperationController::class, 'live'])->middleware('throttle:60,1');
+        Route::get('/operation/orders/{id}', [StaffOperationController::class, 'show']);
+        Route::post('/operation/orders/{id}/status', [StaffOperationController::class, 'status']);
+        Route::post('/operation/orders/{id}/paid', [StaffOperationController::class, 'paid']);
     });
 });

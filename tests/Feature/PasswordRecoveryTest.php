@@ -49,7 +49,7 @@ class PasswordRecoveryTest extends TestCase
     {
         $unrelated = User::factory()->create();
         DB::table('sessions')->insert(['id' => 'unrelated-session', 'user_id' => $unrelated->id, 'payload' => '', 'last_activity' => time()]);
-        foreach (['admin', 'owner', 'courier'] as $role) {
+        foreach (['admin', 'owner', 'courier', 'staff'] as $role) {
             $this->travel(61)->seconds();
             $user = User::factory()->create(['role' => $role, 'password' => 'OriginalPassword2026!', 'remember_token' => Str::random(60)]);
             $remember = $user->remember_token;

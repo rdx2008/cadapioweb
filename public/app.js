@@ -65,6 +65,28 @@ document.querySelectorAll("[data-cart]").forEach((form) => {
     form.addEventListener("change", update);
     update();
 });
+document.querySelectorAll('[data-staff-feed]').forEach(feed=>{
+    const message=document.querySelector('[data-staff-connection]');
+    let signature='',running=false,stopped=false;
+    const refresh=async()=>{
+        if(stopped)return;
+        if(document.hidden||running){setTimeout(refresh,5000);return;}
+        running=true;
+        const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+        try{
+            const response=await fetch(feed.dataset.url,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},signal:controller.signal});
+            if([401,403,404].includes(response.status)||response.redirected){feed.replaceChildren();message.textContent='Seu acesso foi alterado ou expirou. Entre novamente.';stopped=true;return;}
+            if(!response.ok)throw new Error('Conexão indisponível. Tentaremos novamente.');
+            const data=await response.json();
+            const editing=feed.contains(document.activeElement)||feed.querySelector('details[open]');
+            if(!editing&&signature!==data.signature){feed.innerHTML=data.html;signature=data.signature;}
+            message.textContent=editing?'Conectado. Termine a ação para atualizar a fila.':'Atualizado às '+new Date().toLocaleTimeString('pt-BR');
+        }catch{message.textContent='Sem atualização no momento. Tentaremos novamente.';}
+        finally{clearTimeout(timeout);running=false;if(!stopped)setTimeout(refresh,5000);}
+    };
+    setTimeout(refresh,5000);
+});
+
 async function readLiveJson(url) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);

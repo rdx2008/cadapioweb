@@ -779,3 +779,5 @@ footer { padding:15px 32px 25px; font-size:10px; }
 .command-row p { flex-basis:100%; margin:0; color:#7b5544; }
 
 [data-delivery-settings] [hidden] { display: none !important; }
+
+@media(max-width:740px) { .staff-order-grid, .team-profile-grid { grid-template-columns: 1fr !important; } }

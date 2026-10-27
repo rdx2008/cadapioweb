@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','CadapioWeb · Sua operação conectada')</title><link rel="stylesheet" href="/app.css?v=6"><script src="/app.js?v=5" defer></script><script src="/menu.js?v=4" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','CadapioWeb · Sua operação conectada')</title><link rel="stylesheet" href="/app.css?v=7"><script src="/app.js?v=6" defer></script><script src="/menu.js?v=4" defer></script></head>
 <body><div class="shell">
 <aside class="sidebar">
     <a class="brand" href="/app">cadapio<span>web</span></a>
@@ -11,8 +11,9 @@
         @php
         $nav = match(auth()->user()->role) {
             'admin' => [['/admin','home','Visão geral'],['/admin#empresas','users','Empresas'],['/admin#entregadores','truck','Entregadores'],['/admin#evolution','chat','WhatsApp central'],['/admin/ifood','store','Integração iFood']],
+            'staff' => [['/operation','orders','Minha operação']],
             'courier' => [['/courier','home','Meu painel'],['/courier#ofertas','truck','Ofertas de corrida'],['/courier#corridas','orders','Minhas corridas']],
-            default => [['/dashboard','home','Visão geral'],['/dashboard#pedidos','orders','Pedidos'],['/dashboard#cardapio','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/dashboard#logistica','truck','Entregas'],['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood']],
+            default => [['/dashboard','home','Visão geral'],['/dashboard#pedidos','orders','Pedidos'],['/dashboard#cardapio','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/dashboard#logistica','truck','Entregas'],['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood'],['/team','users','Equipe e acessos']],
         };
         @endphp
         @foreach($nav as [$href,$icon,$label])<a href="{{ $href }}" data-nav-link>@include('partials.icon',['name'=>$icon])<span>{{ $label }}</span>@if($label==='Pedidos'&&isset($summary))<span class="nav-count" data-summary="pending">{{ $summary['pending'] }}</span>@endif</a>@endforeach
@@ -20,7 +21,7 @@
         <a href="/">@include('partials.icon',['name'=>'home']) Conheça a plataforma</a><a href="/login">@include('partials.icon',['name'=>'users']) Entrar no sistema</a><a href="/entregadores/cadastro">@include('partials.icon',['name'=>'truck']) Sou entregador</a>
     @endauth
     </nav>
-    <div class="sidebar-bottom">@auth<div class="account"><span class="account-avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name,0,2)) }}</span><div><strong>{{ auth()->user()->name }}</strong><small>{{ ['admin'=>'Superadministrador','owner'=>'Proprietário','courier'=>'Entregador'][auth()->user()->role]??'Minha conta' }}</small></div></div>@else<p>Seu negócio,<br>no seu ritmo.</p>@endauth</div>
+    <div class="sidebar-bottom">@auth<div class="account"><span class="account-avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name,0,2)) }}</span><div><strong>{{ auth()->user()->name }}</strong><small>{{ ['admin'=>'Superadministrador','owner'=>'Proprietário','courier'=>'Entregador','staff'=>'Equipe da loja'][auth()->user()->role]??'Minha conta' }}</small></div></div>@else<p>Seu negócio,<br>no seu ritmo.</p>@endauth</div>
 </aside>
 <main>
     <header class="topbar"><div class="breadcrumb"><span>{{ auth()->user()?->role==='admin'?'Plataforma':'Painel' }}</span><span>/</span><strong data-page-label>@yield('page-label','Visão geral')</strong></div><div class="topbar-actions">@if(isset($selectedStore)&&$selectedStore) @php($headerOpen=app(App\Services\StoreAvailability::class)->isOpen($selectedStore))<span class="store-status {{ $headerOpen?'':'is-closed' }}"><i></i>{{ $headerOpen?'Loja aberta':'Loja fechada' }}</span><a class="button outline" href="/cardapio/{{ $selectedStore->slug }}" target="_blank" rel="noopener">@include('partials.icon',['name'=>'external']) Ver cardápio</a>@else<span class="pill">{{ now()->timezone('America/Sao_Paulo')->format('d/m/Y') }}</span>@endif @auth<form action="/logout" method="post" class="logout-form">@csrf<button type="submit" class="logout-button" aria-label="Sair da conta">Sair<span class="logout-detail"> da conta</span> →</button></form>@endauth</div></header>

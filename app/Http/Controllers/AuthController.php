@@ -12,7 +12,7 @@ class AuthController extends Controller
     public function login(Request $r)
     {
         $data = $r->validate(['email' => 'required|email', 'password' => 'required|string']);
-        if (! Auth::attempt($data)) {
+        if (! Auth::attempt($data + ['access_enabled' => true])) {
             return back()->withErrors(['email' => 'E-mail ou senha inválidos.'])->onlyInput('email');
         }$r->session()->regenerate();
 

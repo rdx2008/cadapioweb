@@ -2,6 +2,14 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Equipe por loja — 26/10/2026
+
+Proprietário cria acessos em Equipe e acessos com e-mail, senha inicial de 12 caracteres, perfil Operação/Cozinha e lojas permitidas. Operação vê atendimento/valores e pode aceitar, preparar, concluir, cancelar com motivo e registrar recebimento manual nas lojas liberadas. Cozinha recebe somente itens/adicionais, modalidade e situação; não recebe telefone, endereço ou valores, e só pode iniciar preparo e marcar pronto. Configurações, catálogo, equipe, relatórios do proprietário, despacho/acerto e integrações iFood/WhatsApp permanecem exclusivos do proprietário. Perfis personalizados e gerência delegada não estão incluídos nesta etapa.
+
+Painel /operation e atualização a cada cinco segundos são separados do painel do proprietário. Leituras, detalhes, filtros e alterações verificam tenant e vínculo à loja no servidor; ações revalidam perfil, bloqueio e lojas com trava no usuário. Alterar acesso encerra sessões em banco e renova remember_token; bloqueados não entram novamente. Tela limpa a fila ao receber revogação/expiração. Proprietário não pode converter/bloquear sua própria conta por essas rotas, nem gerenciar pessoas/lojas de outra empresa. Usuários e permissões são auditados sem senha. Migration aditiva mantém proprietários/admins/entregadores ativos e adiciona vínculo com chaves estrangeiras compostas para consistência por tenant.
+
+Validação: 98 testes PHP e cinco JavaScript; Chrome em 1280/390/320 px com criação real dos perfis em banco isolado, navegação restrita, privacidade da cozinha e revogação de sessão em banco. Concorrência PostgreSQL e piloto em lojas reais permanecem necessários. Recuperação de senha também cobre perfil staff. Não há convite automático por e-mail; senha inicial deve ser compartilhada privadamente.
+
 ## Recuperação de senha — 26/10/2026
 
 Implementados link no login, solicitação neutra por e-mail, mensagem em português e formulário de redefinição. Broker Laravel utiliza token hasheado, expiração de 60 minutos, limitação de solicitação e consumo único. Reset serializa o acesso ao token em transação, troca senha e remember_token, encerra sessões do usuário em banco e registra auditoria sem senha/token. Outras contas e sessões permanecem preservadas. URL de e-mail utiliza APP_URL confiável; formulário usa no-store/no-referrer e dados sensíveis não são gravados no old input.
@@ -86,7 +94,7 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 
 | Área | Estado confirmado |
 |---|---|
-| Empresas e acesso | Login, perfis e isolamento das operações existentes; recuperação de senha implementada, pendente de SMTP real; faltam usuários/permissões por loja |
+| Empresas e acesso | Login, perfis e isolamento das operações existentes; recuperação de senha implementada, pendente de SMTP real; equipe por loja implementada com Operação/Cozinha; permissões personalizadas pendentes |
 | Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; faltam variações, combos, feriados e mais de dois períodos diários |
 | Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; validação geográfica por raio implementada com API configurável, pendente de piloto; faltam agendamento e pagamento online |
 | Pedidos e cozinha | Aceite, preparo, pronto, conclusão, filtros, paginação, detalhes privados, atualização automática e som ativável; faltam estações e ocorrências completas |

@@ -6,6 +6,30 @@ const vm = require('node:vm');
 
 const script = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
 
+test('staff feed preserves open actions, pauses when hidden and clears data on revoked access', async () => {
+    const status = {};
+    let editing = false, revoked = false, calls = 0;
+    const feed = {dataset: {url: '/operation/live'}, innerHTML: 'Initial', contains: () => false,
+        querySelector: () => editing ? {} : null, replaceChildren() {this.innerHTML = '';}};
+    const runtime = environment({'[data-staff-feed]': [feed]}, {'[data-staff-connection]': status}, async () => {
+        calls++;
+        return {ok: !revoked, status: revoked ? 403 : 200, redirected: false, json: async () => ({html: 'Updated', signature: 'v1'})};
+    });
+    await runtime.tick();
+    assert.equal(feed.innerHTML, 'Updated');
+    editing = true; feed.innerHTML = 'Open action';
+    await runtime.tick();
+    assert.equal(feed.innerHTML, 'Open action');
+    runtime.document.hidden = true;
+    const before = calls;
+    await runtime.tick();
+    assert.equal(calls, before);
+    runtime.document.hidden = false; revoked = true;
+    await runtime.tick();
+    assert.equal(feed.innerHTML, '');
+    assert.match(status.textContent, /acesso foi alterado/);
+});
+
 function environment(lists = {}, singles = {}, fetcher = async () => { throw new Error('Unexpected fetch'); }) {
     const timers = new Map();
     const events = {};
