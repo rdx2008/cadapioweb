@@ -31,7 +31,7 @@ class DispatchService
             if (! $ride || ! in_array($ride->status, ['searching', 'offered', 'broadcast'])) {
                 return;
             }
-            if ($tenant->courier_module !== 'active') {
+            if ($tenant->courier_module !== 'active' || ! app(TenantState::class)->active($tenant->id)) {
                 return;
             }
             $live = DB::table('offers')->where('ride_id', $id)->where('status', 'open')->where('expires_at', '>', now())->exists();
@@ -104,6 +104,7 @@ class DispatchService
                 return $ride->id;
             }
             abort_unless($tenant->courier_module === 'active', 409, 'Módulo em encerramento.');
+            abort_unless(app(TenantState::class)->active($tenant->id), 409, 'Empresa indisponível.');
             $offer = DB::table('offers')->find($offerId);
             $driver = DB::table('drivers')->where('id', $driverId)->lockForUpdate()->first();
             abort_unless($offer->status === 'open' && now()->lt($offer->expires_at) && ! $ride->driver_id && in_array($ride->status, ['offered', 'broadcast']) && $this->eligible($driver), 409, 'Oferta indisponível.');

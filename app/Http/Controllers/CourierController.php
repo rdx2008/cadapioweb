@@ -21,7 +21,7 @@ class CourierController extends Controller
     {
         $d = $this->driver();
 
-        return view('courier', $this->board($d) + ['driver' => $d, 'presence' => $this->presenceState($d), 'stores' => DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('tenants.courier_module', 'active')->select('stores.id', 'stores.name', 'stores.address')->get()]);
+        return view('courier', $this->board($d) + ['driver' => $d, 'presence' => $this->presenceState($d), 'stores' => DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('tenants.courier_module', 'active')->where('tenants.status', 'active')->whereNull('tenants.deleted_at')->select('stores.id', 'stores.name', 'stores.address')->get()]);
     }
 
     public function live(): JsonResponse
@@ -36,7 +36,7 @@ class CourierController extends Controller
     private function board(object $driver): array
     {
         $offers = DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->join('orders', 'orders.id', '=', 'rides.order_id')->join('stores', 'stores.id', '=', 'rides.store_id')->join('tenants', 'tenants.id', '=', 'rides.tenant_id')
-            ->where('offers.driver_id', $driver->id)->where('offers.status', 'open')->where('offers.expires_at', '>', now())->whereIn('rides.status', ['offered', 'broadcast'])->where('tenants.courier_module', 'active')
+            ->where('offers.driver_id', $driver->id)->where('offers.status', 'open')->where('offers.expires_at', '>', now())->whereIn('rides.status', ['offered', 'broadcast'])->where('tenants.courier_module', 'active')->where('tenants.status', 'active')->whereNull('tenants.deleted_at')
             ->select('offers.id', 'offers.expires_at', 'rides.fare_cents', 'rides.route_meters', 'rides.cash_cents', 'stores.name', 'stores.address', 'orders.payment_method')->orderBy('offers.id')->get();
         if ($driver->status !== 'approved' || ! $driver->available || ! $driver->heartbeat_at || now()->subSeconds(90)->gt($driver->heartbeat_at)) {
             $offers = collect();
@@ -68,7 +68,7 @@ class CourierController extends Controller
         if (! $driver->checkin_store_id) {
             return $base + ['label' => 'Disponível para ofertas da região'];
         }
-        $store = DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('stores.id', $driver->checkin_store_id)->where('tenants.courier_module', 'active')->select('stores.*')->first();
+        $store = DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('stores.id', $driver->checkin_store_id)->where('tenants.courier_module', 'active')->where('tenants.status', 'active')->whereNull('tenants.deleted_at')->select('stores.*')->first();
         if (! $store || $driver->accuracy === null || $driver->accuracy > 50 || $driver->latitude === null || $driver->longitude === null || DispatchService::distance($driver->latitude, $driver->longitude, $store->latitude, $store->longitude) > 150) {
             return array_replace($base, ['label' => 'Fora da fila · confirme a localização na loja', 'renew' => false]);
         }
@@ -98,7 +98,7 @@ class CourierController extends Controller
                 return false;
             }
             if (! $busy && $locked->checkin_store_id) {
-                $store = DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('stores.id', $locked->checkin_store_id)->where('tenants.courier_module', 'active')->select('stores.*')->first();
+                $store = DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('stores.id', $locked->checkin_store_id)->where('tenants.courier_module', 'active')->where('tenants.status', 'active')->whereNull('tenants.deleted_at')->select('stores.*')->first();
                 if (! $store || DispatchService::distance($data['latitude'], $data['longitude'], $store->latitude, $store->longitude) > 150) {
                     DB::table('drivers')->where('id', $driver->id)->update(['available' => false, 'checkin_store_id' => null, 'checked_in_at' => null]);
 
@@ -130,7 +130,7 @@ class CourierController extends Controller
             $storeId = null;
             $checkin = null;
             if (! empty($d['store_id'])) {
-                $s = DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('stores.id', $d['store_id'])->where('tenants.courier_module', 'active')->select('stores.*')->firstOrFail();
+                $s = DB::table('stores')->join('tenants', 'tenants.id', '=', 'stores.tenant_id')->where('stores.id', $d['store_id'])->where('tenants.courier_module', 'active')->where('tenants.status', 'active')->whereNull('tenants.deleted_at')->select('stores.*')->firstOrFail();
                 abort_unless(DispatchService::distance($d['latitude'], $d['longitude'], $s->latitude, $s->longitude) <= 150, 422, 'Check-in permitido a até 150 m da loja.');
                 $storeId = $s->id;
                 $checkin = $locked->checkin_store_id === $storeId && $locked->available && $locked->heartbeat_at && now()->subSeconds(90)->lte($locked->heartbeat_at) ? $locked->checked_in_at : now();

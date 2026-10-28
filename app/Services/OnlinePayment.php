@@ -54,6 +54,9 @@ class OnlinePayment
         try {
             $attempt = DB::transaction(function () use ($order) {
                 DB::table('tenants')->where('id', $order->tenant_id)->lockForUpdate()->firstOrFail();
+                if (! app(TenantState::class)->active($order->tenant_id)) {
+                    return null;
+                }
                 $current = DB::table('orders')->where('id', $order->id)->lockForUpdate()->firstOrFail();
                 $attempt = DB::table('payment_attempts')->where('order_id', $order->id)->lockForUpdate()->firstOrFail();
                 if ($current->status === 'cancelled' || $current->payment_status === 'paid' || $attempt->needs_review || now()->gte(Carbon::parse($attempt->expires_at, 'UTC'))) {

@@ -12,6 +12,7 @@ class CheckoutQuote
 
     public function calculate(object $store, array $draft): array
     {
+        $this->require(app(TenantState::class)->active($store->tenant_id), 'Esta empresa não está recebendo novos pedidos.');
         $schedule = app(OrderScheduling::class)->quote($store, $draft['scheduled_for'] ?? null);
         $this->require(! str_starts_with($draft['payment_method'] ?? '', 'online_') || ! $schedule['prepare_at'] || Carbon::parse($schedule['prepare_at'], 'UTC')->gte(now()->addMinutes(10)), 'Escolha um horário que permita pelo menos 10 minutos para o pagamento online antes do preparo.');
         $lines = [];

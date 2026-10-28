@@ -2,6 +2,18 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Gestão de empresas e BI — 27/10/2026
+
+Superadmin > Empresas > Gerenciar empresa permite editar nome/identificador e nome/e-mail do proprietário principal, suspender com motivo, reativar, excluir da operação e restaurar. Exclusão exige senha atual do superadmin e identificador exato; pedidos ou entregas em andamento impedem a exclusão. É uma exclusão lógica: histórico de pedidos, pagamentos, usuários e auditoria permanece consultável. Empresas excluídas ficam ocultas por padrão na lista e podem ser exibidas/restauradas, inicialmente suspensas.
+
+Suspensão bloqueia login e requisições de proprietários/equipe, cardápio próprio, novas cobranças e novas ofertas de motoboy; revoga ofertas abertas e libera reservas temporárias sem afetar a conta global do entregador. Entregas já atribuídas podem terminar. Confirmações e consultas de cobranças existentes continuam conciliando dinheiro recebido. A ação não fecha a loja no marketplace iFood.
+
+Menu BI e crescimento: /admin/bi na plataforma e /bi no tenant. Filtros por período (até 366 dias), fuso, empresa no admin e loja; comparação com período anterior de mesma duração, evolução diária, vendas pagas, produtos/frete separados, pagamentos em aberto/conferência, ticket médio, cancelamentos, clientes atendidos e recorrentes, melhores dias e horários, produtos, formas de pagamento, entrega/retirada, rankings de lojas e empresas, entrada de empresas e exportação CSV diária. Contagens ativas/suspensas representam a base atual, enquanto entradas/exclusões respeitam o período. CSV e HTML respeitam o tenant autenticado mesmo com parâmetros adulterados; não exportam dados pessoais.
+
+Métricas de vendas usam a data de criação do pedido no fuso escolhido, pagamento confirmado e pedido não cancelado. O total inclui frete e não representa lucro líquido. Clientes atendidos são telefones válidos normalizados em pedidos concluídos; recorrência significa dois ou mais pedidos concluídos no próprio período, por empresa. Dias sem venda entram na média semanal e na série diária. Dados são do cardápio próprio; testes iFood não entram. Receita de assinaturas do SaaS permanece sem lançamentos até existir cobrança/registro desse módulo, separada do volume dos restaurantes.
+
+Verificação final: 186 testes PHP e 13 JavaScript aprovados; Pint, compilação de templates/rotas e fluxo administrativo em Chrome aprovados. Sem transbordamento horizontal em 320/390 px. Nova migration: 2026_10_28_021156_add_tenant_lifecycle_and_bi_indexes. Validação em SQLite local e Chrome em computador/celular; PostgreSQL/Coolify e dados reais continuam sujeitos à validação no ambiente publicado. Nenhuma chamada real aos provedores ou alteração na produção foi executada.
+
 ## Configuração simplificada e PagBank em produção — 27/10/2026
 
 Tela de pagamento online mantém apenas a introdução fornecida pelo usuário. InfinitePay pede habilitação e tag, sem texto sobre API Key. PagBank pede habilitação e token, sem seletor de ambiente nem mensagens de homologação. Orientação do token: conta PagBank pelo computador > Vendas > Integrações > Gerar Token, conforme https://developer.pagbank.com.br/docs/token-de-autenticacao. Mensagem de sucesso simplificada.

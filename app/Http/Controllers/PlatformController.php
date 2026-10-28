@@ -33,9 +33,9 @@ class PlatformController extends Controller
         });
     }
 
-    public function admin()
+    public function admin(Request $request)
     {
-        return view('admin', ['tenants' => DB::table('tenants')->orderByDesc('id')->get(), 'drivers' => DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->select('drivers.*', 'users.name', 'users.email')->get(), 'storeCount' => DB::table('stores')->count(), 'owners' => User::where('role', 'owner')->get()->groupBy('tenant_id'), 'evolutionUrl' => DB::table('settings')->where('key', 'evolution_url')->value('value')]);
+        return view('admin', ['tenants' => DB::table('tenants')->when(! $request->boolean('include_deleted'), fn ($q) => $q->whereNull('deleted_at'))->orderByDesc('id')->get(), 'drivers' => DB::table('drivers')->join('users', 'users.id', '=', 'drivers.user_id')->select('drivers.*', 'users.name', 'users.email')->get(), 'storeCount' => DB::table('stores')->count(), 'owners' => User::where('role', 'owner')->get()->groupBy('tenant_id'), 'evolutionUrl' => DB::table('settings')->where('key', 'evolution_url')->value('value')]);
     }
 
     public function createTenant(Request $r)

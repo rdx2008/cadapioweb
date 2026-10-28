@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BusinessIntelligenceController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CourierController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\StaffOperationController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\TenantAdminController;
 use App\Http\Controllers\WhatsappController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,12 +56,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/ifood/{id}/receiving', [IfoodController::class, 'receiving'])->name('ifood.receiving');
         Route::post('/admin/ifood/{id}/actions', [IfoodController::class, 'enableActions'])->name('ifood.actions.enable');
         Route::get('/admin', [PlatformController::class, 'admin']);
+        Route::get('/admin/bi', [BusinessIntelligenceController::class, 'index']);
+        Route::get('/admin/bi/export', [BusinessIntelligenceController::class, 'export']);
+        Route::get('/admin/tenants/{id}/edit', [TenantAdminController::class, 'edit'])->name('tenants.edit');
+        Route::post('/admin/tenants/{id}/edit', [TenantAdminController::class, 'update'])->name('tenants.update');
+        Route::post('/admin/tenants/{id}/status', [TenantAdminController::class, 'status'])->name('tenants.status');
+        Route::post('/admin/tenants/{id}/delete', [TenantAdminController::class, 'delete'])->name('tenants.delete');
+        Route::post('/admin/tenants/{id}/restore', [TenantAdminController::class, 'restore'])->name('tenants.restore');
         Route::post('/admin/tenants', [PlatformController::class, 'createTenant']);
         Route::post('/admin/tenants/{id}/module', [PlatformController::class, 'module']);
         Route::post('/admin/drivers/{id}', [PlatformController::class, 'approve']);
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/bi', [BusinessIntelligenceController::class, 'index']);
+        Route::get('/bi/export', [BusinessIntelligenceController::class, 'export']);
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
         Route::post('/stores/{id}/payments/{provider}', [PaymentController::class, 'configure'])->middleware('throttle:10,1')->name('payments.configure');
         Route::post('/orders/{id}/payment/check', [PaymentController::class, 'ownerCheck'])->middleware('throttle:10,1')->name('payments.check');

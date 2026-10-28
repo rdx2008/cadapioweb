@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Tests\BuildsPlatform;
 use Tests\TestCase;
 
 class PasswordRecoveryTest extends TestCase
 {
-    use RefreshDatabase;
+    use BuildsPlatform, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -51,7 +52,7 @@ class PasswordRecoveryTest extends TestCase
         DB::table('sessions')->insert(['id' => 'unrelated-session', 'user_id' => $unrelated->id, 'payload' => '', 'last_activity' => time()]);
         foreach (['admin', 'owner', 'courier', 'staff'] as $role) {
             $this->travel(61)->seconds();
-            $user = User::factory()->create(['role' => $role, 'password' => 'OriginalPassword2026!', 'remember_token' => Str::random(60)]);
+            $user = User::factory()->create(['role' => $role, 'tenant_id' => in_array($role, ['owner', 'staff'], true) ? $this->tenant('reset-'.$role) : null, 'password' => 'OriginalPassword2026!', 'remember_token' => Str::random(60)]);
             $remember = $user->remember_token;
             DB::table('sessions')->insert(['id' => 'session-'.$role, 'user_id' => $user->id, 'payload' => '', 'last_activity' => time()]);
             $token = Password::createToken($user);

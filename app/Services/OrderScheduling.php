@@ -12,7 +12,7 @@ class OrderScheduling
     public function slots(object $store): array
     {
         $this->openMinutes = [];
-        if (! $store->open || ! $store->scheduling_enabled) {
+        if (! $store->open || ! $store->scheduling_enabled || ! app(TenantState::class)->active($store->tenant_id)) {
             return [];
         }
         $slots = [];

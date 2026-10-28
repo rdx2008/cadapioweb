@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\TenantState;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,15 @@ class AuthController extends Controller
         $data = $r->validate(['email' => 'required|email', 'password' => 'required|string']);
         if (! Auth::attempt($data + ['access_enabled' => true])) {
             return back()->withErrors(['email' => 'E-mail ou senha inválidos.'])->onlyInput('email');
-        }$r->session()->regenerate();
+        }
+        if (in_array(Auth::user()->role, ['owner', 'staff'], true) && ! app(TenantState::class)->active(Auth::user()->tenant_id)) {
+            Auth::logout();
+            $r->session()->invalidate();
+            $r->session()->regenerateToken();
+
+            return back()->withErrors(['email' => 'O acesso desta empresa está indisponível. Entre em contato com a administração.'])->onlyInput('email');
+        }
+        $r->session()->regenerate();
 
         return redirect('/app');
     }

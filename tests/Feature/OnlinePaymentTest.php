@@ -85,6 +85,20 @@ class OnlinePaymentTest extends TestCase
         $this->call('POST', '/wp/p', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_X_AUTHENTICITY_TOKEN' => hash('sha256', $key.'-'.$body)], $body)->assertOk();
     }
 
+    public function test_suspension_prevents_payment_redirect_but_existing_receipt_still_reconciles(): void
+    {
+        $f = $this->fixture();
+        $attempt = $this->create($f);
+        DB::table('tenants')->where('id', $f['tenant'])->update(['status' => 'suspended']);
+        $order = DB::table('orders')->where('id', $attempt->order_id)->firstOrFail();
+        $this->assertNull(app(OnlinePayment::class)->start($order));
+        $this->infiniteNotice($f, $attempt);
+        $this->travel(31)->seconds();
+        $this->fakeHttp(['*/payment_check' => Http::response(['success' => true, 'paid' => true, 'amount' => 3000, 'paid_amount' => 3000, 'capture_method' => 'pix'])]);
+        $this->artisan('payments:sync')->assertExitCode(0);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'paid']);
+    }
+
     public function test_infinitepay_link_is_created_once_and_webhook_needs_server_verification(): void
     {
         $f = $this->fixture();

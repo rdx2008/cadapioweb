@@ -8,6 +8,7 @@ use App\Services\DeliveryCoverage;
 use App\Services\OnlinePayment;
 use App\Services\PizzaPricing;
 use App\Services\StoreAvailability;
+use App\Services\TenantState;
 use App\Support\MoneyInput;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +25,10 @@ class MenuController extends Controller
 {
     private function store(string $slug): object
     {
-        return DB::table('stores')->where('slug', $slug)->firstOrFail();
+        $store = DB::table('stores')->where('slug', $slug)->firstOrFail();
+        abort_unless(app(TenantState::class)->active($store->tenant_id), 404, 'Este cardápio está indisponível.');
+
+        return $store;
     }
 
     public function menu(Request $request, string $slug, StoreAvailability $availability): View
@@ -210,6 +214,7 @@ class MenuController extends Controller
         $draft = $this->draft($request, $store, $data['draft_id']);
         try {
             $public = DB::transaction(function () use ($store, $data, $draft, $calculator) {
+                DB::table('tenants')->where('id', $store->tenant_id)->lockForUpdate()->firstOrFail();
                 $current = DB::table('stores')->where('id', $store->id)->lockForUpdate()->first();
                 $existing = DB::table('orders')->where('store_id', $store->id)->where('idempotency_key', $data['draft_id'])->first();
                 if ($existing) {
