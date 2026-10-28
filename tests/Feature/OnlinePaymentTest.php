@@ -41,7 +41,7 @@ class OnlinePaymentTest extends TestCase
         $store = $this->store($tenant);
         $key = 'fake-checkout-key-not-real';
         $secret = Str::random(32);
-        $account = DB::table('store_payment_accounts')->insertGetId(['store_id' => $store, 'provider' => $provider, 'environment' => $provider === 'pagbank' ? 'sandbox' : 'production', 'credential' => Crypt::encryptString($provider === 'pagbank' ? $key : ''), 'handle' => 'loja-teste', 'webhook_secret' => $secret, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $account = DB::table('store_payment_accounts')->insertGetId(['store_id' => $store, 'provider' => $provider, 'environment' => 'production', 'credential' => Crypt::encryptString($provider === 'pagbank' ? $key : ''), 'handle' => 'loja-teste', 'webhook_secret' => $secret, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()]);
         $product = DB::table('products')->insertGetId(['tenant_id' => $tenant, 'store_id' => $store, 'name' => 'Lanche', 'category' => 'Lanches', 'price_cents' => 3000]);
         $cart = ['customer_name' => 'Ana', 'phone' => '11999999999', 'mode' => 'pickup', 'items' => [$product => 1], 'payment_method' => 'online_'.$provider, 'idempotency_key' => (string) Str::uuid()];
 
@@ -64,7 +64,9 @@ class OnlinePaymentTest extends TestCase
                 return Http::response(['link' => 'https://checkout.infinitepay.io/loja/invoice', 'slug' => 'invoice-test']);
             }
 
-            return Http::response(['id' => 'CHEC_TEST-12345', 'reference_id' => $request['reference_id'], 'links' => [['rel' => 'PAY', 'href' => 'https://sandbox.pagamento.pagbank.com.br/pagamento?code=test']]], 201);
+            $host = str_starts_with($request->url(), 'https://sandbox.') ? 'sandbox.pagamento.pagbank.com.br' : 'pagamento.pagbank.com.br';
+
+            return Http::response(['id' => 'CHEC_TEST-12345', 'reference_id' => $request['reference_id'], 'links' => [['rel' => 'PAY', 'href' => 'https://'.$host.'/pagamento?code=test']]], 201);
         });
         $this->post('/cardapio/loja/review', $f['cart'])->assertRedirect();
         $this->post('/cardapio/loja', ['draft_id' => $f['cart']['idempotency_key']])->assertRedirect();
@@ -170,7 +172,7 @@ class OnlinePaymentTest extends TestCase
         $this->travel(31)->seconds();
         app(OnlinePayment::class)->sync($attempt->id);
         $this->assertDatabaseHas('orders', ['payment_status' => 'paid']);
-        Http::assertSent(fn ($request) => $request->url() === 'https://sandbox.api.pagseguro.com/orders/ORDE_TEST-12345' && $request->hasHeader('Authorization', 'Bearer '.$f['key']));
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.pagseguro.com/orders/ORDE_TEST-12345' && $request->hasHeader('Authorization', 'Bearer '.$f['key']));
         Http::assertSent(fn ($request) => $request->method() === 'POST' && str_ends_with($request->url(), '/checkouts/CHEC_TEST-12345/inactivate'));
     }
 
@@ -271,6 +273,7 @@ class OnlinePaymentTest extends TestCase
     public function test_sandbox_checkout_is_not_available_in_production_storefront(): void
     {
         $f = $this->fixture('pagbank');
+        DB::table('store_payment_accounts')->where('id', $f['account'])->update(['environment' => 'sandbox']);
         $this->app->instance('env', 'production');
         $this->withoutMiddleware(PreventRequestForgery::class);
         $this->get('/cardapio/loja')->assertOk()->assertDontSee('value="online_pagbank"', false);
@@ -349,7 +352,7 @@ class OnlinePaymentTest extends TestCase
         DB::table('store_payment_accounts')->where('id', $account->id)->update(['credential' => Crypt::encryptString('obsolete-key')]);
         $this->post('/stores/'.$store.'/payments/infinitepay', ['enabled' => 1, 'handle' => 'minha-tag'])->assertRedirect();
         $this->assertSame('', Crypt::decryptString(DB::table('store_payment_accounts')->first()->credential));
-        $this->get('/stores/'.$store.'/edit')->assertOk()->assertSee('InfiniteTag')->assertDontSee('API Key do Checkout Integrado')->assertDontSee('obsolete-key');
+        $this->get('/stores/'.$store.'/edit')->assertOk()->assertSee('InfiniteTag')->assertDontSee('API Key')->assertDontSee('Sandbox')->assertDontSee('homologação')->assertDontSee('name="environment"', false)->assertSee('Vendas → Integrações → Gerar Token')->assertDontSee('obsolete-key');
         Http::assertNothingSent();
     }
 
@@ -360,5 +363,21 @@ class OnlinePaymentTest extends TestCase
         $attempt = $this->create($f);
         $this->assertSame('waiting', $attempt->state);
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/links') && $request['handle'] === 'loja-teste' && ! $request->hasHeader('X-Api-Key') && ! $request->hasHeader('Authorization'));
+    }
+
+    public function test_pagbank_configuration_uses_production_without_environment_selector(): void
+    {
+        $f = $this->fixture('pagbank');
+        DB::table('store_payment_accounts')->where('id', $f['account'])->update(['environment' => 'sandbox']);
+        $this->actingAs($this->owner($f['tenant']));
+        $this->postJson('/stores/'.$f['store'].'/payments/pagbank', ['enabled' => 1])->assertUnprocessable();
+        $this->post('/stores/'.$f['store'].'/payments/pagbank', ['enabled' => 0])->assertRedirect();
+        $this->assertDatabaseHas('store_payment_accounts', ['id' => $f['account'], 'environment' => 'sandbox', 'enabled' => false]);
+        $this->post('/stores/'.$f['store'].'/payments/pagbank', ['enabled' => 1, 'environment' => 'sandbox', 'credential' => 'production-fake-token'])->assertRedirect();
+        $this->assertDatabaseHas('store_payment_accounts', ['id' => $f['account'], 'environment' => 'production', 'enabled' => true]);
+        $attempt = $this->create($f, 'pagbank');
+        $this->assertSame('production', $attempt->environment);
+        $this->assertSame('waiting', $attempt->state);
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.pagseguro.com/checkouts' && $request->hasHeader('Authorization', 'Bearer production-fake-token'));
     }
 }

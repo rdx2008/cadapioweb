@@ -2,6 +2,14 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Configuração simplificada e PagBank em produção — 27/10/2026
+
+Tela de pagamento online mantém apenas a introdução fornecida pelo usuário. InfinitePay pede habilitação e tag, sem texto sobre API Key. PagBank pede habilitação e token, sem seletor de ambiente nem mensagens de homologação. Orientação do token: conta PagBank pelo computador > Vendas > Integrações > Gerar Token, conforme https://developer.pagbank.com.br/docs/token-de-autenticacao. Mensagem de sucesso simplificada.
+
+Novas configurações dos dois provedores são fixadas em production no servidor, inclusive se a requisição tentar enviar sandbox. Cardápio só oferece contas production em qualquer ambiente da aplicação. Configurações antigas de sandbox não são convertidas silenciosamente: podem ser desabilitadas sem alterar o token e exigem novo token para ativar produção. Tentativas históricas preservam seu ambiente/credencial para consulta de transações anteriores. A base do PagBank para novas cobranças é https://api.pagseguro.com; autenticação e confirmação pela API permanecem.
+
+Validação direcionada: 19 testes de pagamento online aprovados, incluindo configuração sem seletor, endpoint/token de produção, exclusão de sandbox do cardápio e ausência dos textos removidos. Templates compilados e Pint aprovado. Sem migration adicional e sem chamada real de cobrança.
+
 ## Correção InfinitePay por InfiniteTag — 27/10/2026
 
 O contrato adotado é o checkout externo da página https://www.infinitepay.io/checkout-documentacao. Configuração da InfinitePay exige somente habilitação e InfiniteTag sem $. Não há campo nem exigência de API Key. PagBank continua exigindo seu token. A coluna genérica credential é preservada por compatibilidade de esquema; InfinitePay grava um valor vazio criptografado ao salvar, e credenciais antigas nunca são lidas/enviadas para esse provedor, inclusive em tentativas anteriores. Nenhuma nova migration é necessária.

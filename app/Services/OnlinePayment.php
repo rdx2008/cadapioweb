@@ -22,8 +22,7 @@ class OnlinePayment
 
     public function accounts(int $storeId): Collection
     {
-        return DB::table('store_payment_accounts')->where('store_id', $storeId)->where('enabled', true)
-            ->when(! app()->environment(['local', 'testing']), fn ($query) => $query->where('environment', 'production'))->get();
+        return DB::table('store_payment_accounts')->where('store_id', $storeId)->where('enabled', true)->where('environment', 'production')->get();
     }
 
     public function reserve(object $order): void

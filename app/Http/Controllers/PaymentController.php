@@ -19,10 +19,8 @@ class PaymentController extends Controller
     {
         abort_unless(in_array($provider, ['infinitepay', 'pagbank'], true), 404);
         $store = DB::table('stores')->where('tenant_id', $request->user()->tenant_id)->where('id', $id)->firstOrFail();
-        if ($provider === 'infinitepay') {
-            $request->merge(['environment' => 'production']);
-        }
-        $data = $request->validate(['enabled' => 'required|boolean', 'environment' => $provider === 'infinitepay' ? 'required|in:production' : 'required|in:sandbox,production', 'credential' => $provider === 'pagbank' ? ['nullable', 'string', 'max:4096', 'regex:/^[!-~]{8,4096}$/D'] : 'exclude', 'handle' => $provider === 'infinitepay' ? ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/D'] : 'nullable|string|max:100']);
+        $request->merge(['environment' => 'production']);
+        $data = $request->validate(['enabled' => 'required|boolean', 'environment' => 'required|in:production', 'credential' => $provider === 'pagbank' ? ['nullable', 'string', 'max:4096', 'regex:/^[!-~]{8,4096}$/D'] : 'exclude', 'handle' => $provider === 'infinitepay' ? ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/D'] : 'nullable|string|max:100']);
         if ($data['enabled']) {
             $root = config('app.url');
             $parts = parse_url($root);
@@ -39,8 +37,14 @@ class PaymentController extends Controller
             if ($provider === 'pagbank' && empty($data['credential']) && ! $existing) {
                 throw ValidationException::withMessages(['credential' => 'Cadastre a credencial desta loja diretamente neste campo.']);
             }
-            if ($provider === 'pagbank' && $existing && $existing->environment !== $data['environment'] && empty($data['credential'])) {
-                throw ValidationException::withMessages(['credential' => 'Ao trocar de ambiente, informe a credencial correspondente.']);
+            if ($provider === 'pagbank' && $existing && $existing->environment !== 'production' && empty($data['credential'])) {
+                if ($data['enabled']) {
+                    throw ValidationException::withMessages(['credential' => 'Informe o token da sua conta PagBank para ativar os pagamentos.']);
+                }
+                DB::table('store_payment_accounts')->where('id', $existing->id)->update(['enabled' => false, 'updated_at' => now()]);
+                Audit::record('payment.account.updated', ['store_id' => $store->id, 'provider' => $provider, 'enabled' => false], $store->tenant_id);
+
+                return;
             }
             $values = ['enabled' => (bool) $data['enabled'], 'environment' => $data['environment'], 'handle' => $provider === 'infinitepay' ? $data['handle'] : null, 'updated_at' => now()];
             if ($provider === 'infinitepay') {
@@ -56,7 +60,7 @@ class PaymentController extends Controller
             Audit::record('payment.account.updated', ['store_id' => $store->id, 'provider' => $provider, 'environment' => $data['environment'], 'enabled' => (bool) $data['enabled']], $store->tenant_id);
         });
 
-        return back()->with('success', 'Configuração salva. A ativação depende de conta/API liberada e de validação real com o provedor.');
+        return back()->with('success', 'Configuração de pagamento salva.');
     }
 
     public function pay(string $id, OnlinePayment $payments): RedirectResponse
