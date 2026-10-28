@@ -19,15 +19,9 @@
     <label>Endereço do cardápio (slug)<input name="slug" value="{{ old('slug', $store->slug) }}" required>
 <small>Alterar o slug muda o link público.</small>
 </label>
-    <label class="full">Endereço<input name="address" value="{{ old('address', $store->address) }}" required>
-</label>
-<div class="full"><button type="button" class="outline" data-store-locate data-url="/stores/{{ $store->id }}/locate">Localizar endereço da loja</button><div data-store-location-message role="status" aria-live="polite"></div><small>Use rua, número, bairro, cidade e estado. O ponto da loja será o centro do raio de entrega.</small><small>Powered by <a href="https://www.geoapify.com/">Geoapify</a> · <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></small></div>
+@include('partials.store-address',['addressStore'=>$store])
 <label>Logo do cardápio<input type="file" name="logo" accept="image/jpeg,image/png,image/webp"><small>Formato quadrado. JPG, PNG ou WebP, até 2 MB.</small></label>
 <label>Capa do cardápio<input type="file" name="cover" accept="image/jpeg,image/png,image/webp"><small>Imagem horizontal, idealmente 1600 × 500. Até 4 MB.</small></label>
-    <label>Latitude<input name="latitude" type="number" step="any" value="{{ old('latitude', $store->latitude) }}" required>
-</label>
-    <label>Longitude<input name="longitude" type="number" step="any" value="{{ old('longitude', $store->longitude) }}" required>
-</label>
     <label>Recebimento de pedidos<select name="open">
 <option value="1" @selected(old('open', $store->open)==1)>Ativo, respeitando horários</option>
 <option value="0" @selected(old('open', $store->open)==0)>Pausado manualmente</option>

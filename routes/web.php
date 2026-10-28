@@ -12,6 +12,7 @@ use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\StaffOperationController;
+use App\Http\Controllers\StoreAddressController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TenantAdminController;
 use App\Http\Controllers\WhatsappController;
@@ -69,6 +70,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::post('/stores/address/postcode', [StoreAddressController::class, 'postcode'])->middleware('throttle:10,1')->name('stores.address.postcode');
+        Route::post('/stores/address/locate', [StoreAddressController::class, 'locate'])->middleware('throttle:10,1')->name('stores.address.locate');
         Route::get('/bi', [BusinessIntelligenceController::class, 'index']);
         Route::get('/bi/export', [BusinessIntelligenceController::class, 'export']);
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');

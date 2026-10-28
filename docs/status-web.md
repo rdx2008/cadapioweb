@@ -2,6 +2,14 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Endereço automático no cadastro e edição da loja — 28/10/2026
+
+Tenant > Lojas > Criar loja agora usa CEP primeiro. Ao completar oito dígitos, consulta o ViaCEP e preenche rua, bairro, cidade e UF; CEP genérico ou indisponível permite preenchimento manual. Após informar o número, o serviço Geoapify já utilizado pelo sistema busca o ponto com endereço estruturado, preenchendo latitude/longitude automaticamente quando há um único resultado preciso. Múltiplos resultados exigem seleção explícita. Coordenadas ficam em ajuste avançado. O link do cardápio é sugerido pelo nome, mantendo personalização e validação de unicidade no servidor.
+
+A mesma seção é usada ao editar a loja: endereço/ponto existentes são preservados até solicitar alteração. Mudança de endereço limpa coordenadas e invalida respostas antigas; ajuste manual também impede sobrescrita por consulta pendente. Salvar sem ponto solicita localização e só prossegue após resultado válido. Erros não inventam coordenadas. Endpoints novos são exclusivos de proprietários ativos, protegidos por autenticação, CSRF e limite de consultas; a chave do provedor permanece no servidor. O ViaCEP foi extraído para serviço compartilhado com o checkout do cliente, preservando contrato/cache existentes. Não há migração adicional nem novo provedor.
+
+Verificação: 191 testes PHP e 19 JavaScript aprovados, incluindo busca antes de criar qualquer loja, preenchimento/salvamento de coordenadas, isolamento, falha do provedor, resultado impreciso, respostas atrasadas e endereço existente. Chrome local em computador e celular: consulta/preenchimento automáticos, sugestão de link, limpeza ao mudar número e preservação na edição; sem erro JavaScript e sem transbordamento em 390 px. Consultas externas simuladas nesta verificação; a configuração e os limites atuais do geocodificador continuam sendo usados no ambiente publicado.
+
 ## Gestão de empresas e BI — 27/10/2026
 
 Superadmin > Empresas > Gerenciar empresa permite editar nome/identificador e nome/e-mail do proprietário principal, suspender com motivo, reativar, excluir da operação e restaurar. Exclusão exige senha atual do superadmin e identificador exato; pedidos ou entregas em andamento impedem a exclusão. É uma exclusão lógica: histórico de pedidos, pagamentos, usuários e auditoria permanece consultável. Empresas excluídas ficam ocultas por padrão na lista e podem ser exibidas/restauradas, inicialmente suspensas.
