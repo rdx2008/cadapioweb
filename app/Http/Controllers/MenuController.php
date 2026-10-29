@@ -109,9 +109,9 @@ class MenuController extends Controller
             'cart_lines.*.combo_choices.*' => 'array|max:10',
             'cart_lines.*.combo_choices.*.*' => 'integer|min:1',
             'cart_lines.*.choices' => 'sometimes|array|max:20',
-            'cart_lines.*.choices.*' => 'array|max:20',
+            'cart_lines.*.choices.*' => 'array|max:99',
             'cart_lines.*.choices.*.*' => 'integer|min:1',
-            'choices' => 'nullable|array|max:50', 'choices.*' => 'array|max:20', 'choices.*.*' => 'array|max:20', 'choices.*.*.*' => 'integer|min:1',
+            'choices' => 'nullable|array|max:50', 'choices.*' => 'array|max:20', 'choices.*.*' => 'array|max:99', 'choices.*.*.*' => 'integer|min:1',
             'variants' => 'nullable|array|max:500', 'variants.*' => 'nullable|integer|min:1',
             'idempotency_key' => 'required|uuid',
         ]);

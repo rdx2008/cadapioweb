@@ -367,7 +367,7 @@ class CatalogController extends Controller
 
         $flavors = DB::table('pizza_flavors')->where('product_id', $id)->orderBy('id')->get();
         $comboGroups = DB::table('combo_groups')->where('product_id', $id)->orderBy('id')->get();
-        $comboOptions = DB::table('combo_options')->join('products', 'products.id', '=', 'combo_options.component_product_id')->leftJoin('product_variants', 'product_variants.id', '=', 'combo_options.component_variant_id')->where('products.tenant_id', $product->tenant_id)->where('products.store_id', $product->store_id)->whereIn('combo_group_id', $comboGroups->pluck('id'))->select('combo_options.*', 'products.name as component_name', 'product_variants.name as variant_name')->orderBy('combo_options.id')->get()->groupBy('combo_group_id');
+        $comboOptions = DB::table('combo_options')->leftJoin('products', 'products.id', '=', 'combo_options.component_product_id')->leftJoin('product_variants', 'product_variants.id', '=', 'combo_options.component_variant_id')->where(fn ($q) => $q->whereNull('combo_options.component_product_id')->orWhere(fn ($q) => $q->where('products.tenant_id', $product->tenant_id)->where('products.store_id', $product->store_id)))->whereIn('combo_group_id', $comboGroups->pluck('id'))->select('combo_options.*', 'products.name as component_name', 'product_variants.name as variant_name')->orderBy('combo_options.id')->get()->groupBy('combo_group_id');
         $components = [];
         if ($product->product_type === 'combo') {
             $candidates = DB::table('products')->where('tenant_id', $product->tenant_id)->where('store_id', $product->store_id)->where('product_type', 'common')->whereNotExists(function ($query) {
@@ -571,7 +571,7 @@ class CatalogController extends Controller
     public function group(Request $request, int $id): RedirectResponse
     {
         $product = $this->product($id);
-        $data = $request->validate(['group_id' => 'nullable|integer', 'name' => 'required|string|max:100', 'minimum' => 'required|integer|min:0|max:20', 'maximum' => 'required|integer|min:1|max:20|gte:minimum', 'kind' => 'sometimes|in:addon,border']);
+        $data = $request->validate(['group_id' => 'nullable|integer', 'name' => 'required|string|max:100', 'minimum' => 'required|integer|min:0|max:20', 'maximum' => 'required|integer|min:1|max:99|gte:minimum', 'kind' => 'sometimes|in:addon,border']);
         DB::transaction(function () use ($product, $data) {
             DB::table('stores')->where('id', $product->store_id)->lockForUpdate()->first();
             $groupId = $data['group_id'] ?? null;

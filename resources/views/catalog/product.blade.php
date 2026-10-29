@@ -45,7 +45,7 @@
 </label>
 @if($product->product_type==='pizza')<label>Tipo<select name="kind"><option value="addon" @selected($group->kind==='addon')>Adicionais</option><option value="border" @selected($group->kind==='border')>Borda (uma escolha)</option></select></label>@else<input type="hidden" name="kind" value="addon">@endif<label>Mínimo de escolhas<input name="minimum" type="number" min="0" max="20" value="{{ $group->minimum }}" required>
 </label>
-<label>Máximo de escolhas<input name="maximum" type="number" min="1" max="20" value="{{ $group->maximum }}" required>
+<label>Máximo de escolhas<input name="maximum" type="number" min="1" max="99" value="{{ $group->maximum }}" required>
 </label>
 <div class="actions">
 <button class="secondary">Salvar grupo</button>
@@ -84,7 +84,7 @@
 </label>
 @if($product->product_type==='pizza')<label>Tipo<select name="kind"><option value="addon">Adicionais</option><option value="border">Borda (uma escolha)</option></select></label>@else<input type="hidden" name="kind" value="addon">@endif<label>Mínimo (0 = opcional)<input name="minimum" type="number" min="0" max="20" value="0" required>
 </label>
-<label>Máximo<input name="maximum" type="number" min="1" max="20" value="1" required>
+<label>Máximo<input name="maximum" type="number" min="1" max="99" value="1" required>
 </label>
 <button>Criar grupo</button>
 </form>

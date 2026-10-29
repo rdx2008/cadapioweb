@@ -145,4 +145,32 @@ class ComboOrderingTest extends TestCase
         $this->assertDatabaseHas('order_items', ['unit_cents' => 3600]);
         $this->assertDatabaseHas('order_items', ['unit_cents' => 3000]);
     }
+
+    public function test_own_combo_choices_do_not_create_artificial_products_and_are_charged_correctly(): void
+    {
+        $f = $this->fixture();
+        $this->actingAs($this->owner($f['tenant']));
+        $this->post('/products/'.$f['combo'].'/combo/options', ['group_id' => $f['foodGroup'], 'label' => '1/2 Calabresa', 'quantity' => 1, 'surcharge' => '0,00', 'available' => 1])->assertSessionHasNoErrors();
+        $custom = DB::table('combo_options')->where('label', '1/2 Calabresa')->firstOrFail();
+        $this->assertNull($custom->component_product_id);
+        $this->assertDatabaseCount('products', 3);
+        $f['cart']['cart_lines'][0]['combo_choices'][$f['foodGroup']] = [$custom->id];
+        $response = $this->post('/cardapio/loja/review', $f['cart'])->assertRedirect();
+        $this->get($response->headers->get('Location'))->assertOk()->assertSee('1/2 Calabresa')->assertSee('72,00');
+        $this->post('/cardapio/loja', ['draft_id' => $f['cart']['idempotency_key']])->assertRedirect();
+        $this->assertDatabaseHas('orders', ['subtotal_cents' => 7200]);
+    }
+
+    public function test_closed_combo_can_be_ordered_without_required_choices_only_after_explicit_configuration(): void
+    {
+        $tenant = $this->tenant();
+        $store = $this->store($tenant);
+        $combo = $this->product($tenant, $store, 'Combo fechado', 'combo');
+        $cart = ['customer_name' => 'Ana', 'phone' => '11999999999', 'mode' => 'pickup', 'idempotency_key' => (string) Str::uuid(), 'items' => [$combo => 1]];
+        $this->postJson('/cardapio/loja/review', $cart)->assertUnprocessable();
+        $this->actingAs($this->owner($tenant))->post('/products/'.$combo.'/combo/settings', ['combo_fixed' => 1])->assertSessionHasNoErrors();
+        $this->post('/cardapio/loja/review', $cart)->assertRedirect();
+        $this->post('/cardapio/loja', ['draft_id' => $cart['idempotency_key']])->assertRedirect();
+        $this->assertDatabaseHas('orders', ['subtotal_cents' => 1000]);
+    }
 }

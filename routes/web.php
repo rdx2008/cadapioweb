@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BusinessIntelligenceController;
 use App\Http\Controllers\CatalogController;
+use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CourierController;
 use App\Http\Controllers\IfoodController;
@@ -70,6 +71,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/catalog/import', [CatalogImportController::class, 'index'])->name('catalog.import');
+        Route::post('/catalog/import', [CatalogImportController::class, 'upload'])->middleware('throttle:6,1')->name('catalog.import.upload');
+        Route::get('/catalog/import/{reference}', [CatalogImportController::class, 'show'])->name('catalog.import.show');
+        Route::post('/catalog/import/{reference}/mapping', [CatalogImportController::class, 'mapping'])->middleware('throttle:20,1')->name('catalog.import.mapping');
+        Route::post('/catalog/import/{reference}/confirm', [CatalogImportController::class, 'confirm'])->middleware('throttle:6,1')->name('catalog.import.confirm');
         Route::post('/stores/address/postcode', [StoreAddressController::class, 'postcode'])->middleware('throttle:10,1')->name('stores.address.postcode');
         Route::post('/stores/address/locate', [StoreAddressController::class, 'locate'])->middleware('throttle:10,1')->name('stores.address.locate');
         Route::get('/bi', [BusinessIntelligenceController::class, 'index']);
@@ -77,6 +83,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
         Route::post('/stores/{id}/payments/{provider}', [PaymentController::class, 'configure'])->middleware('throttle:10,1')->name('payments.configure');
         Route::post('/orders/{id}/payment/check', [PaymentController::class, 'ownerCheck'])->middleware('throttle:10,1')->name('payments.check');
+        Route::post('/products/{id}/combo/settings', [ComboController::class, 'settings'])->name('products.combo.settings');
         Route::post('/products/{id}/combo/groups', [ComboController::class, 'group'])->name('products.combo.groups');
         Route::post('/products/{id}/combo/options', [ComboController::class, 'option'])->name('products.combo.options');
         Route::post('/products/{id}/combo/options/{optionId}/availability', [ComboController::class, 'availability'])->name('products.combo.availability');

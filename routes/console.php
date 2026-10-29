@@ -31,3 +31,5 @@ Schedule::command('dispatch:tick')->everyTenSeconds()->withoutOverlapping();
 Schedule::command('payments:sync')->everyThirtySeconds()->withoutOverlapping(5)->runInBackground();
 Schedule::command('ifood:sync')->everyThirtySeconds()->withoutOverlapping(10)->runInBackground();
 Schedule::command('ifood:send-commands')->everyTenSeconds()->withoutOverlapping(5)->runInBackground();
+
+Schedule::call(fn () => DB::table('catalog_imports')->where('state', 'draft')->where('expires_at', '<', now())->whereNotNull('payload')->update(['payload' => null, 'state' => 'expired', 'updated_at' => now()]))->hourly()->name('catalog-imports:expire')->withoutOverlapping();
