@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Correção do processamento das fotos importadas — 28/10/2026
+
+Diagnóstico no código: Docker instalava GD sem libwebp/--with-webp, mas o job convertia todas as imagens com imagewebp. O erro era capturado sem diagnóstico na tela. Adicionalmente, comandos de fila rodavam como root, podendo criar diretórios privados inacessíveis ao PHP-FPM www-data. Docker agora instala libwebp-dev, compila GD com WebP, verifica a existência de imagewebp durante o build e inclui gosu. Entrypoint mantém inicialização/chown/bootstrap como root e executa php artisan (worker/scheduler) como www-data, usando o mesmo proprietário do web. O volume app_storage continua compartilhado conforme compose.yaml. O chown no início também corrige arquivos antigos com dono root.
+
+Job verifica o resultado da gravação antes de preencher photo_path, registra resultado individual no JSON da importação e não substitui foto existente. Preserva compatibilidade com jobs antigos sem importId. Fotos ausentes no disco podem ser recuperadas. Lock por produto evita downloads simultâneos. Resultado mostra aguardando/baixadas/preservadas/falhas e motivo legível; reenvio exclusivo do próprio tenant, limitado por frequência, aceita falhas ou tarefas aguardando há mais de cinco minutos. Estados são atualizados com lock na importação, sem perder contadores concorrentes.
+
+Recuperação de importações antigas: após novo build/redeploy de web e worker, imagens já gravadas podem reaparecer com permissões corrigidas. Se faltarem arquivos, reenvie a mesma planilha, escolha ignorar produtos existentes e mantenha importar fotos marcado. Agora essa opção também agenda somente fotos faltantes dos produtos ignorados, preservando nome, preço, publicação e escolhas; sem duplicar produtos. Importações antigas que não guardaram URLs/resultados individuais mostram esse procedimento. Novas importações guardam manifesto para reenvio direto. Nenhuma nova migration.
+
+Verificação: 207 testes PHP aprovados em execução com PHOTO_DOWNLOAD_LIVE=1, incluindo download HTTPS e conversão de uma foto real da planilha Grano Vivo, sem alterar produção. Casos adicionais cobrem falha de escrita sem photo_path fictício, recuperação sem sobrescrever preços, motivo da falha visível, reenvio isolado por tenant e atualização para baixada. Nova execução direcionada passou com consulta externa desabilitada por padrão. O teste externo é opcional na suíte normal. Pint/templates/rotas verificados; não foi possível executar build Docker nesta máquina sem engine, devendo o novo build no Coolify validar WebP e a execução com www-data.
+
 ## Importação de cardápio e escolhas próprias de combos — 28/10/2026
 
 Tenant > Cardápio > Importar planilha permite XLS, XLSX e CSV por loja: upload, detecção de cabeçalhos/colunas por sinônimos, função de cada aba, ajuste manual de mapeamento, prévia dos produtos e escolhas, avisos/erros, confirmação explícita e histórico. Aceita linhas por tamanho ou colunas de tamanhos, categorias, preços em reais, adicionais e sabores em aba separada. Regras ambíguas são bloqueadas; não há promessa de compreender qualquer arquivo sem conferência nem serviço de IA externo. Valores de fórmulas não são calculados; devem ser substituídos por valores no arquivo.

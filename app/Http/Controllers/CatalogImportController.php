@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ImportCatalogPhoto;
 use App\Services\CatalogImportPlan;
 use App\Services\CatalogImportWriter;
 use App\Services\CatalogWorkbook;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -80,5 +82,29 @@ class CatalogImportController extends Controller
         $writer->confirm($this->tenant(), $reference, (int) $data['revision'], $data['duplicates'], $request->boolean('photos'));
 
         return redirect()->route('catalog.import.show', $reference)->with('success', 'Importação concluída. Produtos novos estão pausados para sua revisão.');
+    }
+
+    public function retryPhotos(string $reference): RedirectResponse
+    {
+        $count = DB::transaction(function () use ($reference): int {
+            $import = DB::table('catalog_imports')->where('tenant_id', $this->tenant())->where('reference', $reference)->where('state', 'completed')->lockForUpdate()->firstOrFail();
+            $result = json_decode($import->result, true);
+            $count = 0;
+            $result['photos'] ??= [];
+            foreach ($result['photos'] as $id => &$photo) {
+                if ($photo['state'] === 'failed' || ($photo['state'] === 'pending' && Carbon::parse($photo['updated_at'])->lte(now()->subMinutes(5)))) {
+                    $photo['state'] = 'pending';
+                    $photo['message'] = 'Reenviada para processamento.';
+                    $photo['updated_at'] = now()->toIso8601String();
+                    $count++;
+                    ImportCatalogPhoto::dispatch($this->tenant(), (int) $id, $photo['url'], $import->id)->afterCommit();
+                }
+            }unset($photo);
+            DB::table('catalog_imports')->where('id', $import->id)->update(['result' => json_encode($result, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
+
+            return $count;
+        });
+
+        return back()->with('success', $count ? 'Fotos reenviadas para processamento. Atualize esta página para acompanhar.' : 'Nenhuma foto com falha ou aguardando há mais de cinco minutos. Se o processamento não avançar, entre em contato com o suporte.');
     }
 }

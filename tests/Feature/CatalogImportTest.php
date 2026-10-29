@@ -12,7 +12,9 @@ use App\Services\PizzaPricing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xls;
 use Tests\BuildsPlatform;
@@ -194,5 +196,65 @@ class CatalogImportTest extends TestCase
         Queue::assertPushed(ImportCatalogPhoto::class, $result['photos_queued']);
         $writer->confirm($tenant, $draft->reference, 1, 'skip', true);
         Queue::assertPushed(ImportCatalogPhoto::class, $result['photos_queued']);
+    }
+
+    public function test_reimport_recovers_missing_photos_without_duplicating_or_overwriting_products(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        $tenant = $this->tenant();
+        $store = $this->store($tenant);
+        $this->actingAs($this->owner($tenant));
+        $first = $this->upload($store);
+        $writer = app(CatalogImportWriter::class);
+        $writer->confirm($tenant, $first->reference, 1, 'skip', false);
+        $product = DB::table('products')->where('store_id', $store)->firstOrFail();
+        DB::table('products')->where('id', $product->id)->update(['price_cents' => 22222, 'available' => true]);
+        $second = $this->upload($store);
+        $result = $writer->confirm($tenant, $second->reference, 1, 'skip', true);
+        $this->assertSame(0, $result['created']);
+        $this->assertSame(54, $result['skipped']);
+        $this->assertGreaterThan(0, $result['photos_queued']);
+        $this->assertDatabaseCount('products', 54);
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'price_cents' => 22222, 'available' => true]);
+        $legacy = json_decode(DB::table('catalog_imports')->where('id', $first->id)->value('result'), true);
+        unset($legacy['photos']);
+        DB::table('catalog_imports')->where('id', $first->id)->update(['result' => json_encode($legacy)]);
+        $this->get('/catalog/import/'.$first->reference)->assertOk()->assertSee('Recuperar fotos de uma importação anterior');
+    }
+
+    public function test_photo_failures_are_visible_retry_is_scoped_and_success_is_recorded(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        Http::preventStrayRequests();
+        $tenant = $this->tenant();
+        $store = $this->store($tenant);
+        $owner = $this->owner($tenant);
+        $this->actingAs($owner);
+        $draft = $this->upload($store);
+        $result = app(CatalogImportWriter::class)->confirm($tenant, $draft->reference, 1, 'skip', true);
+        $id = array_key_first($result['photos']);
+        $url = $result['photos'][$id]['url'];
+        $image = imagecreatetruecolor(2, 2);
+        ob_start();
+        imagepng($image);
+        $bytes = ob_get_clean();
+        imagedestroy($image);
+        $fail = true;
+        Http::fake(['storage.googleapis.com/*' => function () use (&$fail, $bytes) {
+            return $fail ? Http::response('', 503) : Http::response($bytes);
+        }]);
+        (new ImportCatalogPhoto($tenant, $id, $url, $draft->id))->handle();
+        $this->get('/catalog/import/'.$draft->reference)->assertOk()->assertSee('HTTP 503');
+        $this->actingAs($this->owner($this->tenant('photo-foreign')))->post('/catalog/import/'.$draft->reference.'/photos/retry')->assertNotFound();
+        $this->actingAs($owner)->post('/catalog/import/'.$draft->reference.'/photos/retry')->assertSessionHasNoErrors();
+        $retry = json_decode(DB::table('catalog_imports')->where('id', $draft->id)->value('result'), true);
+        $this->assertSame('pending', $retry['photos'][$id]['state']);
+        $fail = false;
+        (new ImportCatalogPhoto($tenant, $id, $url, $draft->id))->handle();
+        $done = json_decode(DB::table('catalog_imports')->where('id', $draft->id)->value('result'), true);
+        $this->assertSame('downloaded', $done['photos'][$id]['state']);
+        $this->assertNotNull(DB::table('products')->where('id', $id)->value('photo_path'));
     }
 }

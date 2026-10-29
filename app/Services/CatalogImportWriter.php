@@ -6,6 +6,7 @@ use App\Jobs\ImportCatalogPhoto;
 use App\Support\Audit;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class CatalogImportWriter
@@ -37,10 +38,13 @@ class CatalogImportWriter
                 throw ValidationException::withMessages(['duplicates' => 'Há produtos já cadastrados. Escolha ignorá-los ou revise a planilha.']);
             }
             $categories = DB::table('catalog_categories')->where('store_id', $store->id)->get()->keyBy(fn ($category) => $normalizer->normalize($category->name));
-            $result = ['created' => 0, 'skipped' => 0, 'photos_queued' => 0, 'product_ids' => []];
+            $result = ['created' => 0, 'skipped' => 0, 'photos_queued' => 0, 'product_ids' => [], 'photos' => []];
             foreach ($plan['products'] as $position => $product) {
                 if (isset($keys[$product['key']])) {
                     $result['skipped']++;
+                    if ($photos) {
+                        $this->photo($result, $tenantId, $keys[$product['key']], $product);
+                    }
 
                     continue;
                 }
@@ -84,15 +88,30 @@ class CatalogImportWriter
                 $keys[$product['key']] = $id;
                 $result['created']++;
                 $result['product_ids'][] = $id;
-                if ($photos && preg_match('~^https://storage\.googleapis\.com/[^\s?#]+$~D', $product['photo'])) {
-                    ImportCatalogPhoto::dispatch($tenantId, $id, $product['photo'])->afterCommit();
-                    $result['photos_queued']++;
+                if ($photos) {
+                    $this->photo($result, $tenantId, $id, $product);
                 }
             }
             DB::table('catalog_imports')->where('id', $import->id)->update(['state' => 'completed', 'result' => json_encode($result), 'payload' => null, 'updated_at' => now()]);
+            foreach ($result['photos'] as $id => $photo) {
+                ImportCatalogPhoto::dispatch($tenantId, (int) $id, $photo['url'], $import->id)->afterCommit();
+            }
             Audit::record('catalog.import.completed', ['import_id' => $import->id, 'store_id' => $store->id, 'created' => $result['created'], 'skipped' => $result['skipped']], $tenantId);
 
             return $result;
         });
+    }
+
+    private function photo(array &$result, int $tenantId, int $id, array $product): void
+    {
+        if (! preg_match('~^https://storage\.googleapis\.com/[^\s?#]+$~D', $product['photo'])) {
+            return;
+        }
+        $path = DB::table('products')->where('tenant_id', $tenantId)->where('id', $id)->value('photo_path');
+        if ($path && Storage::disk('local')->exists($path)) {
+            return;
+        }
+        $result['photos'][$id] = ['url' => $product['photo'], 'name' => $product['name'], 'state' => 'pending', 'message' => 'Aguardando processamento.', 'updated_at' => now()->toIso8601String()];
+        $result['photos_queued']++;
     }
 }

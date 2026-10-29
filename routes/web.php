@@ -75,6 +75,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/catalog/import', [CatalogImportController::class, 'upload'])->middleware('throttle:6,1')->name('catalog.import.upload');
         Route::get('/catalog/import/{reference}', [CatalogImportController::class, 'show'])->name('catalog.import.show');
         Route::post('/catalog/import/{reference}/mapping', [CatalogImportController::class, 'mapping'])->middleware('throttle:20,1')->name('catalog.import.mapping');
+        Route::post('/catalog/import/{reference}/photos/retry', [CatalogImportController::class, 'retryPhotos'])->middleware('throttle:3,1')->name('catalog.import.photos.retry');
         Route::post('/catalog/import/{reference}/confirm', [CatalogImportController::class, 'confirm'])->middleware('throttle:6,1')->name('catalog.import.confirm');
         Route::post('/stores/address/postcode', [StoreAddressController::class, 'postcode'])->middleware('throttle:10,1')->name('stores.address.postcode');
         Route::post('/stores/address/locate', [StoreAddressController::class, 'locate'])->middleware('throttle:10,1')->name('stores.address.locate');
