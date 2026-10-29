@@ -2,6 +2,18 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Ocorrências e comprovantes de entrega — 29/10/2026
+
+Próximo bloco independente de iFood: Entregas abre uma central por tenant com filtros de loja/situação/ocorrências abertas, paginação, indicadores e detalhe da corrida. O painel do motoboy tem atalho para detalhes/comprovante/ocorrências; os atalhos antigos de logística permanecem com link para a central. Histórico pode ser consultado com módulo freelancer desativado, desde que a empresa esteja ativa.
+
+Loja e motoboy atribuído registram ocorrências de cliente ausente, endereço, moto ou outras, com descrição e foto opcional. A loja também registra falta de motoboy antes do aceite. O UUID por envio e lock de tenant/corrida impedem duplicação no reenvio; apenas corridas em andamento aceitam novos registros. A loja registra solução obrigatória, autor e horário; repetição não altera a solução original. Não há alteração automática de corrida, numerário, remuneração, pagamento ou acerto ao abrir/resolver ocorrência. Retorno, cancelamento/reatribuição excepcional e alertas automáticos continuam pendentes; não considerar a logística inteira concluída.
+
+Na conclusão, o motoboy pode informar recebedor e anexar foto. Esses campos são opcionais para preservar o fluxo existente; não é validação por PIN/código do cliente. O registro mantém o autor da corrida e o horário; comprovante não é exposto no acompanhamento público do pedido. Fotos são privadas, servidas com autenticação, checagem da empresa/corrida e no-store/nosniff, disponíveis ao proprietário responsável e ao motoboy atribuído; outros tenants, outros motoboys e equipe não acessam. JPG/PNG/WebP até 2 MB/4000 px são convertidos em WebP, removendo metadados do original. Falha posterior na transação remove o arquivo novo e preserva estado, recebimento e reserva do motoboy.
+
+A regra de pagamento permanece: Pix/cartão/online precisam estar pagos para conclusão conforme regras anteriores; dinheiro é confirmado na conclusão. Suspensão da empresa ou módulo em encerramento não impede o motoboy atribuído de registrar problema ou finalizar a corrida. Não são concedidas novas ofertas nessas situações. O proprietário suspenso continua sem acesso até reativação.
+
+Nova migration: 2026_10_29_031812_add_delivery_proofs_and_incidents. Sem nova dependência. Verificação: 213 testes PHP aprovados (214 no total, com o teste de download externo opcional ignorado), 19 JavaScript aprovados; sete testes novos cobrem isolamento, idempotência, pagamento, módulo em encerramento, privacidade, filtros, arquivos inválidos e rollback. Chrome em computador e celular: ocorrência do motoboy > filtro de abertas > solução pela loja > coleta > conclusão com recebedor/foto > leitura privada; sem erro JavaScript e sem transbordamento em 390 px. Executado em SQLite local, sem alteração de produção; concorrência PostgreSQL e piloto físico de entregas seguem pendentes.
+
 ## Correção do processamento das fotos importadas — 28/10/2026
 
 Diagnóstico no código: Docker instalava GD sem libwebp/--with-webp, mas o job convertia todas as imagens com imagewebp. O erro era capturado sem diagnóstico na tela. Adicionalmente, comandos de fila rodavam como root, podendo criar diretórios privados inacessíveis ao PHP-FPM www-data. Docker agora instala libwebp-dev, compila GD com WebP, verifica a existência de imagewebp durante o build e inclui gosu. Entrypoint mantém inicialização/chown/bootstrap como root e executa php artisan (worker/scheduler) como www-data, usando o mesmo proprietário do web. O volume app_storage continua compartilhado conforme compose.yaml. O chown no início também corrige arquivos antigos com dono root.
@@ -274,7 +286,7 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 | Lojas e catálogo | Cadastro e edição, fotos, horários semanais, pausa, grupos/adicionais e cardápio; variações, combos e feriados implementados nas etapas acima; mais de dois períodos diários pendentes |
 | Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; validação geográfica por raio implementada com API configurável, pendente de piloto; agendamento implementado; pagamento online pendente |
 | Pedidos e cozinha | Aceite, preparo, pronto, conclusão, filtros, paginação, detalhes privados, atualização automática e som ativável; faltam estações e ocorrências completas |
-| Freelancers | Cadastro global, aprovação, check-in, FIFO, oferta regional, aceite, coleta e conclusão; faltam presença web automática, posição da fila visível, alertas, regras editáveis e ocorrências |
+| Freelancers | Cadastro global, aprovação, check-in, FIFO, oferta regional, aceite, coleta e conclusão; presença web automática, fila visível e ocorrências/comprovantes implementados; faltam alertas de segundo plano garantidos (dependem de app futuro), retornos e exceções operacionais completas |
 | Tarifação e acerto | Três modos de cálculo e registro manual; distância de rota ainda é informada pela loja, sem mapas ou repasse automático |
 | Evolution | Servidor central, chave criptografada, provisionamento QR e webhook; testes simulados. Falta homologação real, validar número conectado, reconectar/desconectar e envio confiável |
 | WABA | Apenas solicitação pendente, sem conexão oficial implementada |

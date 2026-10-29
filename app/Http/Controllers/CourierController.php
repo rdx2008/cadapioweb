@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DeliveryRecords;
 use App\Services\DispatchService;
 use App\Services\OnlinePayment;
 use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class CourierController extends Controller
@@ -166,27 +168,39 @@ class CourierController extends Controller
 
     public function progress(Request $r, int $id)
     {
-        $r->validate(['status' => 'required|in:collected,completed']);
+        $r->validate(['status' => 'required|in:collected,completed', 'received_by' => 'prohibited_unless:status,completed|nullable|string|max:100', 'photo' => 'prohibited_unless:status,completed|'.DeliveryRecords::PHOTO_RULES]);
         $driver = $this->driver();
-        DB::transaction(function () use ($r, $id, $driver) {
-            $tenantId = DB::table('rides')->where('id', $id)->where('driver_id', $driver->id)->value('tenant_id');
-            abort_unless($tenantId, 404);
-            DB::table('tenants')->where('id', $tenantId)->lockForUpdate()->firstOrFail();
-            $ride = DB::table('rides')->where('id', $id)->where('driver_id', $driver->id)->lockForUpdate()->firstOrFail();
-            abort_unless(($ride->status === 'assigned' && $r->status === 'collected') || ($ride->status === 'collected' && $r->status === 'completed'), 409);
-            $order = DB::table('orders')->where('id', $ride->order_id)->lockForUpdate()->firstOrFail();
-            app(OnlinePayment::class)->requirePaid($order);
-            abort_if($r->status === 'completed' && $order->payment_method !== 'cash' && $order->payment_status !== 'paid', 409, 'A loja precisa confirmar o recebimento do Pix ou cartão antes de concluir a entrega.');
-            DB::table('rides')->where('id', $id)->update(['status' => $r->status, 'completed_at' => $r->status === 'completed' ? now() : null, 'updated_at' => now()]);
-            if ($r->status === 'completed') {
-                DB::table('orders')->where('id', $ride->order_id)->update(['status' => 'completed', 'payment_status' => 'paid', 'updated_at' => now()]);
-                DB::table('driver_claims')->where('driver_id', $driver->id)->where('ride_id', $id)->delete();
-                $other = DB::table('rides')->where('tenant_id', $ride->tenant_id)->whereIn('status', ['assigned', 'collected'])->where('id', '!=', $id)->exists();
-                if (! $other) {
-                    DB::table('tenants')->where('id', $ride->tenant_id)->where('courier_module', 'closing')->update(['courier_module' => 'disabled']);
+        $path = null;
+        try {
+            DB::transaction(function () use ($r, $id, $driver, &$path) {
+                $tenantId = DB::table('rides')->where('id', $id)->where('driver_id', $driver->id)->value('tenant_id');
+                abort_unless($tenantId, 404);
+                DB::table('tenants')->where('id', $tenantId)->lockForUpdate()->firstOrFail();
+                $ride = DB::table('rides')->where('id', $id)->where('driver_id', $driver->id)->lockForUpdate()->firstOrFail();
+                abort_unless(($ride->status === 'assigned' && $r->status === 'collected') || ($ride->status === 'collected' && $r->status === 'completed'), 409);
+                $order = DB::table('orders')->where('id', $ride->order_id)->lockForUpdate()->firstOrFail();
+                app(OnlinePayment::class)->requirePaid($order);
+                abort_if($r->status === 'completed' && $order->payment_method !== 'cash' && $order->payment_status !== 'paid', 409, 'A loja precisa confirmar o recebimento do Pix ou cartão antes de concluir a entrega.');
+                $evidence = [];
+                if ($r->status === 'completed') {
+                    $path = app(DeliveryRecords::class)->photo($r->file('photo'), $ride->tenant_id);
+                    $evidence = ['received_by' => $r->input('received_by'), 'proof_photo_path' => $path, 'proof_recorded_at' => $path || $r->filled('received_by') ? now() : null];
                 }
-            }Audit::record('ride.progress', ['id' => $id, 'status' => $r->status], $ride->tenant_id);
-        });
+                DB::table('rides')->where('id', $id)->update($evidence + ['status' => $r->status, 'completed_at' => $r->status === 'completed' ? now() : null, 'updated_at' => now()]);
+                if ($r->status === 'completed') {
+                    DB::table('orders')->where('id', $ride->order_id)->update(['status' => 'completed', 'payment_status' => 'paid', 'updated_at' => now()]);
+                    DB::table('driver_claims')->where('driver_id', $driver->id)->where('ride_id', $id)->delete();
+                    $other = DB::table('rides')->where('tenant_id', $ride->tenant_id)->whereIn('status', ['assigned', 'collected'])->where('id', '!=', $id)->exists();
+                    if (! $other) {
+                        DB::table('tenants')->where('id', $ride->tenant_id)->where('courier_module', 'closing')->update(['courier_module' => 'disabled']);
+                    }
+                }Audit::record('ride.progress', ['id' => $id, 'status' => $r->status], $ride->tenant_id);
+            });
+        } catch (\Throwable $e) {
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            } throw $e;
+        }
 
         return back()->with('success', 'Etapa registrada.');
     }

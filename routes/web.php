@@ -6,6 +6,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CourierController;
+use App\Http\Controllers\DeliveryRecordController;
 use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderBoardController;
@@ -48,6 +49,10 @@ Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])-
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/deliveries/{id}', [DeliveryRecordController::class, 'show'])->whereNumber('id')->name('deliveries.show');
+    Route::get('/deliveries/{id}/proof', [DeliveryRecordController::class, 'proof'])->whereNumber('id')->name('deliveries.proof');
+    Route::get('/delivery-incidents/{incidentId}/photo', [DeliveryRecordController::class, 'incidentPhoto'])->whereNumber('incidentId')->name('delivery-incidents.photo');
+    Route::post('/deliveries/{id}/incidents', [DeliveryRecordController::class, 'create'])->whereNumber('id')->middleware('throttle:10,1')->name('delivery-incidents.create');
     Route::middleware('access:admin')->group(function () {
         Route::get('/admin/ifood', [IfoodController::class, 'admin'])->name('ifood.admin');
         Route::post('/admin/ifood/configure', [IfoodController::class, 'configure'])->name('ifood.configure');
@@ -71,6 +76,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/deliveries', [DeliveryRecordController::class, 'index'])->name('deliveries.index');
+        Route::post('/delivery-incidents/{incidentId}/resolve', [DeliveryRecordController::class, 'resolve'])->whereNumber('incidentId')->name('delivery-incidents.resolve');
         Route::get('/catalog/import', [CatalogImportController::class, 'index'])->name('catalog.import');
         Route::post('/catalog/import', [CatalogImportController::class, 'upload'])->middleware('throttle:6,1')->name('catalog.import.upload');
         Route::get('/catalog/import/{reference}', [CatalogImportController::class, 'show'])->name('catalog.import.show');
