@@ -304,6 +304,8 @@ document.querySelectorAll("[data-tracking-url]").forEach((panel) => {
         unassigned: "Aguardando entregador",
         assigned: "Entregador a caminho da loja",
         collected: "Pedido em entrega",
+        returning: "Em retorno \u00e0 loja",
+        returned: "Devolvido \u00e0 loja",
         completed: "Entregue",
         cancelled: "Corrida cancelada",
     };

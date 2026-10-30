@@ -61,7 +61,9 @@ class DeliveryRecordController extends Controller
         $store = DB::table('stores')->where('id', $ride->store_id)->firstOrFail();
         $incidents = DB::table('delivery_incidents')->join('users as authors', 'authors.id', '=', 'delivery_incidents.author_id')->leftJoin('users as resolvers', 'resolvers.id', '=', 'delivery_incidents.resolved_by')->where('ride_id', $ride->id)->where('delivery_incidents.tenant_id', $ride->tenant_id)->select('delivery_incidents.*', 'authors.name as author_name', 'resolvers.name as resolver_name')->orderByDesc('delivery_incidents.id')->get();
 
-        return view('deliveries.show', compact('ride', 'order', 'store', 'incidents'));
+        $attempts = DB::table('delivery_attempts')->where('ride_id', $id)->when(auth()->user()->role === 'courier', fn ($q) => $q->where('driver_id', $ride->driver_id))->orderByDesc('id')->get();
+
+        return view('deliveries.show', compact('ride', 'order', 'store', 'incidents', 'attempts'));
     }
 
     public function create(Request $request, int $id, DeliveryRecords $records): RedirectResponse
@@ -81,7 +83,7 @@ class DeliveryRecordController extends Controller
 
                     return;
                 }
-                $allowed = $request->user()->role === 'courier' ? ['assigned', 'collected'] : ['searching', 'offered', 'broadcast', 'unassigned', 'assigned', 'collected'];
+                $allowed = $request->user()->role === 'courier' ? ['assigned', 'collected', 'returning'] : ['searching', 'offered', 'broadcast', 'unassigned', 'assigned', 'collected', 'returning'];
                 abort_unless(in_array($ride->status, $allowed, true), 409, 'A corrida já foi encerrada.');
                 abort_if($request->user()->role === 'courier' && $data['kind'] === 'no_courier', 422);
                 $path = $records->photo($request->file('photo'), $ride->tenant_id);

@@ -65,7 +65,7 @@ class TenantAdminController extends Controller
             if ($data['confirm_slug'] !== $company->slug) {
                 throw ValidationException::withMessages(['confirm_slug' => 'Digite o identificador exato da empresa para confirmar.']);
             }
-            if (DB::table('orders')->where('tenant_id', $id)->whereIn('status', ['pending', 'accepted', 'preparing', 'ready'])->exists() || DB::table('rides')->where('tenant_id', $id)->whereIn('status', ['assigned', 'collected'])->exists()) {
+            if (DB::table('orders')->where('tenant_id', $id)->whereIn('status', ['pending', 'accepted', 'preparing', 'ready'])->exists() || DB::table('rides')->where('tenant_id', $id)->whereIn('status', ['assigned', 'collected', 'returning'])->exists()) {
                 throw ValidationException::withMessages(['confirm_slug' => 'Conclua ou cancele os pedidos e finalize as entregas em andamento antes de excluir a empresa.']);
             }
             $state->stopNewOffers($id);

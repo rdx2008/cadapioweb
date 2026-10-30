@@ -34,11 +34,15 @@ class DispatchService
             if ($tenant->courier_module !== 'active' || ! app(TenantState::class)->active($tenant->id)) {
                 return;
             }
-            $live = DB::table('offers')->where('ride_id', $id)->where('status', 'open')->where('expires_at', '>', now())->exists();
+            $order = DB::table('orders')->where('id', $ride->order_id)->first();
+            if (! $order || $order->status !== 'ready' || $order->payment_status === 'review') {
+                return;
+            }
+            $live = DB::table('offers')->where('ride_id', $id)->where('dispatch_round', $ride->dispatch_round)->where('status', 'open')->where('expires_at', '>', now())->exists();
             if ($live) {
                 return;
             }
-            $expired = DB::table('offers')->where('ride_id', $id)->where('status', 'open')->get();
+            $expired = DB::table('offers')->where('ride_id', $id)->where('dispatch_round', $ride->dispatch_round)->where('status', 'open')->get();
             foreach ($expired as $offer) {
                 DB::table('offers')->where('id', $offer->id)->update(['status' => 'expired']);
                 DB::table('driver_claims')->where('driver_id', $offer->driver_id)->where('ride_id', $id)->whereNotNull('expires_at')->delete();
@@ -47,7 +51,7 @@ class DispatchService
                 }
             }
             $store = DB::table('stores')->find($ride->store_id);
-            $seen = DB::table('offers')->where('ride_id', $id)->pluck('driver_id');
+            $seen = DB::table('offers')->where('ride_id', $id)->where('dispatch_round', $ride->dispatch_round)->pluck('driver_id');
             $queue = DB::table('drivers')->where('checkin_store_id', $store->id)->whereNotIn('id', $seen)->orderBy('checked_in_at')->orderBy('id')->get();
             if ($ride->status !== 'broadcast') {
                 foreach ($queue as $candidate) {
@@ -60,7 +64,7 @@ class DispatchService
                         continue;
                     }
                     DB::table('driver_claims')->insert(['driver_id' => $d->id, 'ride_id' => $id, 'expires_at' => now()->addSeconds(30)]);
-                    $this->offer($id, $d->id, 30);
+                    $this->offer($id, $d->id, 30, $ride->dispatch_round);
                     DB::table('rides')->where('id', $id)->update(['status' => 'offered', 'updated_at' => now()]);
 
                     return;
@@ -71,14 +75,14 @@ class DispatchService
             $count = 0;
             foreach ($drivers as $d) {
                 if ($this->eligible($d) && ! DB::table('driver_claims')->where('driver_id', $d->id)->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))->exists() && self::distance($d->latitude, $d->longitude, $store->latitude, $store->longitude) <= $radius) {
-                    $this->offer($id, $d->id, 60);
+                    $this->offer($id, $d->id, 60, $ride->dispatch_round);
                     $count++;
                 }
             }
             if (! $count && $radius === 3000) {
                 foreach ($drivers as $d) {
                     if ($this->eligible($d) && ! DB::table('driver_claims')->where('driver_id', $d->id)->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))->exists() && self::distance($d->latitude, $d->longitude, $store->latitude, $store->longitude) <= 5000) {
-                        $this->offer($id, $d->id, 60);
+                        $this->offer($id, $d->id, 60, $ride->dispatch_round);
                         $count++;
                     }
                 }
@@ -87,9 +91,9 @@ class DispatchService
         }, 3);
     }
 
-    private function offer(int $ride, int $driver, int $seconds): void
+    private function offer(int $ride, int $driver, int $seconds, int $round): void
     {
-        DB::table('offers')->insert(['ride_id' => $ride, 'driver_id' => $driver, 'expires_at' => now()->addSeconds($seconds), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('offers')->insert(['dispatch_round' => $round, 'ride_id' => $ride, 'driver_id' => $driver, 'expires_at' => now()->addSeconds($seconds), 'created_at' => now(), 'updated_at' => now()]);
     }
 
     public function accept(int $offerId, int $driverId): int
@@ -100,6 +104,7 @@ class DispatchService
             $tenantId = DB::table('rides')->where('id', $initial->ride_id)->value('tenant_id');
             $tenant = DB::table('tenants')->where('id', $tenantId)->lockForUpdate()->first();
             $ride = DB::table('rides')->where('id', $initial->ride_id)->lockForUpdate()->first();
+            abort_unless($initial->dispatch_round === $ride->dispatch_round, 409, 'Oferta de uma tentativa anterior.');
             if ($ride->driver_id === $driverId && in_array($ride->status, ['assigned', 'collected', 'completed'])) {
                 return $ride->id;
             }
@@ -129,7 +134,8 @@ class DispatchService
         DB::transaction(function () use ($offerId, $driverId) {
             $initial = DB::table('offers')->where('id', $offerId)->where('driver_id', $driverId)->first();
             abort_unless($initial, 404);
-            DB::table('rides')->where('id', $initial->ride_id)->lockForUpdate()->first();
+            $ride = DB::table('rides')->where('id', $initial->ride_id)->lockForUpdate()->first();
+            abort_unless($initial->dispatch_round === $ride->dispatch_round, 409);
             $o = DB::table('offers')->find($offerId);
             abort_unless($o->status === 'open', 409);
             DB::table('offers')->where('id', $offerId)->update(['status' => 'declined']);

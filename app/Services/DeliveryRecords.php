@@ -11,7 +11,7 @@ class DeliveryRecords
 {
     public const KINDS = ['customer_absent' => 'Cliente ausente', 'address_issue' => 'Problema no endereço', 'vehicle_issue' => 'Problema com a moto', 'no_courier' => 'Sem motoboy disponível', 'other' => 'Outra ocorrência'];
 
-    public const STATUSES = ['searching' => 'Buscando motoboy', 'offered' => 'Ofertada na fila', 'broadcast' => 'Ofertada na região', 'unassigned' => 'Sem motoboy', 'assigned' => 'Atribuída', 'collected' => 'Em entrega', 'completed' => 'Concluída', 'cancelled' => 'Cancelada'];
+    public const STATUSES = ['searching' => 'Buscando motoboy', 'offered' => 'Ofertada na fila', 'broadcast' => 'Ofertada na região', 'unassigned' => 'Sem motoboy', 'assigned' => 'Atribuída', 'collected' => 'Em entrega', 'returning' => 'Em retorno à loja', 'returned' => 'Devolvido à loja', 'completed' => 'Concluída', 'cancelled' => 'Cancelada'];
 
     public const PHOTO_RULES = 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048|dimensions:max_width=4000,max_height=4000';
 

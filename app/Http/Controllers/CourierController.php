@@ -38,14 +38,16 @@ class CourierController extends Controller
     private function board(object $driver): array
     {
         $offers = DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->join('orders', 'orders.id', '=', 'rides.order_id')->join('stores', 'stores.id', '=', 'rides.store_id')->join('tenants', 'tenants.id', '=', 'rides.tenant_id')
-            ->where('offers.driver_id', $driver->id)->where('offers.status', 'open')->where('offers.expires_at', '>', now())->whereIn('rides.status', ['offered', 'broadcast'])->where('tenants.courier_module', 'active')->where('tenants.status', 'active')->whereNull('tenants.deleted_at')
+            ->where('offers.driver_id', $driver->id)->whereColumn('offers.dispatch_round', 'rides.dispatch_round')->where('offers.status', 'open')->where('offers.expires_at', '>', now())->whereIn('rides.status', ['offered', 'broadcast'])->where('tenants.courier_module', 'active')->where('tenants.status', 'active')->whereNull('tenants.deleted_at')
             ->select('offers.id', 'offers.expires_at', 'rides.fare_cents', 'rides.route_meters', 'rides.cash_cents', 'stores.name', 'stores.address', 'orders.payment_method')->orderBy('offers.id')->get();
         if ($driver->status !== 'approved' || ! $driver->available || ! $driver->heartbeat_at || now()->subSeconds(90)->gt($driver->heartbeat_at)) {
             $offers = collect();
         }
         $rides = DB::table('rides')->join('orders', 'orders.id', '=', 'rides.order_id')->where('rides.driver_id', $driver->id)->select('rides.*', 'orders.address', 'orders.phone', 'orders.customer_name', 'orders.payment_method', 'orders.payment_status', 'orders.change_for_cents', 'orders.total_cents')->orderByDesc('rides.id')->limit(30)->get();
 
-        return compact('offers', 'rides');
+        $attempts = DB::table('delivery_attempts')->join('rides', 'rides.id', '=', 'delivery_attempts.ride_id')->join('stores', 'stores.id', '=', 'rides.store_id')->where('delivery_attempts.driver_id', $driver->id)->select('delivery_attempts.*', 'stores.name as store_name')->orderByDesc('delivery_attempts.id')->limit(30)->get();
+
+        return compact('offers', 'rides', 'attempts');
     }
 
     private function presenceState(object $driver): array
@@ -54,7 +56,7 @@ class CourierController extends Controller
         if ($driver->status !== 'approved') {
             return $base + ['label' => 'Cadastro pendente ou bloqueado'];
         }
-        if (DB::table('rides')->where('driver_id', $driver->id)->whereIn('status', ['assigned', 'collected'])->exists()) {
+        if (DB::table('rides')->where('driver_id', $driver->id)->whereIn('status', ['assigned', 'collected', 'returning'])->exists()) {
             return array_replace($base, ['label' => 'Em corrida · novas ofertas suspensas', 'renew' => true]);
         }
         if ($this->expiredExclusiveOffer($driver->id)) {
@@ -92,7 +94,7 @@ class CourierController extends Controller
         $accepted = DB::transaction(function () use ($driver, $data): bool {
             $locked = DB::table('drivers')->where('id', $driver->id)->lockForUpdate()->firstOrFail();
             abort_unless($locked->status === 'approved', 403, 'Cadastro não aprovado.');
-            $busy = DB::table('rides')->where('driver_id', $driver->id)->whereIn('status', ['assigned', 'collected'])->exists();
+            $busy = DB::table('rides')->where('driver_id', $driver->id)->whereIn('status', ['assigned', 'collected', 'returning'])->exists();
             $expiredOffer = $this->expiredExclusiveOffer($driver->id);
             if (! $busy && ($expiredOffer || ! $locked->available || ! $locked->heartbeat_at || now()->subSeconds(90)->gt($locked->heartbeat_at))) {
                 DB::table('drivers')->where('id', $driver->id)->update(['available' => false, 'checkin_store_id' => null, 'checked_in_at' => null]);
@@ -117,7 +119,7 @@ class CourierController extends Controller
 
     private function expiredExclusiveOffer(int $driverId): bool
     {
-        return DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->where('offers.driver_id', $driverId)->where('offers.status', 'open')->where('offers.expires_at', '<=', now())->where('rides.status', 'offered')->exists();
+        return DB::table('offers')->join('rides', 'rides.id', '=', 'offers.ride_id')->where('offers.driver_id', $driverId)->whereColumn('offers.dispatch_round', 'rides.dispatch_round')->where('offers.status', 'open')->where('offers.expires_at', '<=', now())->where('rides.status', 'offered')->exists();
     }
 
     public function presence(Request $r)
@@ -168,7 +170,7 @@ class CourierController extends Controller
 
     public function progress(Request $r, int $id)
     {
-        $r->validate(['status' => 'required|in:collected,completed', 'received_by' => 'prohibited_unless:status,completed|nullable|string|max:100', 'photo' => 'prohibited_unless:status,completed|'.DeliveryRecords::PHOTO_RULES]);
+        $r->validate(['status' => 'required|in:collected,completed', 'expected_round' => 'nullable|integer|min:1', 'received_by' => 'prohibited_unless:status,completed|nullable|string|max:100', 'photo' => 'prohibited_unless:status,completed|'.DeliveryRecords::PHOTO_RULES]);
         $driver = $this->driver();
         $path = null;
         try {
@@ -177,6 +179,7 @@ class CourierController extends Controller
                 abort_unless($tenantId, 404);
                 DB::table('tenants')->where('id', $tenantId)->lockForUpdate()->firstOrFail();
                 $ride = DB::table('rides')->where('id', $id)->where('driver_id', $driver->id)->lockForUpdate()->firstOrFail();
+                abort_if($r->filled('expected_round') && $ride->dispatch_round !== $r->integer('expected_round'), 409, 'A tentativa mudou. Atualize a página.');
                 abort_unless(($ride->status === 'assigned' && $r->status === 'collected') || ($ride->status === 'collected' && $r->status === 'completed'), 409);
                 $order = DB::table('orders')->where('id', $ride->order_id)->lockForUpdate()->firstOrFail();
                 app(OnlinePayment::class)->requirePaid($order);
@@ -190,7 +193,7 @@ class CourierController extends Controller
                 if ($r->status === 'completed') {
                     DB::table('orders')->where('id', $ride->order_id)->update(['status' => 'completed', 'payment_status' => 'paid', 'updated_at' => now()]);
                     DB::table('driver_claims')->where('driver_id', $driver->id)->where('ride_id', $id)->delete();
-                    $other = DB::table('rides')->where('tenant_id', $ride->tenant_id)->whereIn('status', ['assigned', 'collected'])->where('id', '!=', $id)->exists();
+                    $other = DB::table('rides')->where('tenant_id', $ride->tenant_id)->whereIn('status', ['assigned', 'collected', 'returning'])->where('id', '!=', $id)->exists();
                     if (! $other) {
                         DB::table('tenants')->where('id', $ride->tenant_id)->where('courier_module', 'closing')->update(['courier_module' => 'disabled']);
                     }

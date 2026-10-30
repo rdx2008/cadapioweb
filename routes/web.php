@@ -6,6 +6,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CourierController;
+use App\Http\Controllers\DeliveryExceptionController;
 use App\Http\Controllers\DeliveryRecordController;
 use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\MenuController;
@@ -49,6 +50,8 @@ Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])-
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/delivery-attempts/{attemptId}', [DeliveryExceptionController::class, 'show'])->whereNumber('attemptId')->name('delivery-attempts.show');
+    Route::post('/deliveries/{id}/return', [DeliveryExceptionController::class, 'act'])->defaults('action', 'return')->whereNumber('id')->middleware('throttle:10,1')->name('deliveries.return');
     Route::get('/deliveries/{id}', [DeliveryRecordController::class, 'show'])->whereNumber('id')->name('deliveries.show');
     Route::get('/deliveries/{id}/proof', [DeliveryRecordController::class, 'proof'])->whereNumber('id')->name('deliveries.proof');
     Route::get('/delivery-incidents/{incidentId}/photo', [DeliveryRecordController::class, 'incidentPhoto'])->whereNumber('incidentId')->name('delivery-incidents.photo');
@@ -76,6 +79,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::post('/deliveries/{id}/exceptions/{action}', [DeliveryExceptionController::class, 'act'])->whereNumber('id')->whereIn('action', ['release', 'receive', 'retry'])->name('deliveries.exceptions');
+        Route::post('/delivery-attempts/{attemptId}/settle', [DeliveryExceptionController::class, 'settle'])->whereNumber('attemptId')->name('delivery-attempts.settle');
         Route::get('/deliveries', [DeliveryRecordController::class, 'index'])->name('deliveries.index');
         Route::post('/delivery-incidents/{incidentId}/resolve', [DeliveryRecordController::class, 'resolve'])->whereNumber('incidentId')->name('delivery-incidents.resolve');
         Route::get('/catalog/import', [CatalogImportController::class, 'index'])->name('catalog.import');

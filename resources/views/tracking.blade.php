@@ -20,7 +20,7 @@
 <h2>Total: R$ {{ number_format($order->total_cents/100,2,',','.') }}</h2>
 <p>Pagamento: <span data-tracking-payment>{{ $order->payment_status==='paid'?'Recebido':($order->payment_status==='review'?'Em conferência':(app(App\Services\OnlinePayment::class)->isOnline($order)?'Aguardando pagamento online':'Na entrega ou retirada')) }}</span>
 </p>
-<p>Entrega: <span data-tracking-ride>{{ $ride->status??'Aguardando despacho ou retirada' }}</span>
+<p>Entrega: <span data-tracking-ride>{{ App\Services\DeliveryRecords::STATUSES[$ride->status??'']??'Aguardando despacho ou retirada' }}</span>
 </p>
 <p data-cancel-reason>{{ $order->cancellation_reason }}</p>
 <p class="muted compact" data-tracking-connection role="status">Consultando andamento…</p>

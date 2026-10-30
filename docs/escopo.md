@@ -690,4 +690,10 @@ Combos podem ser fechados ou ter grupos de escolhas próprias, além de componen
 
 Central de entregas por loja/situação, histórico de ocorrências com autoria e solução, descrição e foto privada opcional. Motoboy atribuído registra em corrida ativa; proprietário registra também falta de motoboy antes do aceite. Registrar ou resolver ocorrência não modifica automaticamente estado, pagamento ou acerto. Suspensão comercial e encerramento do módulo preservam o tratamento da corrida aceita.
 
-Conclusão pode conter nome de recebedor e foto opcional, restritos ao proprietário e ao motoboy responsável. Esse registro declaratório não substitui o futuro código de confirmação do cliente. Arquivos passam por validação/conversão e autorização por empresa/corrida, sem exposição pública. Cancelamento excepcional, retorno, reatribuição, PIN e alertas de ocorrências em tempo real permanecem no escopo posterior.
+Conclusão pode conter nome de recebedor e foto opcional, restritos ao proprietário e ao motoboy responsável. Esse registro declaratório não substitui o futuro código de confirmação do cliente. Arquivos passam por validação/conversão e autorização por empresa/corrida, sem exposição pública. PIN e alertas de ocorrências em tempo real permanecem no escopo posterior.
+
+### 17.11. Retorno e troca de motoboy
+
+Antes da coleta, o proprietário confirma que o pacote permanece na loja, informa motivo/remuneração e libera o motoboy. Depois da coleta, loja ou motoboy solicitam retorno; a reserva só é liberada quando a loja confirma recebimento físico, conferência e valores. Cada tentativa encerrada preserva proposta, remuneração combinada, dinheiro declarado e autoria, com acerto externo individual auditado. Valores do cliente e remuneração são conferidos separadamente, sem compensação, transferência ou estorno automáticos.
+
+Dinheiro declarado no retorno exige conferência do pagamento antes de nova busca. Recebimento parcial não quita o pedido; o total original permanece. Cancelar o pedido devolvido preserva o histórico da entrega. A nova busca é explícita, mantém a cotação e invalida ofertas de rodadas anteriores; motoboy anterior acessa apenas seu resumo sem dados da entrega seguinte. Alteração de cotação entre tentativas e conciliação automática de saldos parciais são evoluções posteriores.
