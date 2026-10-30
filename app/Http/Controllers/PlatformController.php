@@ -205,7 +205,7 @@ class PlatformController extends Controller
             }$s = $this->store($o->store_id);
             $fare = $calculator->quote($s, $d['route_meters'] ?? null, $d['fare_cents'] ?? null);
 
-            return DB::table('rides')->insertGetId(['tenant_id' => $this->tid(), 'store_id' => $s->id, 'order_id' => $id, 'status' => 'searching', 'rate_mode' => $s->rate_mode, 'fare_cents' => $fare, 'route_meters' => $d['route_meters'] ?? null, 'cash_cents' => $o->payment_status === 'paid' || $o->payment_method !== 'cash' ? 0 : $o->total_cents, 'created_at' => now(), 'updated_at' => now()]);
+            return DB::table('rides')->insertGetId(['confirmation_required' => true, 'tenant_id' => $this->tid(), 'store_id' => $s->id, 'order_id' => $id, 'status' => 'searching', 'rate_mode' => $s->rate_mode, 'fare_cents' => $fare, 'route_meters' => $d['route_meters'] ?? null, 'cash_cents' => $o->payment_status === 'paid' || $o->payment_method !== 'cash' ? 0 : $o->total_cents, 'created_at' => now(), 'updated_at' => now()]);
         });
         $service->dispatch($rideId);
 

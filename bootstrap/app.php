@@ -12,5 +12,5 @@ return Application::configure(basePath: dirname(__DIR__))
         $m->preventRequestForgery(except: ['webhooks/evolution/*', 'wp/p', 'wp/i/*']);
     })
     ->withExceptions(function (Exceptions $e): void {
-        $e->dontFlash(['client_secret', 'token', 'credential']);
+        $e->dontFlash(['client_secret', 'token', 'credential', 'delivery_code']);
     })->create();

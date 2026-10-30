@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\DeliveryConfirmation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -92,7 +93,7 @@ class CheckoutPaymentTest extends TestCase
             $this->assertDatabaseHas('orders', ['id' => $order, 'payment_status' => 'pending']);
             $this->get('/courier')->assertOk()->assertSee('Aguarde a loja');
             $this->actingAs($owner)->post('/orders/'.$order.'/paid')->assertRedirect();
-            $this->actingAs($courier)->post('/courier/rides/'.$ride->id, ['status' => 'completed'])->assertRedirect();
+            $this->actingAs($courier)->post('/courier/rides/'.$ride->id, ['status' => 'completed', 'expected_round' => $ride->dispatch_round, 'delivery_code' => app(DeliveryConfirmation::class)->forCustomer(DB::table('rides')->find($ride->id))])->assertRedirect()->assertSessionHasNoErrors();
             $this->assertDatabaseHas('orders', ['id' => $order, 'payment_status' => 'paid', 'status' => 'completed']);
             $this->assertDatabaseHas('rides', ['id' => $ride->id, 'cash_cents' => 0, 'status' => 'completed']);
         }

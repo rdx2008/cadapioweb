@@ -23,6 +23,8 @@
 <p>Entrega: <span data-tracking-ride>{{ App\Services\DeliveryRecords::STATUSES[$ride->status??'']??'Aguardando despacho ou retirada' }}</span>
 </p>
 <p data-cancel-reason>{{ $order->cancellation_reason }}</p>
+@php($deliveryCode=app(App\Services\DeliveryConfirmation::class)->forCustomer($order->status==='ready'?$ride:null))
+<section data-delivery-code-panel @if(!$deliveryCode) hidden @endif><h2>Código de entrega</h2><p>Informe ao motoboy somente quando receber seu pedido.</p><strong data-delivery-code style="font-size:2rem;letter-spacing:.2em">{{ $deliveryCode }}</strong><p class="muted">O código confirma a entrega. O pagamento combinado continua sendo necessário.</p></section>
 <p class="muted compact" data-tracking-connection role="status">Consultando andamento…</p>
 </div>
 </div>

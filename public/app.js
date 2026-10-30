@@ -329,6 +329,12 @@ document.querySelectorAll("[data-tracking-url]").forEach((panel) => {
                 data.payment_status === "paid"
                     ? "Recebido"
                     : data.payment_status === "review" ? "Em conferência" : data.payment_online ? "Aguardando pagamento online" : "Na entrega ou retirada";
+            const codePanel = panel.querySelector('[data-delivery-code-panel]');
+            const code = panel.querySelector('[data-delivery-code]');
+            if (codePanel && code) {
+                codePanel.hidden = !data.delivery_code;
+                code.textContent = data.delivery_code || '';
+            }
             const onlineActions = panel.querySelector('[data-online-actions]');
             if (onlineActions) onlineActions.hidden = data.payment_status === 'paid' || data.status === 'cancelled';
             const onlinePay = panel.querySelector('[data-online-pay]');
@@ -343,6 +349,10 @@ document.querySelectorAll("[data-tracking-url]").forEach((panel) => {
             panel.querySelector("[data-tracking-connection]").textContent =
                 "Atualizado às " + new Date().toLocaleTimeString("pt-BR");
         } catch {
+            const codePanel = panel.querySelector('[data-delivery-code-panel]');
+            const code = panel.querySelector('[data-delivery-code]');
+            if (codePanel) codePanel.hidden = true;
+            if (code) code.textContent = '';
             panel.querySelector("[data-tracking-connection]").textContent =
                 "Não foi possível atualizar agora. Tentaremos novamente.";
         } finally {

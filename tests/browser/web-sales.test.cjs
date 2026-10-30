@@ -181,3 +181,13 @@ test('ifood list pauses in hidden pages and preserves the last view on network f
     assert.equal(feed.innerHTML, 'Imported test orders');
     assert.match(message.textContent, /indisponível/);
 });
+
+test('delivery code appears after collection and is cleared on return or failed refresh', async () => {
+    const fields=Object.fromEntries(['[data-tracking-status]','[data-tracking-payment]','[data-tracking-ride]','[data-cancel-reason]','[data-tracking-connection]','[data-delivery-code-panel]','[data-delivery-code]'].map(key=>[key,{}]));
+    let code='012345',failed=false;
+    const panel={dataset:{trackingUrl:'/pedido/test/status'},querySelector:key=>fields[key]};
+    const runtime=environment({'[data-tracking-url]':[panel]}, {}, async()=>{if(failed)throw Error('offline');return jsonResponse({status:'ready',payment_status:'pending',ride_status:'collected',delivery_code:code});});
+    await runtime.tick();assert.equal(fields['[data-delivery-code]'].textContent,'012345');assert.equal(fields['[data-delivery-code-panel]'].hidden,false);
+    code=null;await runtime.tick();assert.equal(fields['[data-delivery-code]'].textContent,'');assert.equal(fields['[data-delivery-code-panel]'].hidden,true);
+    code='123456';await runtime.tick();failed=true;await runtime.tick();assert.equal(fields['[data-delivery-code]'].textContent,'');assert.equal(fields['[data-delivery-code-panel]'].hidden,true);
+});

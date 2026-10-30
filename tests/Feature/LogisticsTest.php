@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\DeliveryConfirmation;
 use App\Services\DispatchService;
 use App\Services\FareCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -128,7 +129,7 @@ class LogisticsTest extends TestCase
             ->post('/admin/tenants/'.$tenant.'/module', ['state' => 'disabled'])->assertRedirect();
         $this->assertDatabaseHas('tenants', ['id' => $tenant, 'courier_module' => 'closing']);
         $this->actingAs($courier)->post('/courier/rides/'.$ride->id, ['status' => 'collected'])->assertRedirect();
-        $this->post('/courier/rides/'.$ride->id, ['status' => 'completed'])->assertRedirect();
+        $this->post('/courier/rides/'.$ride->id, ['status' => 'completed', 'expected_round' => $ride->dispatch_round, 'delivery_code' => app(DeliveryConfirmation::class)->forCustomer(DB::table('rides')->find($ride->id))])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseMissing('driver_claims', ['driver_id' => $driver]);
         $this->assertDatabaseHas('orders', ['id' => $order, 'status' => 'completed', 'payment_status' => 'paid']);
         $this->assertDatabaseHas('tenants', ['id' => $tenant, 'courier_module' => 'disabled']);

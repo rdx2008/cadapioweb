@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DeliveryConfirmation;
 use App\Services\DeliveryRecords;
 use App\Services\DispatchService;
 use App\Services\OnlinePayment;
@@ -170,7 +171,7 @@ class CourierController extends Controller
 
     public function progress(Request $r, int $id)
     {
-        $r->validate(['status' => 'required|in:collected,completed', 'expected_round' => 'nullable|integer|min:1', 'received_by' => 'prohibited_unless:status,completed|nullable|string|max:100', 'photo' => 'prohibited_unless:status,completed|'.DeliveryRecords::PHOTO_RULES]);
+        $r->validate(['status' => 'required|in:collected,completed', 'expected_round' => 'nullable|integer|min:1', 'delivery_code' => 'prohibited_unless:status,completed|nullable|string|regex:/^[0-9]{6}$/D', 'received_by' => 'prohibited_unless:status,completed|nullable|string|max:100', 'photo' => 'prohibited_unless:status,completed|'.DeliveryRecords::PHOTO_RULES]);
         $driver = $this->driver();
         $path = null;
         try {
@@ -185,9 +186,13 @@ class CourierController extends Controller
                 app(OnlinePayment::class)->requirePaid($order);
                 abort_if($r->status === 'completed' && $order->payment_method !== 'cash' && $order->payment_status !== 'paid', 409, 'A loja precisa confirmar o recebimento do Pix ou cartão antes de concluir a entrega.');
                 $evidence = [];
+                if ($r->status === 'collected' && $ride->confirmation_required) {
+                    $evidence['confirmation_cipher'] = app(DeliveryConfirmation::class)->generate();
+                }
                 if ($r->status === 'completed') {
+                    app(DeliveryConfirmation::class)->verify($ride, $r->input('delivery_code'), $r->integer('expected_round'));
                     $path = app(DeliveryRecords::class)->photo($r->file('photo'), $ride->tenant_id);
-                    $evidence = ['received_by' => $r->input('received_by'), 'proof_photo_path' => $path, 'proof_recorded_at' => $path || $r->filled('received_by') ? now() : null];
+                    $evidence = ['confirmation_verified_at' => $ride->confirmation_required ? now() : null, 'confirmation_cipher' => null, 'received_by' => $r->input('received_by'), 'proof_photo_path' => $path, 'proof_recorded_at' => $path || $r->filled('received_by') ? now() : null];
                 }
                 DB::table('rides')->where('id', $id)->update($evidence + ['status' => $r->status, 'completed_at' => $r->status === 'completed' ? now() : null, 'updated_at' => now()]);
                 if ($r->status === 'completed') {

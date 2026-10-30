@@ -690,10 +690,16 @@ Combos podem ser fechados ou ter grupos de escolhas próprias, além de componen
 
 Central de entregas por loja/situação, histórico de ocorrências com autoria e solução, descrição e foto privada opcional. Motoboy atribuído registra em corrida ativa; proprietário registra também falta de motoboy antes do aceite. Registrar ou resolver ocorrência não modifica automaticamente estado, pagamento ou acerto. Suspensão comercial e encerramento do módulo preservam o tratamento da corrida aceita.
 
-Conclusão pode conter nome de recebedor e foto opcional, restritos ao proprietário e ao motoboy responsável. Esse registro declaratório não substitui o futuro código de confirmação do cliente. Arquivos passam por validação/conversão e autorização por empresa/corrida, sem exposição pública. PIN e alertas de ocorrências em tempo real permanecem no escopo posterior.
+Conclusão pode conter nome de recebedor e foto opcional, restritos ao proprietário e ao motoboy responsável. Arquivos passam por validação/conversão e autorização por empresa/corrida, sem exposição pública. Novas corridas também exigem o código do acompanhamento do cliente conforme 17.12; corridas legadas mantêm a regra anterior.
 
 ### 17.11. Retorno e troca de motoboy
 
 Antes da coleta, o proprietário confirma que o pacote permanece na loja, informa motivo/remuneração e libera o motoboy. Depois da coleta, loja ou motoboy solicitam retorno; a reserva só é liberada quando a loja confirma recebimento físico, conferência e valores. Cada tentativa encerrada preserva proposta, remuneração combinada, dinheiro declarado e autoria, com acerto externo individual auditado. Valores do cliente e remuneração são conferidos separadamente, sem compensação, transferência ou estorno automáticos.
 
 Dinheiro declarado no retorno exige conferência do pagamento antes de nova busca. Recebimento parcial não quita o pedido; o total original permanece. Cancelar o pedido devolvido preserva o histórico da entrega. A nova busca é explícita, mantém a cotação e invalida ofertas de rodadas anteriores; motoboy anterior acessa apenas seu resumo sem dados da entrega seguinte. Alteração de cotação entre tentativas e conciliação automática de saldos parciais são evoluções posteriores.
+
+### 17.12. Código do cliente e alertas de ocorrências
+
+Novas corridas exigem seis dígitos gerados na coleta e mostrados no acompanhamento do cliente. O motoboy informa o código ao concluir; pagamento continua sujeito às regras de recebimento. Segredo criptografado, limite de tentativas, validação da rodada e transação preservam reserva/valores nas falhas. Conclusão apaga o segredo e registra verificação; retorno oculta e nova tentativa renova. Corridas anteriores à migration mantêm o fluxo anterior. Quem possui o link do pedido acessa o acompanhamento; não há envio por SMS ou validação de identidade.
+
+Proprietário recebe contador e atalhos de ocorrências abertas por consulta periódica de 15 segundos, com som opcional mediante clique. Resolução atualiza o contador, aba oculta pausa e acesso revogado limpa a tela. Avisos dependem do painel aberto; push, WebSocket e funcionamento garantido em segundo plano continuam para etapa posterior. Piloto físico e concorrência PostgreSQL seguem necessários antes de considerar a logística completa.

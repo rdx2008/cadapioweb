@@ -6,6 +6,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CourierController;
+use App\Http\Controllers\DeliveryAlertController;
 use App\Http\Controllers\DeliveryExceptionController;
 use App\Http\Controllers\DeliveryRecordController;
 use App\Http\Controllers\IfoodController;
@@ -81,6 +82,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('access:owner')->group(function () {
         Route::post('/deliveries/{id}/exceptions/{action}', [DeliveryExceptionController::class, 'act'])->whereNumber('id')->whereIn('action', ['release', 'receive', 'retry'])->name('deliveries.exceptions');
         Route::post('/delivery-attempts/{attemptId}/settle', [DeliveryExceptionController::class, 'settle'])->whereNumber('attemptId')->name('delivery-attempts.settle');
+        Route::get('/delivery-alerts/live', [DeliveryAlertController::class, 'live'])->middleware('throttle:60,1')->name('delivery-alerts.live');
         Route::get('/deliveries', [DeliveryRecordController::class, 'index'])->name('deliveries.index');
         Route::post('/delivery-incidents/{incidentId}/resolve', [DeliveryRecordController::class, 'resolve'])->whereNumber('incidentId')->name('delivery-incidents.resolve');
         Route::get('/catalog/import', [CatalogImportController::class, 'index'])->name('catalog.import');
@@ -148,7 +150,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/courier/offline', [CourierController::class, 'offline']);
         Route::post('/courier/offers/{id}/accept', [CourierController::class, 'accept']);
         Route::post('/courier/offers/{id}/decline', [CourierController::class, 'decline']);
-        Route::post('/courier/rides/{id}', [CourierController::class, 'progress']);
+        Route::post('/courier/rides/{id}', [CourierController::class, 'progress'])->middleware('throttle:delivery-progress');
     });
     Route::middleware('access:staff')->group(function () {
         Route::get('/operation', [StaffOperationController::class, 'index'])->name('staff.operation');
