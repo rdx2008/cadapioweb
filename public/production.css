@@ -1,0 +1,4 @@
+.production-timer { display:block; max-width:100%; padding:8px 10px; background:#f2f5f4; border-radius:8px; color:#42564d; font-size:12px; overflow-wrap:anywhere; }
+.production-timer.is-late { background:#fff0e9; color:#a43820; font-weight:700; border-left:3px solid #cf492b; }
+.production-timeline { display:flex; flex-wrap:wrap; gap:20px; }
+.production-timeline div { min-width:130px; }.production-timeline dt { color:var(--muted); font-size:12px; }.production-timeline dd { margin:6px 0 0; font-weight:600; }

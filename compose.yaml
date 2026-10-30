@@ -1,0 +1,119 @@
+name: cadapioweb
+x-app: &app
+    build: .
+    restart: unless-stopped
+    environment: &environment
+        APP_NAME: CadapioWeb
+        APP_ENV: production
+        APP_DEBUG: "false"
+        APP_KEY: ${APP_KEY:-base64:${SERVICE_REALBASE64_APPKEY}}
+        APP_URL: ${APP_URL:-${SERVICE_URL_WEB_8080:-${SERVICE_URL_WEB:-http://localhost}}}
+        APP_LOCALE: pt_BR
+        TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+        DB_CONNECTION: pgsql
+        DB_HOST: postgres
+        DB_PORT: 5432
+        DB_DATABASE: cadapioweb
+        DB_USERNAME: cadapioweb
+        DB_PASSWORD: ${DB_PASSWORD:-${SERVICE_PASSWORD_POSTGRES}}
+        REDIS_HOST: redis
+        REDIS_PASSWORD: ${REDIS_PASSWORD:-${SERVICE_PASSWORD_REDIS}}
+        QUEUE_CONNECTION: database
+        CACHE_STORE: database
+        SESSION_DRIVER: database
+        SESSION_SECURE_COOKIE: "true"
+        LOG_CHANNEL: stderr
+        RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+        GEOAPIFY_API_KEY: ${GEOAPIFY_API_KEY:-}
+        GEOCODING_DAILY_LIMIT: ${GEOCODING_DAILY_LIMIT:-2800}
+        MAIL_MAILER: ${MAIL_MAILER:-log}
+        MAIL_HOST: ${MAIL_HOST:-}
+        MAIL_PORT: ${MAIL_PORT:-587}
+        MAIL_USERNAME: ${MAIL_USERNAME:-}
+        MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+        MAIL_SCHEME: ${MAIL_SCHEME:-smtp}
+        MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-hello@example.com}
+        MAIL_FROM_NAME: ${MAIL_FROM_NAME:-CadapioWeb}
+    volumes:
+        - app_storage:/var/www/html/storage
+    depends_on:
+        postgres:
+            condition: service_healthy
+        redis:
+            condition: service_healthy
+services:
+    web:
+        <<: *app
+        environment:
+            <<: *environment
+            SERVICE_URL_WEB_8080: /
+        expose:
+            - "8080"
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "php",
+                    "-r",
+                    "exit(@file_get_contents('http://localhost:8080/up') === false ? 1 : 0);",
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 90s
+    worker:
+        <<: *app
+        command:
+            [
+                "php",
+                "artisan",
+                "queue:work",
+                "--sleep=2",
+                "--tries=3",
+                "--timeout=60",
+            ]
+        stop_grace_period: 90s
+    scheduler:
+        <<: *app
+        command: ["php", "artisan", "schedule:work"]
+        stop_grace_period: 20s
+    postgres:
+        image: postgres:17-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: cadapioweb
+            POSTGRES_USER: cadapioweb
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-${SERVICE_PASSWORD_POSTGRES}}
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U cadapioweb -d cadapioweb"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+    redis:
+        image: redis:7.4-alpine
+        restart: unless-stopped
+        environment:
+            REDIS_PASSWORD: ${REDIS_PASSWORD:-${SERVICE_PASSWORD_REDIS}}
+        command:
+            [
+                "sh",
+                "-c",
+                'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"',
+            ]
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG',
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+volumes:
+    app_storage:
+    postgres_data:
+    redis_data:

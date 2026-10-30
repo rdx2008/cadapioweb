@@ -1,0 +1,23 @@
+@php($labels=['pending'=>'Novo','accepted'=>'Aceito','preparing'=>'Em preparo','ready'=>'Pronto','completed'=>'Concluído','cancelled'=>'Cancelado'])
+<div class="order-list">
+@forelse($boardOrders as $order)
+<article class="order-row">
+
+    <a class="order-number" href="/orders/{{ $order->id }}">#{{ $order->id }}</a>
+    <div class="order-customer">@include('partials.payment-details',['payment'=>$order])
+@include('partials.production-timer')
+@if($scheduleLabel=app(App\Services\OrderScheduling::class)->label($order))<p class="badge">Agendado: {{ $scheduleLabel }}<br>Preparo a partir de {{ Illuminate\Support\Carbon::parse($order->prepare_at,'UTC')->timezone($order->scheduled_timezone)->format('d/m H:i') }}</p>@endif
+<div><strong>{{ $order->customer_name }}</strong> <span class="badge {{ $order->status }}">{{ $labels[$order->status] }}</span></div><small>{{ $boardItems->get($order->id,collect())->sum('quantity') }} itens · {{ $order->mode==='delivery'?'Entrega':'Retirada' }} · {{ Illuminate\Support\Carbon::parse($order->created_at)->timezone('America/Sao_Paulo')->format('d/m H:i') }}</small><span class="order-payment">{{ $order->payment_status==='paid'?'Recebido':'Recebimento pendente' }}</span></div>
+    <strong class="order-amount">R$ {{ number_format($order->total_cents/100,2,',','.') }}</strong>
+    <div class="order-actions"><a class="button secondary" href="/orders/{{ $order->id }}">Ver pedido</a>@if(isset(['pending'=>1,'accepted'=>1,'preparing'=>1,'ready'=>1][$order->status]))<form action="/orders/{{ $order->id }}/status" method="post">@csrf<input type="hidden" name="status" value="{{ ['pending'=>'accepted','accepted'=>'preparing','preparing'=>'ready','ready'=>'completed'][$order->status] }}"><button @disabled(($order->status==='accepted' && !app(App\Services\OrderScheduling::class)->canPrepare($order)) || (app(App\Services\OnlinePayment::class)->isOnline($order) && $order->payment_status!=='paid')) class="{{ $order->status==='pending'?'':'outline' }}">{{ ['pending'=>'Aceitar','accepted'=>'Preparar','preparing'=>'Marcar como pronto','ready'=>'Concluir'][$order->status] }}</button></form>@endif</div>
+    <details class="order-more"><summary>Itens e outras ações</summary><div class="order-more-content"><div>@foreach($boardItems->get($order->id,collect()) as $item)<p><strong>{{ $item->quantity }} × {{ $item->name }}</strong>@foreach(json_decode($item->options??'[]',true) as $option)<br><span class="muted">{{ $option['group'] }}: {{ $option['name'] }}</span>@endforeach</p>@endforeach<p class="muted">{{ $order->phone }}</p></div><div>
+    @if(!in_array($order->status,['cancelled','completed']))
+        @if($order->payment_status!=='paid' && !app(App\Services\OnlinePayment::class)->isOnline($order))<form action="/orders/{{ $order->id }}/paid" method="post">@csrf<button class="secondary">Registrar recebido</button></form>@endif
+        <details><summary>Cancelar pedido</summary><form action="/orders/{{ $order->id }}/status" method="post">@csrf<input type="hidden" name="status" value="cancelled"><label>Motivo<textarea name="cancellation_reason" required maxlength="500"></textarea></label><button class="secondary">Confirmar cancelamento</button></form></details>
+    @endif
+    @if($order->status==='ready'&&$order->mode==='delivery'&&$tenant->courier_module==='active')<details><summary>Solicitar motoboy freelancer</summary><form action="/orders/{{ $order->id }}/dispatch" method="post">@csrf<label>Distância de rota em metros (tarifa/km)<input name="route_meters" type="number" min="1"></label><label>Cotação (R$) (por corrida)<input name="fare" type="text" inputmode="decimal"></label><button>Despachar</button></form></details>@endif
+    </div></div></details>
+</article>
+@empty<div class="empty orders-empty">@include('partials.icon',['name'=>'orders'])<h3>Nenhum pedido neste filtro</h3><p>Os novos pedidos aparecerão aqui automaticamente.</p></div>@endforelse
+</div>
+<div class="pagination-bar"><span>{{ $boardOrders->total() }} pedidos · página {{ $boardOrders->currentPage() }} de {{ max(1,$boardOrders->lastPage()) }}</span><div class="actions">@if($boardOrders->previousPageUrl())<a class="button secondary" href="{{ $boardOrders->previousPageUrl() }}#pedidos">← Anterior</a>@endif @if($boardOrders->nextPageUrl())<a class="button secondary" href="{{ $boardOrders->nextPageUrl() }}#pedidos">Próxima →</a>@endif</div></div>
