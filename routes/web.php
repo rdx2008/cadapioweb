@@ -46,7 +46,7 @@ Route::post('/pedido/{id}/pagar', [PaymentController::class, 'pay'])->middleware
 Route::post('/pedido/{id}/consultar-pagamento', [PaymentController::class, 'check'])->middleware('throttle:8,1');
 Route::get('/pedido/{id}/status', [MenuController::class, 'status'])->middleware('throttle:60,1');
 Route::get('/media/products/{id}', [CatalogController::class, 'photo']);
-Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])->whereIn('kind', ['logo', 'cover']);
+Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])->whereIn('kind', ['logo', 'cover'])->name('stores.branding');
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);

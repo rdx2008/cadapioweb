@@ -703,3 +703,9 @@ Dinheiro declarado no retorno exige conferência do pagamento antes de nova busc
 Novas corridas exigem seis dígitos gerados na coleta e mostrados no acompanhamento do cliente. O motoboy informa o código ao concluir; pagamento continua sujeito às regras de recebimento. Segredo criptografado, limite de tentativas, validação da rodada e transação preservam reserva/valores nas falhas. Conclusão apaga o segredo e registra verificação; retorno oculta e nova tentativa renova. Corridas anteriores à migration mantêm o fluxo anterior. Quem possui o link do pedido acessa o acompanhamento; não há envio por SMS ou validação de identidade.
 
 Proprietário recebe contador e atalhos de ocorrências abertas por consulta periódica de 15 segundos, com som opcional mediante clique. Resolução atualiza o contador, aba oculta pausa e acesso revogado limpa a tela. Avisos dependem do painel aberto; push, WebSocket e funcionamento garantido em segundo plano continuam para etapa posterior. Piloto físico e concorrência PostgreSQL seguem necessários antes de considerar a logística completa.
+
+### 17.13. Organização das configurações da loja
+
+Configurações agrupadas em dados, endereço/localização, entrega/frete, pagamentos presenciais e online, aparência, horários/feriados, agendamentos e remuneração do motoboy freelancer. Menu interno à direita no computador e navegação horizontal no celular; links preservam acesso às seções anteriores. Cada assunto tem salvamento independente, preservando as demais configurações e as regras de validação existentes. Busca automática de endereço permanece disponível.
+
+Navegação não descarta campos. Alterações pendentes são sinalizadas, com aviso ao sair ou salvar outro assunto; erro de preenchimento mantém os dados submetidos e leva ao formulário correspondente. Cadastro inicial da loja, credenciais e infraestrutura de pagamentos/geolocalização mantêm os fluxos existentes.

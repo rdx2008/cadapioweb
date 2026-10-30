@@ -181,8 +181,19 @@ class CatalogController extends Controller
     public function updateStore(Request $request, int $id): RedirectResponse
     {
         $store = $this->store($id);
-        MoneyInput::normalize($request, ['minimum_order' => 'minimum_order_cents', 'base_fare' => 'base_cents', 'per_km_fare' => 'per_km_cents', 'minimum_fare' => 'minimum_cents']);
-        $data = $request->validate([
+        $sections = [
+            'dados' => ['name', 'slug', 'open', 'minimum_order_cents'],
+            'endereco' => ['address', 'latitude', 'longitude'],
+            'aparencia' => ['logo', 'cover'],
+            'horarios' => ['timezone', 'use_hours', 'hours'],
+            'agendamentos' => ['scheduling_enabled', 'scheduling_lead_minutes', 'scheduling_prep_minutes', 'scheduling_days'],
+            'pagamentos' => ['accepts_cash', 'accepts_card', 'accepts_pix'],
+            'motoboy' => ['rate_mode', 'base_cents', 'per_km_cents', 'minimum_cents'],
+        ];
+        $section = $request->validate(['settings_section' => ['nullable', Rule::in(array_keys($sections))]])['settings_section'] ?? null;
+        $money = ['minimum_order' => 'minimum_order_cents', 'base_fare' => 'base_cents', 'per_km_fare' => 'per_km_cents', 'minimum_fare' => 'minimum_cents'];
+        MoneyInput::normalize($request, $section ? array_filter($money, fn ($field) => in_array($field, $sections[$section], true)) : $money);
+        $rules = [
             'name' => 'required|string|max:100', 'slug' => ['required', 'alpha_dash:ascii', 'max:100', Rule::unique('stores')->ignore($id)],
             'address' => 'required|string|max:240', 'latitude' => 'required|numeric|between:-90,90', 'longitude' => 'required|numeric|between:-180,180',
             'open' => 'required|boolean', 'timezone' => ['required', Rule::in(timezone_identifiers_list())], 'minimum_order_cents' => 'required|integer|min:0|max:1000000',
@@ -200,35 +211,43 @@ class CatalogController extends Controller
             'cover' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'rate_mode' => 'required|in:fixed,per_km,per_ride', 'base_cents' => 'required|integer|min:0|max:100000',
             'per_km_cents' => 'required|integer|min:0|max:100000', 'minimum_cents' => 'required|integer|min:0|max:100000',
-        ]);
-        if (($data['scheduling_prep_minutes'] ?? $store->scheduling_prep_minutes) > ($data['scheduling_lead_minutes'] ?? $store->scheduling_lead_minutes)) {
-            throw ValidationException::withMessages(['scheduling_lead_minutes' => 'A antecedência mínima deve ser igual ou maior que o tempo de preparo.']);
+        ];
+        if ($section) {
+            $rules = array_filter($rules, fn ($field) => in_array(explode('.', $field)[0], $sections[$section], true), ARRAY_FILTER_USE_KEY);
+            $rules = array_map(fn ($rule) => is_string($rule) ? str_replace('sometimes|', 'required|', $rule) : $rule, $rules);
         }
-        ksort($data['hours']);
-        if (! ($data['accepts_cash'] ?? $store->accepts_cash) && ! ($data['accepts_card'] ?? $store->accepts_card) && ! ($data['accepts_pix'] ?? $store->accepts_pix) && app(OnlinePayment::class)->accounts($store->id)->isEmpty()) {
-            throw ValidationException::withMessages(['accepts_cash' => 'Mantenha pelo menos uma forma de pagamento disponível.']);
+        $data = $request->validate($rules);
+        if (isset($data['hours'])) {
+            ksort($data['hours']);
+            $data['weekly_hours'] = $data['use_hours'] ? json_encode(array_values($data['hours']), JSON_THROW_ON_ERROR) : null;
+            unset($data['hours'], $data['use_hours']);
         }
-        $data['weekly_hours'] = $data['use_hours'] ? json_encode(array_values($data['hours']), JSON_THROW_ON_ERROR) : null;
-        unset($data['hours'], $data['use_hours']);
         unset($data['logo'], $data['cover']);
         $uploads = [];
         foreach (['logo', 'cover'] as $kind) {
-            if ($request->hasFile($kind)) {
+            if ((! $section || $section === 'aparencia') && $request->hasFile($kind)) {
                 $uploads[] = $data[$kind.'_path'] = $request->file($kind)->store('tenants/'.$store->tenant_id.'/stores', 'local');
             }
         }
         try {
-            DB::transaction(function () use ($store, $data) {
-                DB::table('stores')->where('id', $store->id)->lockForUpdate()->first();
+            DB::transaction(function () use ($store, $data, $section) {
+                $store = DB::table('stores')->where('id', $store->id)->lockForUpdate()->firstOrFail();
+                if ((! $section || $section === 'agendamentos') && ($data['scheduling_prep_minutes'] ?? $store->scheduling_prep_minutes) > ($data['scheduling_lead_minutes'] ?? $store->scheduling_lead_minutes)) {
+                    throw ValidationException::withMessages(['scheduling_lead_minutes' => 'A antecedência mínima deve ser igual ou maior que o tempo de preparo.']);
+                }
+                if ((! $section || $section === 'pagamentos') && ! ($data['accepts_cash'] ?? $store->accepts_cash) && ! ($data['accepts_card'] ?? $store->accepts_card) && ! ($data['accepts_pix'] ?? $store->accepts_pix) && app(OnlinePayment::class)->accounts($store->id)->isEmpty()) {
+                    throw ValidationException::withMessages(['accepts_cash' => 'Mantenha pelo menos uma forma de pagamento disponível.']);
+                }
+
                 DB::table('stores')->where('id', $store->id)->update($data + ['updated_at' => now()]);
-                Audit::record('store.updated', ['store_id' => $store->id], $store->tenant_id);
+                Audit::record('store.updated', ['store_id' => $store->id, 'section' => $section], $store->tenant_id);
             });
         } catch (\Throwable $exception) {
             Storage::disk('local')->delete($uploads);
             throw $exception;
         }
 
-        return back()->with('success', 'Loja e horários atualizados.');
+        return ($section ? redirect(route('stores.edit', $id).'#'.$section) : back())->with('success', 'Configurações da loja salvas.');
     }
 
     public function availability(Request $request, int $id): RedirectResponse

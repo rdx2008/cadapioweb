@@ -2,7 +2,7 @@
 @foreach(['infinitepay'=>'InfinitePay','pagbank'=>'PagSeguro / PagBank'] as $provider=>$label)
 @php($account=Illuminate\Support\Facades\DB::table('store_payment_accounts')->where('store_id',$store->id)->where('provider',$provider)->select('provider','environment','handle','enabled')->first())
 @php($enabled=$account?->enabled && $account->environment==='production')
-<details><summary>{{ $label }} · {{ $enabled?'Habilitado':'Desabilitado' }}</summary><form action="{{ route('payments.configure',[$store->id,$provider]) }}" method="post" class="fields">@csrf
+<details @if(old('payment_provider')===$provider) open @endif><summary>{{ $label }} · {{ $enabled?'Habilitado':'Desabilitado' }}</summary><form action="{{ route('payments.configure',[$store->id,$provider]) }}" method="post" class="fields">@csrf<input type="hidden" name="payment_provider" value="{{ $provider }}">
 <label>Receber pagamentos<select name="enabled"><option value="0" @selected(!$enabled)>Desabilitado</option><option value="1" @selected($enabled)>Habilitado</option></select></label>
 @if($provider==='infinitepay')<label>InfiniteTag (sem $)<input name="handle" value="{{ $account?->handle }}" maxlength="100" required autocomplete="off" placeholder="Ex.: minha-loja"></label>
 @else

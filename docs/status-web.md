@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Configurações da loja organizadas por assunto — 29/10/2026
+
+Lojas > Configurar mantém a identidade visual existente e organiza dados da loja, endereço/localização, entrega/frete, pagamentos, aparência, horários/feriados, agendamentos e motoboy freelancer. Menu interno fica à direita no computador e vira navegação horizontal no celular; seção em leitura é destacada, com links reais e suporte aos antigos #delivery-settings, #special-hours e #online-payments. Todos os pagamentos ficam adjacentes: entrega/retirada, InfinitePay e PagBank. Aparência mostra logo/capa atuais quando cadastrados.
+
+Cada assunto principal tem formulário e salvamento independente, usando settings_section com lista explícita de campos permitidos. Dados de outros assuntos enviados junto são ignorados; regras de pagamento disponível, agendamento e endereço permanecem. Horários/agendamentos/pagamentos não são apagados ao salvar outra seção. Validações de pagamento e agendamento são conferidas com a loja bloqueada na transação. O endpoint completo anterior continua compatível. Frete/regiões, datas especiais e provedores mantêm seus formulários e regras existentes; salvar provedor retorna para #online-payments. Busca de CEP/geocodificação permanece no formulário de endereço.
+
+Alterações pendentes são sinalizadas no formulário e menu. Navegar entre seções mantém os campos; sair da página com alterações aciona aviso do navegador. Salvar um assunto enquanto outro tem alterações pede confirmação antes de descartá-las. Erros mantêm valores submetidos, abrem detalhes relevantes e levam à seção correspondente. Segredo PagBank continua fora do old input, sem exibir credencial salva. Esta entrega reorganiza configuração da loja existente; cadastro inicial de loja e infraestrutura geográfica não foram alterados.
+
+Validação: 234 testes PHP aprovados (235 no total, um download externo opcional ignorado), 27 JavaScript aprovados, Pint e compilação de templates/rotas. Seis casos novos verificam salvamento parcial, isolamento de tenant/campos, pagamentos, endereço, horários/agendamento e imagem existente; quatro testes JS cobrem navegação, erro, alterações pendentes e interceptação da busca de endereço. Chrome local em 1440 e 390 px: menu à direita, agrupamento de pagamentos, salvamento presencial, erro de agendamento com retorno à seção e preservação dos valores, correção e navegação móvel; sem erro JavaScript ou transbordamento. Sem migration ou dependência nova. Nenhuma alteração em produção.
+
 ## Código de entrega e alertas no painel — 29/10/2026
 
 Novas corridas criadas pelo despacho da loja exigem código de seis dígitos para concluir; corridas anteriores à migration mantêm a regra existente. A coleta gera um segredo aleatório criptografado, mostrado no acompanhamento do cliente somente durante a entrega. Não é renderizado no painel do motoboy/proprietário, feeds internos ou auditoria; o código informado também não é gravado no old input da sessão. O acompanhamento usa o link secreto do pedido, não autenticação por SMS nem prova de identidade. Página sem cache e com no-referrer. Guarde a APP_KEY existente no deploy para preservar a criptografia.

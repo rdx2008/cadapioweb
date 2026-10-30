@@ -60,7 +60,7 @@ class PaymentController extends Controller
             Audit::record('payment.account.updated', ['store_id' => $store->id, 'provider' => $provider, 'environment' => $data['environment'], 'enabled' => (bool) $data['enabled']], $store->tenant_id);
         });
 
-        return back()->with('success', 'Configuração de pagamento salva.');
+        return redirect(route('stores.edit', $id).'#online-payments')->with('success', 'Configuração de pagamento salva.');
     }
 
     public function pay(string $id, OnlinePayment $payments): RedirectResponse
