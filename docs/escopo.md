@@ -709,3 +709,8 @@ Proprietário recebe contador e atalhos de ocorrências abertas por consulta per
 Configurações agrupadas em dados, endereço/localização, entrega/frete, pagamentos presenciais e online, aparência, horários/feriados, agendamentos e remuneração do motoboy freelancer. Menu interno à direita no computador e navegação horizontal no celular; links preservam acesso às seções anteriores. Cada assunto tem salvamento independente, preservando as demais configurações e as regras de validação existentes. Busca automática de endereço permanece disponível.
 
 Navegação não descarta campos. Alterações pendentes são sinalizadas, com aviso ao sair ou salvar outro assunto; erro de preenchimento mantém os dados submetidos e leva ao formulário correspondente. Cadastro inicial da loja, credenciais e infraestrutura de pagamentos/geolocalização mantêm os fluxos existentes.
+### 17.14. Extrato de entregas e acertos
+
+Relatório de corridas concluídas e tentativas encerradas para cada tenant e para o próprio motoboy. Período por data de encerramento, fuso, loja, motoboy e situação atual do acerto; paginação e exportação CSV completa. Remuneração bruta, numerário da corrida e dinheiro declarado nas tentativas são separados, sem duplicar corrida devolvida ou compensar valores automaticamente. Não altera pagamentos, repasses ou registros de acerto.
+
+Histórico próprio do motoboy permanece disponível após reatribuição ou suspensão da empresa, sem expor clientes ou registros de outros entregadores. CSV protege campos textuais contra interpretação como fórmulas. Confirmações externas continuam nos detalhes autorizados de cada registro. Não é fechamento contábil por data do pagamento: o filtro considera encerramento e mostra o estado atual do acerto.

@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Extrato consolidado de entregas e acertos — 29/10/2026
+
+Loja acessa em Entregas > Extrato e acertos; motoboy tem Meu extrato e acertos no painel. Relatório reúne somente corridas concluídas e tentativas encerradas, contando cada remuneração uma vez. Corrida devolvida/liberada em si não é somada como nova obrigação: são usados os snapshots de suas tentativas. Remuneração, remuneração bruta ainda sem acerto, numerário previsto das corridas concluídas e dinheiro declarado nas tentativas ficam separados, sem compensação ou transferência automática. Valores e estados originais não são alterados ao consultar/exportar.
+
+Filtros de período (até 366 dias, término até hoje), loja, motoboy para proprietário, situação atual de acerto e fuso. Data é de conclusão/encerramento, não criação do pedido nem data do acerto. Legado sem completed_at usa updated_at e, na falta deste, created_at. Acertos são exibidos no estado atual, sem simular um fechamento contábil histórico. Tabela paginada em 30 registros; CSV exporta todas as páginas do filtro em lotes, com BOM UTF-8, separador ponto e vírgula e proteção de nomes que poderiam virar fórmulas no Excel. Exportações têm limite próprio de seis por minuto; consulta da tela permanece disponível.
+
+Proprietário consulta apenas sua empresa ativa; opções de motoboy exigem atividade vinculada à empresa. Motoboy consulta apenas seus registros, inclusive tentativas anteriores à troca, em qualquer loja para a qual trabalhou; não consegue trocar o driver_id pelo filtro. Histórico próprio continua disponível durante suspensão da empresa. Usuário bloqueado, equipe e superadmin não acessam este relatório. Não são exportados endereço/telefone/nome do cliente, descrições privadas, códigos ou credenciais. Os atalhos levam aos registros e confirmações manuais já existentes, com as autorizações anteriores.
+
+Verificação: 241 testes PHP aprovados (242 no total, um download externo opcional ignorado), 27 JavaScript aprovados, Pint, templates e rotas. Sete casos novos verificam totais sem duplicação, data/fuso/limites, filtros, troca de motoboy, suspensão/perfis, CSV com todas as páginas e fórmulas neutralizadas, limite de exportação e preservação dos acertos. Chrome local: acesso pela loja e pelo motoboy, filtros, CSV baixado e tela móvel em 390 px sem transbordamento ou erro JavaScript. Sem migration ou dependência nova; sem alteração em produção. PostgreSQL e piloto real continuam pendentes.
+
 ## Configurações da loja organizadas por assunto — 29/10/2026
 
 Lojas > Configurar mantém a identidade visual existente e organiza dados da loja, endereço/localização, entrega/frete, pagamentos, aparência, horários/feriados, agendamentos e motoboy freelancer. Menu interno fica à direita no computador e vira navegação horizontal no celular; seção em leitura é destacada, com links reais e suporte aos antigos #delivery-settings, #special-hours e #online-payments. Todos os pagamentos ficam adjacentes: entrega/retirada, InfinitePay e PagBank. Aparência mostra logo/capa atuais quando cadastrados.
@@ -319,7 +329,7 @@ Fundação funcional e parte do delivery inicial implementadas. As fases 0 e 1 d
 | Checkout | Revisão antes de confirmar, preços e adicionais no servidor, idempotência, regiões/frete e pedido mínimo; validação geográfica por raio implementada com API configurável, pendente de piloto; agendamento implementado; pagamento online pendente |
 | Pedidos e cozinha | Aceite, preparo, pronto, conclusão, filtros, paginação, detalhes privados, atualização automática e som ativável; faltam estações e ocorrências completas |
 | Freelancers | Cadastro global, aprovação, check-in, FIFO, oferta regional, aceite, coleta e conclusão; presença web automática, fila visível e ocorrências/comprovantes implementados; troca antes da coleta, retorno físico, acerto por tentativa, código do cliente e alertas no painel aberto também implementados; faltam piloto físico, concorrência PostgreSQL e segundo plano garantido (depende de app futuro) |
-| Tarifação e acerto | Três modos de cálculo e registro manual; distância de rota ainda é informada pela loja, sem mapas ou repasse automático |
+| Tarifação e acerto | Três modos de cálculo, registro manual e extrato consolidado por período/loja/motoboy com CSV; remuneração e dinheiro do cliente separados; distância de rota ainda informada pela loja, sem mapas ou repasse automático |
 | Evolution | Servidor central, chave criptografada, provisionamento QR e webhook; testes simulados. Falta homologação real, validar número conectado, reconectar/desconectar e envio confiável |
 | WABA | Apenas solicitação pendente, sem conexão oficial implementada |
 | Infraestrutura | Dockerfile/Compose e CI preparados; homologação Coolify e concorrência real PostgreSQL pendentes |

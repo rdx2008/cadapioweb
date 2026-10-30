@@ -1,7 +1,7 @@
 @extends('layout')
 @section('content')
 <div data-courier-workspace data-live-url="{{ route('courier.live') }}" data-heartbeat-url="{{ route('courier.heartbeat') }}" data-renew="{{ $presence['renew'] ? '1' : '0' }}" data-server-time="{{ now()->timestamp * 1000 }}">
-<div class="page-heading"><div><span class="dashboard-eyebrow">MOTOBOY FREELANCER</span><h1>Seu próximo destino.</h1><p>Disponibilidade, ofertas e suas entregas no mesmo lugar.</p></div></div>
+<div class="page-heading"><div><span class="dashboard-eyebrow">MOTOBOY FREELANCER</span><h1>Seu próximo destino.</h1><p>Disponibilidade, ofertas e suas entregas no mesmo lugar.</p></div><a class="button secondary" href="{{ route('delivery-statement.index') }}">Meu extrato e acertos</a></div>
 <div class="card"><div class="section-head"><h2 data-courier-presence>{{ $presence['label'] }}</h2><span class="pill" data-courier-queue>@if($presence['queue_position']){{ $presence['queue_position'] }}º de {{ $presence['queue_total'] }} na fila @else Sem posição na fila @endif</span></div>
 <p class="muted">A localização é renovada a cada 30 segundos com esta página visível. Após 90 segundos sem presença válida, novas ofertas ficam suspensas. Com a tela bloqueada ou o navegador fechado, o recebimento de ofertas não é garantido.</p>
 <p class="muted" data-courier-gps role="status">{{ $presence['renew'] ? 'Aguardando atualização da localização.' : 'Confirme sua disponibilidade para começar.' }}</p>
