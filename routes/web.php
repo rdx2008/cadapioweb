@@ -13,6 +13,7 @@ use App\Http\Controllers\DeliveryStatementController;
 use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderBoardController;
+use App\Http\Controllers\OrderPrintController;
 use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlatformController;
@@ -51,6 +52,8 @@ Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])-
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
+    Route::post('/orders/{id}/print-jobs', [OrderPrintController::class, 'prepare'])->whereNumber('id')->name('order-prints.prepare');
+    Route::get('/order-prints/{reference}', [OrderPrintController::class, 'show'])->whereUuid('reference')->name('order-prints.show');
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/delivery-statement', [DeliveryStatementController::class, 'index'])->name('delivery-statement.index');
     Route::get('/delivery-statement/export', [DeliveryStatementController::class, 'export'])->middleware('throttle:delivery-statement-export')->name('delivery-statement.export');

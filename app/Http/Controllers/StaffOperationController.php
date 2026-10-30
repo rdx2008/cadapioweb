@@ -70,7 +70,7 @@ class StaffOperationController extends Controller
         $user = $this->member($request);
         $order = $this->order($user, $id);
 
-        return view('staff.order', ['staff' => $user, 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $order->id)->get()]);
+        return view('staff.order', ['store' => DB::table('stores')->where('id', $order->store_id)->firstOrFail(), 'staff' => $user, 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $order->id)->get()]);
     }
 
     public function status(Request $request, int $id): RedirectResponse

@@ -28,4 +28,5 @@
 @if($order->payment_status==='review'&&$order->payment_method==='cash'&&$ride?->status==='returned'&&$order->status!=='cancelled')
 <section class="card"><h2>Conferir recebimento após a devolução</h2><p>Confira no histórico o dinheiro declarado pelo motoboy e os repasses. Registre a quitação somente quando tiver recebido o total de R$ {{ number_format($order->total_cents/100,2,',','.') }}. Recebimento parcial não quita o pedido.</p><form class="stack-form" method="post" action="/orders/{{ $order->id }}/paid">@csrf<label><span><input type="checkbox" required> Conferi o recebimento integral do pedido.</span></label><button>Confirmar pagamento integral recebido</button></form></section>
 @endif
+@include('partials.order-printing')
 @endsection
