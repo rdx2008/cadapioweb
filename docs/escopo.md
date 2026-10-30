@@ -719,3 +719,8 @@ Histórico próprio do motoboy permanece disponível após reatribuição ou sus
 Preparação de vias de produção e conferência com itens congelados do pedido, formatos 58/80 mm e A4 e diálogo nativo do navegador. Cozinha não recebe dados de contato ou preços; atendimento recebe valores, entrega e pagamento registrado. Snapshot criptografado e numeração por pedido/finalidade, histórico autorizado e auditoria da preparação permitem identificar outra via sem duplicar no reenvio do mesmo pedido de preparação.
 
 Impressão não altera estado, recebimento ou corrida e não é documento fiscal. Avisos de aceite/pagamento/agendamento/cancelamento acompanham a via. O servidor não confirma impressão física nem conta folhas geradas pelo diálogo; reabrir uma via preserva seu registro. Agente de impressão silenciosa, filas por estação, confirmação de hardware e piloto com impressoras físicas permanecem para etapa posterior.
+### 17.16. Tempos de produção
+
+Aceite, início de preparo e pedido pronto ganham horários persistidos, com histórico privado no fuso da loja. Meta interna de 1 a 240 minutos configurável nos dados da loja é congelada ao iniciar cada produção. Painéis de pedidos e cozinha exibem fila, preparo, duração concluída e destaque visual de atraso; agendados não acumulam fila antes do preparo previsto. Registros legados sem dados não recebem horários inventados.
+
+Contadores não avançam pedido, cobram ou despacham automaticamente; preservam bloqueios de agendamento/pagamento e escopo da equipe. Meta interna não substitui horário prometido ao cliente. Esta etapa não inclui estações, preparo por item, garantia de notificações em segundo plano ou produção iFood.

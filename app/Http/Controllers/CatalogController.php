@@ -182,7 +182,7 @@ class CatalogController extends Controller
     {
         $store = $this->store($id);
         $sections = [
-            'dados' => ['name', 'slug', 'open', 'minimum_order_cents'],
+            'dados' => ['name', 'slug', 'open', 'minimum_order_cents', 'preparation_target_minutes'],
             'endereco' => ['address', 'latitude', 'longitude'],
             'aparencia' => ['logo', 'cover'],
             'horarios' => ['timezone', 'use_hours', 'hours'],
@@ -194,6 +194,7 @@ class CatalogController extends Controller
         $money = ['minimum_order' => 'minimum_order_cents', 'base_fare' => 'base_cents', 'per_km_fare' => 'per_km_cents', 'minimum_fare' => 'minimum_cents'];
         MoneyInput::normalize($request, $section ? array_filter($money, fn ($field) => in_array($field, $sections[$section], true)) : $money);
         $rules = [
+            'preparation_target_minutes' => ['sometimes', 'integer', 'min:1', 'max:240'],
             'name' => 'required|string|max:100', 'slug' => ['required', 'alpha_dash:ascii', 'max:100', Rule::unique('stores')->ignore($id)],
             'address' => 'required|string|max:240', 'latitude' => 'required|numeric|between:-90,90', 'longitude' => 'required|numeric|between:-180,180',
             'open' => 'required|boolean', 'timezone' => ['required', Rule::in(timezone_identifiers_list())], 'minimum_order_cents' => 'required|integer|min:0|max:1000000',

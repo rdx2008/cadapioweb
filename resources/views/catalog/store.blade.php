@@ -21,6 +21,7 @@
     <label>Pedido mínimo em produtos (R$)<input name="minimum_order" type="text" inputmode="decimal" value="{{ old('minimum_order', number_format($store->minimum_order_cents/100,2,',','')) }}" required>
 </label>
 </div>
+<label>Meta interna de preparo (minutos)<input name="preparation_target_minutes" type="number" min="1" max="240" value="{{ old('preparation_target_minutes',$store->preparation_target_minutes) }}" required><small>Conta a partir de Iniciar preparo. Novas produções usam esta meta; pedidos em preparo mantêm a meta registrada.</small></label>
 <div class="actions"><button>Salvar dados da loja</button><span data-settings-save-status class="muted" role="status"></span></div></form></div></section>
 <section id="endereco" class="store-settings-section" data-settings-section><div class="card"><h2>Endereço e localização</h2><form action="/stores/{{ $store->id }}/edit" method="post" enctype="multipart/form-data">@csrf<input type="hidden" name="settings_section" value="endereco">
 @include('partials.store-address',['addressStore'=>$store])

@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Tempos de produção e meta interna — 30/10/2026
+
+Transições do pedido próprio registram aceite, início do preparo e pronto, na mesma transação do estado/auditoria. Meta interna configurável em Configurações da loja > Dados da loja, de 1 a 240 minutos, padrão 30. Ao iniciar o preparo, o pedido guarda a meta daquele momento: mudanças na loja valem apenas para novas produções. Meta é interna, distinta da antecedência de agendamento e do prazo combinado com o cliente.
+
+Painéis do proprietário e da equipe exibem fila/preparo, meta e atraso; detalhes mostram horários no fuso da loja e duração concluída. Contadores usam referência de tempo do servidor e relógio monotônico do navegador, atualizados a cada 30 segundos com página visível, incluindo retorno por histórico. Feeds existentes continuam atualizando estados. Agendado não conta fila antes de seu horário de preparo. Atraso é visual, não altera status, pagamento, disponibilidade ou despacho; não envia notificações em segundo plano. Marcar pronto congela o tempo de preparo. Cancelamento preserva horários já registrados e interrompe o contador.
+
+Migration: `2026_10_30_030910_add_order_production_times`. Horários antigos não são reconstruídos: legado sem dados mostra Não registrado/tempo não registrado. Cozinha continua sem valores ou contato do cliente, limitada a suas lojas; os bloqueios de agendamento e pagamento online permanecem. Fluxo por estação/por item e expedição detalhada continuam pendentes; este bloco não equivale a KDS completo nem inclui pedidos iFood.
+
+Validação: 254 testes PHP aprovados (255 no total, um download externo opcional ignorado), 30 JavaScript aprovados; Pint e templates/rotas. Seis testes PHP novos cobrem horários, meta congelada, atraso sem transição automática, agendamento/pagamento, cozinha por loja, legado/cancelamento, configuração e rollback. Três testes JavaScript cobrem cálculo com relógio do servidor, fila agendada, pausa, tempo concluído fixo e retomada. Chrome local: configurar meta > aceitar > iniciar preparo > mudar meta da loja > confirmar preservação no pedido > pronto > histórico móvel; sem erros JavaScript/transbordamento em 390 px. Sem nova dependência ou alteração em produção; concorrência PostgreSQL e piloto real permanecem pendentes.
+
 ## Vias de impressão pelo navegador — 29/10/2026
 
 Detalhes do pedido, no proprietário e na operação da equipe, oferecem Preparar via de impressão. Duas finalidades: produção/cozinha (itens, quantidades e opções, sem preços ou cliente) e conferência/atendimento (itens/valores finais, cliente, endereço de entrega, frete, pagamento registrado e troco previsto quando aplicável). Seleção de bobina 58 mm, 80 mm ou A4; botão explícito abre o diálogo nativo. Documento não fiscal. Não há impressão silenciosa, conexão direta com impressora, estações ou agente local nesta entrega.

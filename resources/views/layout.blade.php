@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','CadapioWeb · Sua operação conectada')</title><link rel="stylesheet" href="/app.css?v=7">@if(in_array(auth()->user()?->role,['owner','admin'],true))<link rel="stylesheet" href="/tenant-theme.css?v=2">@endif<script src="/app.js?v=9" defer></script><script src="/menu-cart.js?v=3" defer></script><script src="/menu.js?v=9" defer></script><script src="/store-address.js?v=1" defer></script>@stack('styles')</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','CadapioWeb · Sua operação conectada')</title><link rel="stylesheet" href="/app.css?v=7">@if(in_array(auth()->user()?->role,['owner','admin'],true))<link rel="stylesheet" href="/tenant-theme.css?v=2">@endif<script src="/app.js?v=9" defer></script><script src="/menu-cart.js?v=3" defer></script><script src="/menu.js?v=9" defer></script><script src="/store-address.js?v=1" defer></script><link rel="stylesheet" href="/production.css?v=1"><script src="/production.js?v=1" defer></script>@stack('styles')</head>
 <body><div class="shell">
 <aside class="sidebar">
     <a class="brand" href="/app">cadapio<span>web</span></a>

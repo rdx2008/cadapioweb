@@ -5,6 +5,7 @@
 
     <a class="order-number" href="/orders/{{ $order->id }}">#{{ $order->id }}</a>
     <div class="order-customer">@include('partials.payment-details',['payment'=>$order])
+@include('partials.production-timer')
 @if($scheduleLabel=app(App\Services\OrderScheduling::class)->label($order))<p class="badge">Agendado: {{ $scheduleLabel }}<br>Preparo a partir de {{ Illuminate\Support\Carbon::parse($order->prepare_at,'UTC')->timezone($order->scheduled_timezone)->format('d/m H:i') }}</p>@endif
 <div><strong>{{ $order->customer_name }}</strong> <span class="badge {{ $order->status }}">{{ $labels[$order->status] }}</span></div><small>{{ $boardItems->get($order->id,collect())->sum('quantity') }} itens · {{ $order->mode==='delivery'?'Entrega':'Retirada' }} · {{ Illuminate\Support\Carbon::parse($order->created_at)->timezone('America/Sao_Paulo')->format('d/m H:i') }}</small><span class="order-payment">{{ $order->payment_status==='paid'?'Recebido':'Recebimento pendente' }}</span></div>
     <strong class="order-amount">R$ {{ number_format($order->total_cents/100,2,',','.') }}</strong>

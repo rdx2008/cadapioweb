@@ -7,6 +7,7 @@ use App\Services\DashboardSummary;
 use App\Services\DispatchService;
 use App\Services\FareCalculator;
 use App\Services\OnlinePayment;
+use App\Services\OrderProduction;
 use App\Services\OrderScheduling;
 use App\Support\Audit;
 use App\Support\MoneyInput;
@@ -147,7 +148,8 @@ class PlatformController extends Controller
             abort_if($r->status === 'preparing' && ! app(OrderScheduling::class)->canPrepare($o), 409, 'Aguarde o horário previsto para iniciar o preparo deste pedido agendado.');
             abort_unless(in_array($r->status, $allowed[$o->status] ?? []), 409, 'Transição inválida.');
             abort_if(DB::table('rides')->where('order_id', $id)->whereIn('status', ['assigned', 'collected', 'returning'])->exists(), 409, 'Trate a corrida atribuída antes de alterar o pedido.');
-            DB::table('orders')->where('id', $id)->update(['status' => $r->status, 'cancellation_reason' => $r->status === 'cancelled' ? $r->cancellation_reason : null, 'updated_at' => now()]);
+            $production = app(OrderProduction::class)->transition($o, $r->status);
+            DB::table('orders')->where('id', $id)->update($production + ['status' => $r->status, 'cancellation_reason' => $r->status === 'cancelled' ? $r->cancellation_reason : null, 'updated_at' => now()]);
             if ($r->status === 'cancelled' && app(OnlinePayment::class)->isOnline($o)) {
                 DB::table('payment_attempts')->where('order_id', $id)->update(['needs_review' => true, 'message' => 'Pedido cancelado. Confira e trate eventual pagamento/estorno diretamente no provedor.', 'updated_at' => now()]);
                 if ($o->payment_status === 'paid') {
