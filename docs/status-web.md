@@ -2,6 +2,12 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Indicadores de produção no BI — 31/10/2026
+
+BI do proprietário e superadmin agora mostra tempo médio de preparo, percentual dentro da meta, produções medidas e pedidos prontos/concluídos sem medição válida. Usa os mesmos filtros de empresa, loja e data de criação do relatório. Considera prontos/concluídos independentemente do pagamento; exclui cancelados e preparos em andamento. Meta é o snapshot registrado no pedido; configuração atual não reescreve o passado. Horários ausentes/invertidos ficam fora da média, e somente produções com meta positiva entram no percentual. Sem dados exibe Sem dados, sem transformar ausência em zero minutos. Não representa prazo de entrega. CSV diário de vendas permanece com sua finalidade financeira.
+
+Validação: testes de cálculo, limite exato da meta, duração zero, legado, horários invertidos, cancelados, preparo ativo e filtros por empresa/loja/data; testes de BI existentes. Suíte completa: 256 testes PHP aprovados e um teste externo opcional ignorado; 30 testes JavaScript aprovados; Pint e compilação Blade concluídos. Sem migration ou dependência nova.
+
 ## Tempos de produção e meta interna — 30/10/2026
 
 Transições do pedido próprio registram aceite, início do preparo e pronto, na mesma transação do estado/auditoria. Meta interna configurável em Configurações da loja > Dados da loja, de 1 a 240 minutos, padrão 30. Ao iniciar o preparo, o pedido guarda a meta daquele momento: mudanças na loja valem apenas para novas produções. Meta é interna, distinta da antecedência de agendamento e do prazo combinado com o cliente.

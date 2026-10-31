@@ -724,3 +724,6 @@ Impressão não altera estado, recebimento ou corrida e não é documento fiscal
 Aceite, início de preparo e pedido pronto ganham horários persistidos, com histórico privado no fuso da loja. Meta interna de 1 a 240 minutos configurável nos dados da loja é congelada ao iniciar cada produção. Painéis de pedidos e cozinha exibem fila, preparo, duração concluída e destaque visual de atraso; agendados não acumulam fila antes do preparo previsto. Registros legados sem dados não recebem horários inventados.
 
 Contadores não avançam pedido, cobram ou despacham automaticamente; preservam bloqueios de agendamento/pagamento e escopo da equipe. Meta interna não substitui horário prometido ao cliente. Esta etapa não inclui estações, preparo por item, garantia de notificações em segundo plano ou produção iFood.
+### 17.17. Eficiência da produção no BI
+
+Tempo médio entre início do preparo e pronto, percentual dentro da meta congelada do pedido e cobertura de medição nos mesmos filtros do BI. Somente prontos/concluídos com horários válidos entram na média; cancelados e preparos ativos ficam fora. Ausência de meta não entra no percentual, e ausência de dados não representa desempenho zero. Data do filtro é a criação do pedido; meta interna não representa prazo de entrega. Sem alteração de pagamentos ou estados.

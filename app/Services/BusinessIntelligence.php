@@ -63,11 +63,12 @@ class BusinessIntelligence
         $weekday = array_fill(0, 7, ['days' => 0, 'paid_cents' => 0, 'paid_orders' => 0, 'average_cents' => 0]);
         $hours = array_fill(0, 24, ['paid_orders' => 0, 'paid_cents' => 0]);
         $methods = $modes = $statuses = [];
+        $production = ['measured' => 0, 'seconds' => 0, 'with_target' => 0, 'on_time' => 0, 'without_measurement' => 0, 'average_minutes' => null, 'on_time_rate' => null];
         for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
             $daily[$date->toDateString()] = ['date' => $date->toDateString(), 'orders' => 0, 'paid_cents' => 0, 'paid_orders' => 0, 'previous_cents' => 0, 'new_tenants' => 0];
             $weekday[$date->dayOfWeek]['days']++;
         }
-        foreach ((clone $query)->select('orders.id', 'orders.created_at', 'orders.status', 'orders.payment_status', 'orders.total_cents', 'orders.mode', 'orders.payment_method')->lazyById(1000, 'orders.id', 'id') as $order) {
+        foreach ((clone $query)->select('orders.id', 'orders.created_at', 'orders.status', 'orders.payment_status', 'orders.total_cents', 'orders.mode', 'orders.payment_method', 'orders.preparation_started_at', 'orders.ready_at', 'orders.preparation_target_minutes')->lazyById(1000, 'orders.id', 'id') as $order) {
             $at = Carbon::parse($order->created_at, 'UTC')->timezone($timezone);
             $day = $at->toDateString();
             if (! isset($daily[$day])) {
@@ -75,6 +76,21 @@ class BusinessIntelligence
             }
             $daily[$day]['orders']++;
             $statuses[$order->status] = ($statuses[$order->status] ?? 0) + 1;
+            if (in_array($order->status, ['ready', 'completed'], true)) {
+                $seconds = $order->preparation_started_at && $order->ready_at
+                    ? Carbon::parse($order->preparation_started_at, 'UTC')->diffInSeconds(Carbon::parse($order->ready_at, 'UTC'), false)
+                    : -1;
+                if ($seconds >= 0) {
+                    $production['measured']++;
+                    $production['seconds'] += $seconds;
+                    if ($order->preparation_target_minutes > 0) {
+                        $production['with_target']++;
+                        $production['on_time'] += $seconds <= $order->preparation_target_minutes * 60 ? 1 : 0;
+                    }
+                } else {
+                    $production['without_measurement']++;
+                }
+            }
             if ($order->payment_status === 'paid' && $order->status !== 'cancelled') {
                 $amount = (int) $order->total_cents;
                 $daily[$day]['paid_cents'] += $amount;
@@ -119,6 +135,9 @@ class BusinessIntelligence
             }
         }
 
-        return compact('summary', 'previous', 'growth', 'daily', 'weekday', 'hours', 'methods', 'modes', 'statuses', 'products', 'storeRanking', 'companyRanking', 'platformStats', 'days', 'previousStart', 'start', 'end', 'timezone');
+        $production['average_minutes'] = $production['measured'] ? round($production['seconds'] / $production['measured'] / 60, 1) : null;
+        $production['on_time_rate'] = $production['with_target'] ? round(100 * $production['on_time'] / $production['with_target'], 1) : null;
+
+        return compact('summary', 'previous', 'growth', 'daily', 'weekday', 'hours', 'methods', 'modes', 'statuses', 'products', 'storeRanking', 'companyRanking', 'platformStats', 'days', 'previousStart', 'start', 'end', 'timezone', 'production');
     }
 }
