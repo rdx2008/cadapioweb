@@ -55,7 +55,11 @@ Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])-
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
+    Route::get('/pos/orders/{orderId}', [PosController::class, 'result'])->whereNumber('orderId')->name('pos.result');
+    Route::post('/pos/orders/{orderId}/dispatch', [PosController::class, 'dispatch'])->whereNumber('orderId')->middleware('throttle:10,1')->name('pos.dispatch');
     Route::get('/pos/{id}', [PosController::class, 'sale'])->whereNumber('id')->name('pos.sale');
+    Route::post('/pos/{id}/postcode', [PosController::class, 'postcode'])->whereNumber('id')->middleware('throttle:10,1')->name('pos.postcode');
+    Route::post('/pos/{id}/delivery', [PosController::class, 'delivery'])->whereNumber('id')->middleware('throttle:10,1')->name('pos.delivery');
     Route::post('/pos/{id}/review', [PosController::class, 'review'])->whereNumber('id')->middleware('throttle:30,1')->name('pos.prepare');
     Route::get('/pos/{id}/review/{key}', [PosController::class, 'preview'])->whereNumber('id')->whereUuid('key')->name('pos.review');
     Route::post('/pos/{id}/review/{key}/edit', [PosController::class, 'edit'])->whereNumber('id')->whereUuid('key')->name('pos.edit');

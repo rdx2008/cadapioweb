@@ -16,7 +16,8 @@ class DispatchService
 
     private function eligible(object $driver): bool
     {
-        return $driver->status === 'approved' && $driver->available && $driver->heartbeat_at && now()->subSeconds(90)->lte($driver->heartbeat_at) && $driver->accuracy !== null && $driver->accuracy <= 50;
+        return $driver->status === 'approved' && $driver->available && $driver->heartbeat_at && now()->subSeconds(90)->lte($driver->heartbeat_at) && $driver->accuracy !== null && $driver->accuracy <= 50
+            && DB::table('users')->where('id', $driver->user_id)->where('role', 'courier')->where('access_enabled', true)->exists();
     }
 
     public function dispatch(int $id): void
@@ -52,6 +53,25 @@ class DispatchService
             }
             $store = DB::table('stores')->find($ride->store_id);
             $seen = DB::table('offers')->where('ride_id', $id)->where('dispatch_round', $ride->dispatch_round)->pluck('driver_id');
+            if ($order->preferred_driver_id) {
+                $driver = DB::table('drivers')->where('id', $order->preferred_driver_id)->lockForUpdate()->first();
+                if ($driver && ! $seen->contains($driver->id) && $this->eligible($driver)
+                    && DB::table('users')->where('id', $driver->user_id)->where('access_enabled', true)->exists()
+                    && $driver->checkin_store_id === $store->id && is_numeric($driver->latitude) && is_numeric($driver->longitude)
+                    && self::distance($driver->latitude, $driver->longitude, $store->latitude, $store->longitude) <= 150) {
+                    DB::table('driver_claims')->where('driver_id', $driver->id)->whereNotNull('expires_at')->where('expires_at', '<=', now())->delete();
+                    if (! DB::table('driver_claims')->where('driver_id', $driver->id)->exists()) {
+                        DB::table('driver_claims')->insert(['driver_id' => $driver->id, 'ride_id' => $id, 'expires_at' => now()->addSeconds(30)]);
+                        $this->offer($id, $driver->id, 30, $ride->dispatch_round);
+                        DB::table('rides')->where('id', $id)->update(['status' => 'offered', 'updated_at' => now()]);
+
+                        return;
+                    }
+                }
+                DB::table('rides')->where('id', $id)->update(['status' => 'unassigned', 'updated_at' => now()]);
+
+                return;
+            }
             $queue = DB::table('drivers')->where('checkin_store_id', $store->id)->whereNotIn('id', $seen)->orderBy('checked_in_at')->orderBy('id')->get();
             if ($ride->status !== 'broadcast') {
                 foreach ($queue as $candidate) {

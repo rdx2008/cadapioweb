@@ -96,6 +96,11 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
             const product=products.find(product=>Number(product.dataset.productId)===line.productId);edit.disabled=!product;
             edit.addEventListener('click',()=>openProduct(product,line));
             const remove=document.createElement('button');remove.type='button';remove.className='bag-remove';remove.textContent='×';remove.setAttribute('aria-label','Remover '+line.name+' '+line.variantName);remove.addEventListener('click',()=>{cart.remove(line.id);update();});
+            if(form.hasAttribute('data-pos-cart')){
+                const stepper=document.createElement('div');stepper.className='pos-quantity';
+                for(const delta of [-1,1]){const button=document.createElement('button');button.type='button';button.textContent=delta<0?'-':'+';button.setAttribute('aria-label',(delta<0?'Diminuir ':'Aumentar ')+line.name);button.addEventListener('click',()=>{try{if(line.quantity+delta<1)cart.remove(line.id);else cart.save({...line,quantity:line.quantity+delta},line.id);update();}catch(error){cartMessage.textContent=error.message;}});stepper.append(button);if(delta<0){const qty=document.createElement('strong');qty.textContent=line.quantity;stepper.append(qty);}}
+                actions.prepend(stepper);
+            }
             actions.append(edit,remove);row.append(copy,actions);lines.append(row);
             appendInput(`cart_lines[${index}][product_id]`,line.productId);appendInput(`cart_lines[${index}][quantity]`,line.quantity);
             if(line.variantId)appendInput(`cart_lines[${index}][variant_id]`,line.variantId);
@@ -118,6 +123,7 @@ document.querySelectorAll('[data-menu-cart]').forEach(form => {
         form.querySelector('[data-mobile-total]').textContent=menuMoney(subtotal+(fee||0));
     }
 
+    form.addEventListener('pos-clear',()=>{cart.lines=[];editingId=null;update();});
     const paymentMethod=form.querySelector('[data-payment-method]'),cashChange=form.querySelector('[data-cash-change]');
     if(paymentMethod&&cashChange){
         const updatePayment=()=>{const cash=paymentMethod.value==='cash';cashChange.hidden=!cash;cashChange.querySelector('input').disabled=!cash;};

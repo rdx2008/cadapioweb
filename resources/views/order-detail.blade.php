@@ -3,7 +3,7 @@
 <div class="heading">
 <div class="eyebrow">Operação da loja</div>
 <h1>Pedido #{{ $order->id }}</h1>
-@if($order->source==='pos')<p class="badge">Venda no PDV · balcão / retirada</p>@endif
+@if($order->source==='pos')<p class="badge">Venda no PDV · {{ $order->mode==='delivery'?'Entrega':'Retirada' }}</p>@endif
 @include('partials.payment-details',['payment'=>$order])
 @if($scheduleLabel=app(App\Services\OrderScheduling::class)->label($order))<p class="badge">Agendado: {{ $scheduleLabel }}<br>Preparo a partir de {{ Illuminate\Support\Carbon::parse($order->prepare_at,'UTC')->timezone($order->scheduled_timezone)->format('d/m H:i') }}</p>@endif
 <a href="/dashboard#pedidos">← Voltar aos pedidos</a>
@@ -30,5 +30,6 @@
 <section class="card"><h2>Conferir recebimento após a devolução</h2><p>Confira no histórico o dinheiro declarado pelo motoboy e os repasses. Registre a quitação somente quando tiver recebido o total de R$ {{ number_format($order->total_cents/100,2,',','.') }}. Recebimento parcial não quita o pedido.</p><form class="stack-form" method="post" action="/orders/{{ $order->id }}/paid">@csrf<label><span><input type="checkbox" required> Conferi o recebimento integral do pedido.</span></label><button>Confirmar pagamento integral recebido</button></form></section>
 @endif
 @include('partials.production-timeline')
+@include('partials.pos-shortcut')
 @include('partials.order-printing')
 @endsection
