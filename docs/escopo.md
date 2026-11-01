@@ -727,3 +727,7 @@ Contadores não avançam pedido, cobram ou despacham automaticamente; preservam 
 ### 17.17. Eficiência da produção no BI
 
 Tempo médio entre início do preparo e pronto, percentual dentro da meta congelada do pedido e cobertura de medição nos mesmos filtros do BI. Somente prontos/concluídos com horários válidos entram na média; cancelados e preparos ativos ficam fora. Ausência de meta não entra no percentual, e ausência de dados não representa desempenho zero. Data do filtro é a criação do pedido; meta interna não representa prazo de entrega. Sem alteração de pagamentos ou estados.
+
+### 17.18. Fila dedicada de cozinha
+
+Proprietário e equipe autorizada acessam fila por loja e etapa, com contadores, itens/opções, tempos e bloqueios de preparo. Sem dados pessoais ou preços na fila. Aceitos aguardam início explícito; em preparo podem ficar prontos; atendimento continua responsável por conferência, entrega e retirada. Priorização por horário previsto de preparo/aceite, paginação e atualização periódica com página visível. Não inclui estações, tarefas por item ou pedidos iFood.

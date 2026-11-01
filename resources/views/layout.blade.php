@@ -11,9 +11,9 @@
         @php
         $nav = match(auth()->user()->role) {
             'admin' => [['/admin','home','Visão geral'],['/admin/bi','chart','BI e crescimento'],['/admin#empresas','users','Empresas'],['/admin#entregadores','truck','Entregadores'],['/admin#evolution','chat','WhatsApp central'],['/admin/ifood','store','Integração iFood']],
-            'staff' => [['/operation','orders','Minha operação']],
+            'staff' => [['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha']],
             'courier' => [['/courier','home','Meu painel'],['/courier#ofertas','truck','Ofertas de corrida'],['/courier#corridas','orders','Minhas corridas']],
-            default => [['/dashboard','home','Visão geral'],['/bi','chart','BI e crescimento'],['/dashboard#pedidos','orders','Pedidos'],['/catalog','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/deliveries','truck','Entregas'],['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood'],['/team','users','Equipe e acessos']],
+            default => [['/dashboard','home','Visão geral'],['/bi','chart','BI e crescimento'],['/dashboard#pedidos','orders','Pedidos'],['/kitchen','menu','Cozinha'],['/catalog','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/deliveries','truck','Entregas'],['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood'],['/team','users','Equipe e acessos']],
         };
         @endphp
         @foreach($nav as [$href,$icon,$label])<a href="{{ $href }}" data-nav-link>@include('partials.icon',['name'=>$icon])<span>{{ $label }}</span>@if($label==='Pedidos'&&isset($summary))<span class="nav-count" data-summary="pending">{{ $summary['pending'] }}</span>@endif</a>@endforeach

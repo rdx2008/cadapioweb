@@ -11,6 +11,7 @@ use App\Http\Controllers\DeliveryExceptionController;
 use App\Http\Controllers\DeliveryRecordController;
 use App\Http\Controllers\DeliveryStatementController;
 use App\Http\Controllers\IfoodController;
+use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderBoardController;
 use App\Http\Controllers\OrderPrintController;
@@ -52,6 +53,9 @@ Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])-
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
+    Route::get('/kitchen', [KitchenController::class, 'index'])->name('kitchen.index');
+    Route::get('/kitchen/live', [KitchenController::class, 'live'])->middleware('throttle:60,1')->name('kitchen.live');
+    Route::post('/kitchen/orders/{id}/status', [KitchenController::class, 'status'])->whereNumber('id')->middleware('throttle:30,1')->name('kitchen.status');
     Route::post('/orders/{id}/print-jobs', [OrderPrintController::class, 'prepare'])->whereNumber('id')->name('order-prints.prepare');
     Route::get('/order-prints/{reference}', [OrderPrintController::class, 'show'])->whereUuid('reference')->name('order-prints.show');
     Route::post('/logout', [AuthController::class, 'logout']);

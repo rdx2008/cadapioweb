@@ -1,0 +1,11 @@
+<div class="card"><div class="grid">@foreach(['accepted'=>'Aguardando preparo','preparing'=>'Em preparo','ready'=>'Prontos para conferência'] as $value=>$label)<a href="{{ route('kitchen.index',array_filter(['stage'=>$value,'store_id'=>$filters['store_id']??null])) }}" @if($stage===$value) aria-current="page" @endif>{{ $label }} <strong>{{ $counts[$value]??0 }}</strong></a>@endforeach</div></div>
+<div class="grid staff-order-grid">@forelse($orders as $order)<article class="card">
+<p class="muted">{{ $stores->firstWhere('id',$order->store_id)?->name }}</p><h2>Pedido #{{ $order->id }}</h2><p>{{ $order->mode==='delivery'?'Entrega':'Retirada' }}</p>
+@include('partials.production-timer')
+@if($scheduleLabel=app(App\Services\OrderScheduling::class)->label($order))<p class="badge">Agendado: {{ $scheduleLabel }}<br>Preparo a partir de {{ Illuminate\Support\Carbon::parse($order->prepare_at,'UTC')->timezone($order->scheduled_timezone)->format('d/m H:i') }}</p>@endif
+@foreach($items->get($order->id,collect()) as $item)<p><strong>{{ $item->quantity }} × {{ $item->name }}</strong>@foreach(json_decode($item->options??'[]',true) as $option)<br><small>{{ $option['group']??'' }}: {{ $option['name']??'' }}</small>@endforeach</p>@endforeach
+@if($blocked=app(App\Services\OnlinePayment::class)->isOnline($order)&&$order->payment_status!=='paid')<p class="notice">Aguardando confirmação do pagamento online. Não iniciar produção.</p>@endif
+@if(in_array($stage,['accepted','preparing'],true))<form action="{{ route('kitchen.status',$order->id) }}" method="post">@csrf<input type="hidden" name="status" value="{{ $stage==='accepted'?'preparing':'ready' }}"><button @disabled($blocked||($stage==='accepted'&&!app(App\Services\OrderScheduling::class)->canPrepare($order)))>{{ $stage==='accepted'?'Iniciar preparo':'Marcar como pronto' }}</button></form>@else<p class="notice">Pronto para conferência do atendimento. A entrega ou retirada deve ser tratada nos detalhes do pedido.</p>@endif
+<a class="subtle-link" href="{{ $user->role==='owner'?url('/orders/'.$order->id):url('/operation/orders/'.$order->id) }}">Detalhes e impressão →</a>
+</article>@empty<p class="empty">Nenhum pedido nesta etapa para as lojas selecionadas.</p>@endforelse</div>
+{{ $orders->withPath(route('kitchen.index'))->links() }}

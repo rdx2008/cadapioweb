@@ -2,6 +2,14 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Fila dedicada de cozinha — 31/10/2026
+
+Menu Cozinha para proprietário e equipe autorizada: filtro por loja/etapa, contadores de aguardando preparo, em preparo e prontos para conferência, itens/opções congelados do pedido, tempos e metas, agendamento e atalho para detalhes/impressão. Prioriza COALESCE(prepare_at, accepted_at, created_at), seguido de ID; paginação de 30. Não inclui pedidos pendentes de aceite, cancelados ou concluídos. Prontos permanecem até o atendimento tratar entrega/retirada. Não inclui estações ou conclusão por item.
+
+Tela e feed não mostram cliente, endereço, telefone ou preços. Escopo e acesso são conferidos novamente no banco a cada requisição; equipe somente nas lojas atribuídas e empresa ativa. Ações aceitam apenas iniciar preparo/marcar pronto, delegando às mesmas transações/auditoria e bloqueios de pagamento/agendamento/corrida existentes. Não aceita/cancela pedidos nem registra recebimento. Feed reaproveita consulta a cada cinco segundos com página visível, preserva interação em andamento e limpa dados quando acesso é revogado. Sem garantia de alertas em segundo plano.
+
+Validação: cinco testes específicos aprovados, incluindo privacidade, escopo, revogação, suspensão, horários, pagamentos, repetição, ordenação e paginação; regressão completa de 260 testes PHP aprovada e um teste externo opcional ignorado antes da inclusão do quinto teste, que passou separadamente. 30 testes JavaScript aprovados; Pint, templates e rotas compilados. Chrome local: fila e feed verificados em computador e celular de 390 px, sem erros JavaScript ou transbordamento. Sem migration/dependência nova. Piloto físico e concorrência PostgreSQL permanecem pendentes.
+
 ## Indicadores de produção no BI — 31/10/2026
 
 BI do proprietário e superadmin agora mostra tempo médio de preparo, percentual dentro da meta, produções medidas e pedidos prontos/concluídos sem medição válida. Usa os mesmos filtros de empresa, loja e data de criação do relatório. Considera prontos/concluídos independentemente do pagamento; exclui cancelados e preparos em andamento. Meta é o snapshot registrado no pedido; configuração atual não reescreve o passado. Horários ausentes/invertidos ficam fora da média, e somente produções com meta positiva entram no percentual. Sem dados exibe Sem dados, sem transformar ausência em zero minutos. Não representa prazo de entrega. CSV diário de vendas permanece com sua finalidade financeira.
