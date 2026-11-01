@@ -2,6 +2,18 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## PDV inicial de balcão e retirada — 01/11/2026
+
+Menu PDV para proprietário e equipe com perfil operador nas lojas atribuídas. Catálogo, busca/categorias, sacola editável, variações, sabores de pizza, adicionais e combos reaproveitam os componentes e o cálculo do canal próprio. Catálogo foi extraído para MenuCatalog e parcial compartilhada, preservando o cardápio público. Identificação/telefone opcionais; telefone ausente não cria cliente fictício no BI. Venda interna é imediata e sem frete, independente do horário online e do pedido mínimo online; produtos pausados e formas de pagamento desabilitadas continuam bloqueados. Delivery e agendamento não fazem parte deste PDV inicial.
+
+Fluxo: montar > revisar > confirmar, com retorno para editar preservando sacola e recebimento. Somente dinheiro, Pix e cartão presenciais; operador escolhe pagamento pendente ou recebido manualmente. Troco validado no servidor e exibido na revisão. Não cobra/consulta banco ou maquininha e não cria pagamento online. Venda nasce aceita, com horário de aceite, origem pos e usuário autor, seguindo para a fila da cozinha. Cozinha/detalhes/impressão e BI existentes recebem o pedido; o BI inclui vendas pagas do PDV, inclusive ainda em preparo, conforme sua regra de venda paga. Cancelamento mantém o fluxo existente e não representa estorno.
+
+Rascunho de sessão limitado a usuário/loja e 30 minutos; confirmação confere hash da revisão, catálogo e regras atuais dentro da transação. Mudança de preço exige nova revisão; reenvio do mesmo UUID retorna a mesma venda do autor sem duplicar itens/recebimento. Reconfere empresa ativa, perfil e lojas no banco; cozinha, courier e admin não acessam. Origem e autoria ficam no pedido e evento pos.sale; falha de auditoria reverte pedido/itens. Páginas do PDV usam private/no-store.
+
+Migration: 2026_11_01_030421_add_point_of_sale_origin_to_orders. Pedidos anteriores recebem origem menu e autoria nula. Ainda sem caixa por turno, abertura/fechamento, sangrias, suprimentos, conciliação de caixa, divisão de pagamento, TEF ou documento fiscal; essas são etapas seguintes e não estão implícitas no recebimento manual.
+
+Validação: regressão completa com 267 testes PHP aprovados e um download externo opcional ignorado; sete testes específicos do PDV aprovados após incluir o cenário adicional de variações/adicionais e ajustar cabeçalhos privados. 30 testes JavaScript aprovados; Pint, templates e rotas compilados. Chrome local: produto > sacola > revisão > editar preservando dados > confirmar > detalhes, em computador e 390 px, sem erros JS/transbordamento. Prévia em outputs/pdv-frente-caixa.png, pdv-revisao.png e pdv-mobile.png. Sem nova dependência, cobrança externa ou alteração em produção. Piloto real e concorrência PostgreSQL pendentes.
+
 ## Fila dedicada de cozinha — 31/10/2026
 
 Menu Cozinha para proprietário e equipe autorizada: filtro por loja/etapa, contadores de aguardando preparo, em preparo e prontos para conferência, itens/opções congelados do pedido, tempos e metas, agendamento e atalho para detalhes/impressão. Prioriza COALESCE(prepare_at, accepted_at, created_at), seguido de ID; paginação de 30. Não inclui pedidos pendentes de aceite, cancelados ou concluídos. Prontos permanecem até o atendimento tratar entrega/retirada. Não inclui estações ou conclusão por item.

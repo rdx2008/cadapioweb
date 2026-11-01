@@ -18,6 +18,7 @@ use App\Http\Controllers\OrderPrintController;
 use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlatformController;
+use App\Http\Controllers\PosController;
 use App\Http\Controllers\StaffOperationController;
 use App\Http\Controllers\StoreAddressController;
 use App\Http\Controllers\TeamController;
@@ -53,6 +54,12 @@ Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])-
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
+    Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
+    Route::get('/pos/{id}', [PosController::class, 'sale'])->whereNumber('id')->name('pos.sale');
+    Route::post('/pos/{id}/review', [PosController::class, 'review'])->whereNumber('id')->middleware('throttle:30,1')->name('pos.prepare');
+    Route::get('/pos/{id}/review/{key}', [PosController::class, 'preview'])->whereNumber('id')->whereUuid('key')->name('pos.review');
+    Route::post('/pos/{id}/review/{key}/edit', [PosController::class, 'edit'])->whereNumber('id')->whereUuid('key')->name('pos.edit');
+    Route::post('/pos/{id}/review/{key}/confirm', [PosController::class, 'confirm'])->whereNumber('id')->whereUuid('key')->middleware('throttle:20,1')->name('pos.confirm');
     Route::get('/kitchen', [KitchenController::class, 'index'])->name('kitchen.index');
     Route::get('/kitchen/live', [KitchenController::class, 'live'])->middleware('throttle:60,1')->name('kitchen.live');
     Route::post('/kitchen/orders/{id}/status', [KitchenController::class, 'status'])->whereNumber('id')->middleware('throttle:30,1')->name('kitchen.status');

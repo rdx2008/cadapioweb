@@ -731,3 +731,7 @@ Tempo médio entre início do preparo e pronto, percentual dentro da meta congel
 ### 17.18. Fila dedicada de cozinha
 
 Proprietário e equipe autorizada acessam fila por loja e etapa, com contadores, itens/opções, tempos e bloqueios de preparo. Sem dados pessoais ou preços na fila. Aceitos aguardam início explícito; em preparo podem ficar prontos; atendimento continua responsável por conferência, entrega e retirada. Priorização por horário previsto de preparo/aceite, paginação e atualização periódica com página visível. Não inclui estações, tarefas por item ou pedidos iFood.
+
+### 17.19. PDV inicial de balcão/retirada
+
+Tela interna para proprietário e operador autorizado por loja, catálogo compartilhado com adicionais/variações/pizza/combos, sacola e revisão explícita. Registra venda aceita para cozinha, origem e autoria, dinheiro/Pix/cartão presenciais com recebimento manual explícito e troco. Sem frete ou agendamento; horário e pedido mínimo online não limitam a venda interna autorizada. Cálculo no servidor, revalidação na confirmação, rascunho por usuário/loja, prevenção de duplicação e auditoria transacional. Não inclui abertura/fechamento de caixa, sangrias/suprimentos, TEF, divisão de pagamento ou emissão fiscal.

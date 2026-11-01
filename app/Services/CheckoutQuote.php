@@ -10,10 +10,10 @@ class CheckoutQuote
 {
     public function __construct(private StoreAvailability $availability) {}
 
-    public function calculate(object $store, array $draft): array
+    public function calculate(object $store, array $draft, bool $pointOfSale = false): array
     {
         $this->require(app(TenantState::class)->active($store->tenant_id), 'Esta empresa não está recebendo novos pedidos.');
-        $schedule = app(OrderScheduling::class)->quote($store, $draft['scheduled_for'] ?? null);
+        $schedule = $pointOfSale ? ['scheduled_at' => null, 'prepare_at' => null, 'scheduled_timezone' => null] : app(OrderScheduling::class)->quote($store, $draft['scheduled_for'] ?? null);
         $this->require(! str_starts_with($draft['payment_method'] ?? '', 'online_') || ! $schedule['prepare_at'] || Carbon::parse($schedule['prepare_at'], 'UTC')->gte(now()->addMinutes(10)), 'Escolha um horário que permita pelo menos 10 minutos para o pagamento online antes do preparo.');
         $lines = [];
         $subtotal = 0;
@@ -81,7 +81,7 @@ class CheckoutQuote
             $this->require(count($lines) <= 50 && $subtotal <= 100000000, 'O pedido excede o limite de 50 itens ou o valor máximo permitido.');
         }
         $this->require(count($lines) > 0, 'Selecione pelo menos um produto.');
-        $this->require($subtotal >= $store->minimum_order_cents, 'O pedido mínimo em produtos é R$ '.number_format($store->minimum_order_cents / 100, 2, ',', '.').'.');
+        $this->require($pointOfSale || $subtotal >= $store->minimum_order_cents, 'O pedido mínimo em produtos é R$ '.number_format($store->minimum_order_cents / 100, 2, ',', '.').'.');
         $fee = 0;
         $zoneName = null;
         $deliveryAddress = null;
