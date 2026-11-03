@@ -24,11 +24,27 @@ class IfoodController extends Controller
         $data = $request->validate(['merchant_id' => 'required|uuid', 'test_merchant_confirmed' => 'accepted']);
         $report = $diagnostics->collect($this->application(), $data['merchant_id']);
         Audit::record('ifood.diagnostics_collected', ['merchant_id' => strtolower($data['merchant_id']), 'statuses' => array_map(fn ($row) => $row['response']['status'] ?? null, $report['requests'])]);
+
+        return $this->diagnosticDownload($report, 'ifood-diagnostico');
+    }
+
+    public function reasonsDiagnostics(Request $request, int $id, IfoodDiagnostics $diagnostics): StreamedResponse
+    {
+        $order = DB::table('ifood_orders')->where('tenant_id', $request->user()->tenant_id)->where('id', $id)->firstOrFail();
+        $app = DB::table('ifood_apps')->where('id', $order->app_id)->firstOrFail();
+        $report = $diagnostics->collectCancellationReasons($app, $order->external_order_id);
+        Audit::record('ifood.cancellation_diagnostics_collected', ['order_id' => $id], $order->tenant_id);
+
+        return $this->diagnosticDownload($report, 'ifood-motivos');
+    }
+
+    private function diagnosticDownload(array $report, string $name): StreamedResponse
+    {
         $json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
 
         return response()->streamDownload(function () use ($json): void {
             echo $json;
-        }, 'ifood-diagnostico-'.now()->utc()->format('Ymd-His').'.json', [
+        }, $name.'-'.now()->utc()->format('Ymd-His').'.json', [
             'Content-Type' => 'application/json; charset=UTF-8', 'Cache-Control' => 'private, no-store',
             'Referrer-Policy' => 'no-referrer', 'X-Content-Type-Options' => 'nosniff',
         ]);

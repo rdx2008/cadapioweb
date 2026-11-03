@@ -140,10 +140,13 @@ class IfoodClient
         }
         $result = [];
         foreach ($reasons as $reason) {
-            if (! is_array($reason) || ! is_scalar($reason['code'] ?? null) || ! preg_match('/^[A-Za-z0-9_-]{1,40}$/D', (string) $reason['code']) || ! is_string($reason['description'] ?? null) || mb_strlen($reason['description']) > 500) {
+            $code = is_array($reason) ? ($reason['code'] ?? $reason['cancelCodeId'] ?? null) : null;
+            if (! is_array($reason) || (! is_string($code) && ! is_int($code)) || ! preg_match('/^[A-Za-z0-9_-]{1,40}$/D', (string) $code)
+                || (isset($reason['code'], $reason['cancelCodeId']) && (string) $reason['code'] !== (string) $reason['cancelCodeId'])
+                || ! is_string($reason['description'] ?? null) || trim($reason['description']) === '' || mb_strlen($reason['description']) > 500 || array_key_exists((string) $code, $result)) {
                 $this->fail('O iFood retornou um motivo de cancelamento inválido.');
             }
-            $result[(string) $reason['code']] = $reason['description'];
+            $result[(string) $code] = $reason['description'];
         }
 
         return $result;
@@ -224,6 +227,16 @@ class IfoodClient
 
         return $this->authorizedRequest($this->token($app))->beforeSending($capture)
             ->get(self::BASE.'/merchant/v1.0/merchants/'.strtolower($merchantId).($status ? '/status' : ''));
+    }
+
+    public function cancellationReasonsProbe(object $app, string $orderId, callable $capture): Response
+    {
+        if (! Str::isUuid($orderId)) {
+            $this->fail('Identificador de pedido iFood inválido.');
+        }
+
+        return $this->authorizedRequest($this->token($app))->beforeSending($capture)
+            ->get(self::BASE.'/order/v1.0/orders/'.strtolower($orderId).'/cancellationReasons');
     }
 
     private function authorizedRequest(string $token): PendingRequest

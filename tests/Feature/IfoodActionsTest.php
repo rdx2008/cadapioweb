@@ -208,6 +208,82 @@ class IfoodActionsTest extends TestCase
         $this->assertDatabaseHas('ifood_orders', ['id' => $order->id, 'status' => 'cancelled']);
     }
 
+    public function test_cancel_code_id_response_is_normalized_and_sent_as_reason_without_changing_state_early(): void
+    {
+        [$app, $connection, $order, $owner] = $this->fixture();
+        Http::fake(function (ClientRequest $request) use ($order) {
+            if (str_ends_with($request->url(), '/oauth/token')) {
+                return Http::response(['accessToken' => 'private-token', 'expiresIn' => 21600]);
+            }
+            if (str_ends_with($request->url(), '/cancellationReasons')) {
+                return Http::response([['cancelCodeId' => '503', 'description' => 'Item unavailable']]);
+            }
+            if (str_ends_with($request->url(), '/requestCancellation')) {
+                $this->assertSame(['reason' => '503'], $request->data());
+
+                return Http::response([], 202);
+            }
+
+            return Http::response($this->detail($order));
+        });
+        $this->actingAs($owner)->post('/integrations/ifood/orders/'.$order->id.'/reasons')->assertSessionHasNoErrors();
+        $this->get('/integrations/ifood/orders/'.$order->id)->assertOk()->assertSee('Item unavailable');
+        $this->submit($order, 'cancel', reason: '503')->assertSessionHasNoErrors();
+        app(IfoodOutbox::class)->run();
+        $this->assertDatabaseHas('ifood_commands', ['action' => 'cancel', 'status' => 'awaiting_event']);
+        $this->assertDatabaseHas('ifood_orders', ['id' => $order->id, 'status' => 'pending']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_ambiguous_duplicate_and_malformed_reasons_cannot_create_cancellation_commands(): void
+    {
+        [$app, $connection, $order, $owner] = $this->fixture();
+        $reasons = [];
+        Http::fake(function (ClientRequest $request) use (&$reasons) {
+            return str_ends_with($request->url(), '/oauth/token')
+                ? Http::response(['accessToken' => 'private-token', 'expiresIn' => 21600])
+                : Http::response(['reasons' => $reasons]);
+        });
+        $this->actingAs($owner);
+        foreach ([
+            [['code' => true, 'description' => 'Invalid boolean']],
+            [['cancelCodeId' => '503', 'description' => '']],
+            [['code' => '503', 'cancelCodeId' => '501', 'description' => 'Conflicting identifiers']],
+            [['code' => '503', 'description' => 'One'], ['code' => '503', 'description' => 'Two']],
+            [['description' => 'Missing identifier']],
+        ] as $invalid) {
+            $reasons = $invalid;
+            $this->post('/integrations/ifood/orders/'.$order->id.'/reasons')->assertSessionHasErrors('ifood');
+        }
+        $this->assertDatabaseCount('ifood_commands', 0);
+        $this->assertDatabaseHas('ifood_orders', ['id' => $order->id, 'status' => 'pending', 'cancellation_reasons' => null]);
+    }
+
+    public function test_cancellation_diagnostic_is_scoped_read_only_and_redacted_even_for_unknown_payload(): void
+    {
+        [$app, $connection, $order, $owner] = $this->fixture();
+        Http::fake(function (ClientRequest $request) {
+            return str_ends_with($request->url(), '/oauth/token')
+                ? Http::response(['accessToken' => 'private-token', 'expiresIn' => 21600])
+                : Http::response([['unknownField' => 'provider-value', 'echo' => 'private-token secret-server']], 200, ['CF-Ray' => 'trace-example']);
+        });
+        $this->actingAs($owner);
+        $download = $this->post('/integrations/ifood/orders/'.$order->id.'/reasons/diagnostics')->assertOk()->assertDownload()->assertHeader('Cache-Control', 'no-store, private');
+        $text = $download->streamedContent();
+        $report = json_decode($text, true, flags: JSON_THROW_ON_ERROR);
+        $this->assertCount(1, $report['requests']);
+        $this->assertStringEndsWith('/cancellationReasons', $report['requests'][0]['request']['url']);
+        $this->assertStringContainsString('unknownField', $text);
+        $this->assertStringContainsString('trace-example', $text);
+        $this->assertStringNotContainsString('private-token', $text);
+        $this->assertStringNotContainsString('secret-server', $text);
+        $this->assertDatabaseCount('ifood_commands', 0);
+        $this->assertDatabaseHas('ifood_orders', ['id' => $order->id, 'cancellation_reasons' => null, 'status' => 'pending']);
+        $before = Http::recorded()->count();
+        $this->actingAs($this->owner($this->tenant('foreign')))->post('/integrations/ifood/orders/'.$order->id.'/reasons/diagnostics')->assertNotFound();
+        $this->assertCount($before, Http::recorded());
+    }
+
     public function test_ifood_delivery_scheduled_orders_and_changed_credentials_block_unsafe_commands(): void
     {
         [$app, $connection, $order, $owner] = $this->fixture();

@@ -15,12 +15,25 @@ class IfoodDiagnostics
 
     public function collect(object $app, string $merchantId): array
     {
+        return $this->collectRequests($app, [
+            fn ($capture) => $this->client->merchantProbe($app, $merchantId, false, $capture),
+            fn ($capture) => $this->client->merchantProbe($app, $merchantId, true, $capture),
+        ], ['merchant_id' => strtolower($merchantId)]);
+    }
+
+    public function collectCancellationReasons(object $app, string $orderId): array
+    {
+        return $this->collectRequests($app, [fn ($capture) => $this->client->cancellationReasonsProbe($app, $orderId, $capture)], ['order_id' => strtolower($orderId)]);
+    }
+
+    private function collectRequests(object $app, array $probes, array $identity): array
+    {
         $secrets = [Crypt::decryptString($app->client_secret)];
         $records = [];
-        foreach ([false, true] as $status) {
+        foreach ($probes as $probe) {
             $record = ['at_utc' => now()->utc()->toIso8601String(), 'request' => ['method' => 'GET', 'url' => null, 'headers' => []], 'response' => null];
             try {
-                $response = $this->client->merchantProbe($app, $merchantId, $status, function (Request $request) use (&$record, &$secrets): void {
+                $response = $probe(function (Request $request) use (&$record, &$secrets): void {
                     $authorization = $request->header('Authorization')[0] ?? '';
                     if (str_starts_with($authorization, 'Bearer ')) {
                         $secrets[] = substr($authorization, 7);
@@ -49,15 +62,15 @@ class IfoodDiagnostics
 
         return [
             'schema_version' => 1, 'generated_at_utc' => now()->utc()->toIso8601String(),
-            'environment' => 'test', 'client_id' => $app->client_id, 'merchant_id' => strtolower($merchantId),
+            'environment' => 'test', 'client_id' => $app->client_id,
             'notes' => [
-                'Two independent GET requests, one per endpoint, using the same HTTP settings as the app. No redirects or automatic HTTP retries in this diagnostic.',
+                'Independent GET diagnostic requests, using the same HTTP settings as the app. No redirects or automatic HTTP retries in this diagnostic.',
                 'Authorization, cookies and known credentials are redacted. Set IFOOD_ACCESS_TOKEN privately to replay the cURL. No token is included in this file.',
                 'Bodies are bounded at 65536 bytes. Check body_truncated. An HTTP 403 alone does not identify whether the refusal came from authorization or an edge block.',
                 'No polling, acknowledgment, store binding or order action is executed.',
             ],
             'requests' => $records,
-        ];
+        ] + $identity;
     }
 
     private function headers(array $headers, array $secrets): array

@@ -437,6 +437,10 @@ CRM, cupons, fidelidade, campanhas, marketplaces, multimarcas, relatórios conso
 
 Coolify, PostgreSQL, backups restauráveis, segurança e validação em navegador acompanham as entregas. A suíte foi ampliada com testes de revisão do checkout, adicionais, horários, regiões, fotos, isolamento e JavaScript. Passar testes locais não comprova build Docker, homologação externa ou todos os fluxos do escopo.
 
+## Cancelamento iFood — compatibilidade e diagnóstico (03/11/2026)
+
+A consulta de motivos aceita identificadores `code` ou `cancelCodeId`, mantendo a descrição recebida e rejeitando códigos ambíguos, duplicados ou inválidos. O envio continua usando `reason` e depende da confirmação por evento. O proprietário pode baixar o diagnóstico dos motivos no pedido, com credenciais ocultadas e isolamento por empresa. O payload real da falha ainda precisa ser conferido se persistir após publicação; os testes locais usam respostas simuladas.
+
 ## Android — API do entregador pronta, aplicativo pendente (02/11/2026)
 
 Decisão de 02/11/2026: iniciar o aplicativo do entregador pela API, mantendo a operação web independente. Entregue nesta etapa: Laravel Sanctum com tokens por dispositivo; rotas `/api/v1/courier` para login, perfil, lojas, painel (ofertas, corridas, tentativas, presença com código de estado), heartbeat, confirmação de presença, offline, aceite/recusa, detalhe e avanço da corrida (com código do cliente, recebedor e foto), retorno à loja, ocorrências, extrato e registro de dispositivo para push. As regras de presença, fila, aceite único e conclusão foram extraídas para `CourierPresence` e `RideProgress` e são compartilhadas pelo painel web e pela API. Reenvio de etapa já aplicada pela API é aceito sem efeito, para retentativas offline do aplicativo; o painel web mantém o 409.

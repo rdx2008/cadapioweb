@@ -135,6 +135,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/integrations/ifood/orders/{id}/live', [IfoodController::class, 'orderLive'])->middleware('throttle:60,1,integrations-ifood-orders-id-live:')->name('ifood.order.live');
         Route::post('/integrations/ifood/orders/{id}/actions', [IfoodController::class, 'action'])->middleware('throttle:20,1,integrations-ifood-orders-id-actions:')->name('ifood.order.action');
         Route::post('/integrations/ifood/orders/{id}/reasons', [IfoodController::class, 'reasons'])->middleware('throttle:6,1,integrations-ifood-orders-id-reasons:')->name('ifood.order.reasons');
+        Route::post('/integrations/ifood/orders/{id}/reasons/diagnostics', [IfoodController::class, 'reasonsDiagnostics'])->whereNumber('id')->middleware('throttle:2,1,ifood-reasons-diagnostics:')->name('ifood.order.reasons.diagnostics');
         Route::post('/integrations/ifood/{id}/check', [IfoodController::class, 'check'])->middleware('throttle:6,1,integrations-ifood-id-check:')->name('ifood.owner.check');
         Route::get('/dashboard', [PlatformController::class, 'dashboard']);
         Route::get('/orders/live', [OrderBoardController::class, 'live'])->middleware('throttle:60,1,orders-live:');

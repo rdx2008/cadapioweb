@@ -743,3 +743,5 @@ Tela dedicada sem menu administrativo, catálogo e sacola com quantidade, entreg
 ### 17.21. Diagnóstico iFood para suporte
 
 Download restrito ao superadmin, independente de vínculo, com consultas dos dados da loja e status, cURL sanitizada, resposta e cabeçalhos/identificadores de borda retornados. Timeouts, recusa e truncamento ficam explícitos; token/Client Secret/cookies são ocultados. Não vincula lojas nem inicia polling, ACK ou ações de pedido. Evidência real precisa ser coletada no servidor afetado após publicação; não presume a causa de um HTTP 403.
+
+O proprietário também pode baixar diagnóstico somente de leitura dos motivos de cancelamento de um pedido da própria empresa. A leitura normaliza `code` e `cancelCodeId`, rejeita ambiguidades e mantém confirmação por evento para efetivar o cancelamento. A variante efetivamente retornada no servidor depende de coleta real se a falha persistir.
