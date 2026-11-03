@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\IfoodClient;
+use App\Services\IfoodDiagnostics;
 use App\Services\IfoodInbox;
 use App\Services\IfoodOutbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -250,6 +251,25 @@ class IfoodActionsTest extends TestCase
         $this->assertStringNotContainsString('secret-server', $result['message']);
         Http::assertSentCount(2);
         $this->assertDatabaseHas('ifood_orders', ['id' => $order->id, 'status' => 'pending']);
+        $this->actingAs($owner)->post('/integrations/ifood/orders/'.$order->id.'/reasons/diagnostics')->assertOk();
+        $report = app(IfoodDiagnostics::class)->collectCancellationReasons($app, $order->external_order_id);
+        $captured = $report['cancellation_attempt'];
+        $this->assertSame($app->client_id, $report['client_id']);
+        $this->assertSame('POST', $captured['request']['method']);
+        $this->assertSame(['reason' => '503'], json_decode($captured['request']['body'], true));
+        $this->assertSame(400, $captured['response']['status']);
+        $this->assertFalse($captured['response']['body_truncated']);
+        $this->assertStringContainsString('OrderExceededCancellationDeadline', $captured['response']['body']);
+        $this->assertStringContainsString('curl --request POST', $captured['curl']);
+        $this->assertStringContainsString('--data-raw', $captured['curl']);
+        $this->assertStringNotContainsString('private-token', json_encode($captured));
+        $this->assertStringNotContainsString('secret-server', json_encode($captured));
+        $this->assertSame(1, count(collect(Http::recorded())->filter(fn ($pair) => str_ends_with($pair[0]->url(), '/requestCancellation'))));
+        $changed = clone $app;
+        $changed->revision++;
+        $this->assertNull(app(IfoodDiagnostics::class)->collectCancellationReasons($changed, $order->external_order_id)['cancellation_attempt']);
+        $this->travel(25)->hours();
+        $this->assertNull(app(IfoodDiagnostics::class)->collectCancellationReasons($app, $order->external_order_id)['cancellation_attempt']);
     }
 
     public function test_ambiguous_duplicate_and_malformed_reasons_cannot_create_cancellation_commands(): void

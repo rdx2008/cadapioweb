@@ -170,6 +170,9 @@ class IfoodClient
             } catch (ConnectionException) {
                 return ['status' => 'uncertain', 'message' => 'Conexão interrompida durante o envio. Aguarde o evento ou confira no iFood antes de tentar outra ação.'];
             }
+            if ($action === 'cancel') {
+                app(IfoodDiagnostics::class)->captureCancellation($app, $id, $payload, $response, $token);
+            }
             if ($response->status() === 401 && $attempt === 0) {
                 Cache::forget($this->tokenKey($app));
                 try {

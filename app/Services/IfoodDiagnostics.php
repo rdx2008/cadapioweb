@@ -4,6 +4,8 @@ namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Validation\ValidationException;
 
@@ -23,7 +25,36 @@ class IfoodDiagnostics
 
     public function collectCancellationReasons(object $app, string $orderId): array
     {
-        return $this->collectRequests($app, [fn ($capture) => $this->client->cancellationReasonsProbe($app, $orderId, $capture)], ['order_id' => strtolower($orderId)]);
+        $report = $this->collectRequests($app, [fn ($capture) => $this->client->cancellationReasonsProbe($app, $orderId, $capture)], ['order_id' => strtolower($orderId)]);
+        $saved = Cache::get($this->cancellationKey($app, $orderId));
+        $report['cancellation_attempt'] = is_string($saved) ? json_decode(Crypt::decryptString($saved), true, flags: JSON_THROW_ON_ERROR) : null;
+        $report['notes'][] = 'cancellation_attempt is the last captured POST response within 24 hours, for this app revision and order. Downloading does not resend it. Null means no captured attempt is available.';
+
+        return $report;
+    }
+
+    public function captureCancellation(object $app, string $orderId, array $payload, Response $response, string $token): void
+    {
+        $secrets = [$token, Crypt::decryptString($app->client_secret)];
+        $body = $response->body();
+        $clean = $this->redact($body, $secrets);
+        $request = ['method' => 'POST', 'url' => 'https://merchant-api.ifood.com.br/order/v1.0/orders/'.$orderId.'/requestCancellation',
+            'headers' => ['Authorization' => ['[REDACTED]'], 'Accept' => ['application/json'], 'Content-Type' => ['application/json']],
+            'body' => $this->redact(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), $secrets)];
+        $record = ['at_utc' => now()->utc()->toIso8601String(), 'request' => $request, 'curl' => $this->curl($request),
+            'response' => ['status' => $response->status(), 'headers' => $this->headers($response->headers(), $secrets),
+                'body' => mb_convert_encoding(mb_strcut($clean, 0, self::BODY_LIMIT, 'UTF-8'), 'UTF-8', 'UTF-8'),
+                'body_bytes_original' => strlen($body), 'body_truncated' => strlen($clean) > self::BODY_LIMIT]];
+        try {
+            Cache::put($this->cancellationKey($app, $orderId), Crypt::encryptString(json_encode($record, JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)), now()->addDay());
+        } catch (\Throwable) {
+            // Diagnostic storage must never change the result of an already sent command.
+        }
+    }
+
+    private function cancellationKey(object $app, string $orderId): string
+    {
+        return 'ifood:cancellation-diagnostic:'.$app->id.':'.$app->revision.':'.strtolower($orderId);
     }
 
     private function collectRequests(object $app, array $probes, array $identity): array
@@ -96,7 +127,7 @@ class IfoodDiagnostics
 
     private function curl(array $request): string
     {
-        $parts = ['curl --request GET --connect-timeout 5 --max-time 10 --url '.$this->quote($request['url'])];
+        $parts = ['curl --request '.$request['method'].' --connect-timeout 5 --max-time 10 --url '.$this->quote($request['url'])];
         foreach ($request['headers'] as $name => $values) {
             if (strtolower($name) === 'authorization') {
                 $parts[] = '--header "Authorization: Bearer ${IFOOD_ACCESS_TOKEN}"';
@@ -105,6 +136,10 @@ class IfoodDiagnostics
                     $parts[] = '--header '.$this->quote($name.': '.$value);
                 }
             }
+        }
+
+        if (isset($request['body'])) {
+            $parts[] = '--data-raw '.$this->quote($request['body']);
         }
 
         return implode(" \\\n  ", $parts);
