@@ -439,6 +439,8 @@ Coolify, PostgreSQL, backups restauráveis, segurança e validação em navegado
 
 ## Cancelamento iFood — compatibilidade e diagnóstico (03/11/2026)
 
+O POST real retornou `Invalid cancellation request: Field 'cancellationCode' is required`. Corrigido o corpo de envio: `cancellationCode` recebe o código selecionado e `reason` recebe a descrição atual retornada pela consulta. O comando persistido mantém o código interno para idempotência; a conversão ocorre após revalidação imediatamente antes do envio. Recusas anteriores não são reenviadas automaticamente. Suíte iFood: 38 testes passaram; confirmação no servidor externo ainda depende da nova tentativa após publicação.
+
 O diagnóstico do pedido inclui `cancellation_attempt` com o último POST real de cancelamento, corpo enviado, cURL, resposta e cabeçalhos sanitizados. Registro criptografado em cache por 24 horas, separado por aplicativo, revisão das credenciais e pedido; download permanece restrito ao proprietário da empresa. Não reenvia comandos e não recupera respostas anteriores à publicação. Limite de 64 KiB da resposta fica explícito no arquivo.
 
 O diagnóstico real confirmou `cancelCodeId` na consulta HTTP 200. A recusa posterior HTTP 400 ainda exige a resposta do POST para determinar a causa. Mensagens conhecidas de prazo vencido, parâmetro inválido, cancelamento em andamento e pedido ausente são traduzidas sem exibir o corpo bruto; a referência retornada pelo iFood acompanha a recusa quando válida. Não há reenvio automático dessas recusas.

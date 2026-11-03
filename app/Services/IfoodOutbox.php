@@ -125,8 +125,13 @@ class IfoodOutbox
                 $this->fail('Despacho manual permitido somente para entrega própria confirmada pela API.');
             }
             $payload = json_decode(Crypt::decryptString($command->payload), true, flags: JSON_THROW_ON_ERROR);
-            if ($command->action === 'cancel' && ! array_key_exists($payload['reason'], $this->client->cancellationReasons($app, $order->external_order_id))) {
-                $this->fail('O motivo de cancelamento não está mais disponível no iFood. Consulte os motivos novamente.');
+            if ($command->action === 'cancel') {
+                $reasons = $this->client->cancellationReasons($app, $order->external_order_id);
+                $code = $payload['reason'];
+                if (! array_key_exists($code, $reasons)) {
+                    $this->fail('O motivo de cancelamento não está mais disponível no iFood. Consulte os motivos novamente.');
+                }
+                $payload = ['cancellationCode' => (string) $code, 'reason' => $reasons[$code]];
             }
             $ready = DB::transaction(function () use ($app, $order, $command, $deliveredBy): bool {
                 $current = DB::table('ifood_apps')->where('id', $app->id)->lockForUpdate()->firstOrFail();

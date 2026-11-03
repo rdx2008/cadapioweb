@@ -183,7 +183,7 @@ class IfoodActionsTest extends TestCase
                 return Http::response(['reasons' => [['code' => '503', 'description' => 'Produto indisponível']]]);
             }
             if (str_ends_with($path, '/requestCancellation')) {
-                $this->assertSame(['reason' => '503'], $request->data());
+                $this->assertSame(['cancellationCode' => '503', 'reason' => 'Produto indisponível'], $request->data());
 
                 return Http::response([], 202);
             }
@@ -210,7 +210,7 @@ class IfoodActionsTest extends TestCase
         $this->assertDatabaseHas('ifood_orders', ['id' => $order->id, 'status' => 'cancelled']);
     }
 
-    public function test_cancel_code_id_response_is_normalized_and_sent_as_reason_without_changing_state_early(): void
+    public function test_cancel_code_id_response_is_sent_as_cancellation_code_with_description_without_changing_state_early(): void
     {
         [$app, $connection, $order, $owner] = $this->fixture();
         Http::fake(function (ClientRequest $request) use ($order) {
@@ -221,7 +221,10 @@ class IfoodActionsTest extends TestCase
                 return Http::response([['cancelCodeId' => '503', 'description' => 'Item unavailable']]);
             }
             if (str_ends_with($request->url(), '/requestCancellation')) {
-                $this->assertSame(['reason' => '503'], $request->data());
+                if (! isset($request->data()['cancellationCode'])) {
+                    return Http::response(['error' => ['code' => 'InvalidParameter', 'message' => "Invalid cancellation request: Field 'cancellationCode' is required"]], 400);
+                }
+                $this->assertSame(['cancellationCode' => '503', 'reason' => 'Item unavailable'], $request->data());
 
                 return Http::response([], 202);
             }
