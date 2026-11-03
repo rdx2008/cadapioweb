@@ -189,7 +189,20 @@ class IfoodClient
                 return ['status' => 'retry', 'message' => 'Limite de envios atingido. A solicitação aguarda nova tentativa.', 'retry_after' => is_numeric($delay) ? max(30, min(3600, (int) $delay)) : 60];
             }
             if (in_array($response->status(), [400, 401, 403, 404, 422], true)) {
-                return ['status' => 'rejected', 'message' => 'O iFood recusou a solicitação (HTTP '.$response->status().'). Revise o pedido e a autorização da loja.'];
+                $code = $response->json('code') ?? $response->json('error.code');
+                $messages = [
+                    'InvalidParameter' => 'O iFood informou um parâmetro inválido no envio.',
+                    'OrderExceededCancellationDeadline' => 'O prazo de cancelamento deste pedido no iFood terminou.',
+                    'OrderHasACancellationInProgress' => 'Já existe um cancelamento em andamento no iFood. Aguarde os eventos.',
+                    'OrderNotFound' => 'O iFood não encontrou este pedido.',
+                ];
+                $message = is_string($code) && isset($messages[$code]) ? $messages[$code] : 'O iFood recusou a solicitação. Confira o pedido no portal iFood.';
+                $reference = $response->header('X-iFood-Request-Id') ?? $response->header('x-request-id');
+                if (is_string($reference) && preg_match('/^[A-Za-z0-9_-]{1,100}$/D', $reference)) {
+                    $message .= ' Referência: '.$reference.'.';
+                }
+
+                return ['status' => 'rejected', 'message' => $message.' (HTTP '.$response->status().')'];
             }
 
             return ['status' => 'uncertain', 'message' => 'Resposta sem confirmação do resultado. O comando não será reenviado automaticamente; confira o retorno do iFood.'];

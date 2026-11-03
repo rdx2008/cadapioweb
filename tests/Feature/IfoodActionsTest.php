@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\IfoodClient;
 use App\Services\IfoodInbox;
 use App\Services\IfoodOutbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -233,6 +234,22 @@ class IfoodActionsTest extends TestCase
         $this->assertDatabaseHas('ifood_commands', ['action' => 'cancel', 'status' => 'awaiting_event']);
         $this->assertDatabaseHas('ifood_orders', ['id' => $order->id, 'status' => 'pending']);
         $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_rejected_cancellation_explains_deadline_without_exposing_raw_response_or_retrying(): void
+    {
+        [$app, $connection, $order, $owner] = $this->fixture();
+        Http::fake(fn (ClientRequest $request) => str_ends_with($request->url(), '/oauth/token')
+            ? Http::response(['accessToken' => 'private-token', 'expiresIn' => 21600])
+            : Http::response(['code' => 'OrderExceededCancellationDeadline', 'message' => 'private-token secret-server'], 400, ['X-iFood-Request-Id' => 'trace-123']));
+        $result = app(IfoodClient::class)->execute($app, $order->external_order_id, 'cancel', ['reason' => '503']);
+        $this->assertSame('rejected', $result['status']);
+        $this->assertStringContainsString('prazo de cancelamento', $result['message']);
+        $this->assertStringContainsString('trace-123', $result['message']);
+        $this->assertStringNotContainsString('private-token', $result['message']);
+        $this->assertStringNotContainsString('secret-server', $result['message']);
+        Http::assertSentCount(2);
+        $this->assertDatabaseHas('ifood_orders', ['id' => $order->id, 'status' => 'pending']);
     }
 
     public function test_ambiguous_duplicate_and_malformed_reasons_cannot_create_cancellation_commands(): void
