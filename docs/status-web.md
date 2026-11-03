@@ -427,6 +427,8 @@ CRM, cupons, fidelidade, campanhas, marketplaces, multimarcas, relatórios conso
 
 Coolify, PostgreSQL, backups restauráveis, segurança e validação em navegador acompanham as entregas. A suíte foi ampliada com testes de revisão do checkout, adicionais, horários, regiões, fotos, isolamento e JavaScript. Passar testes locais não comprova build Docker, homologação externa ou todos os fluxos do escopo.
 
-## Android adiado
+## Android — API do entregador pronta, aplicativo pendente (02/11/2026)
 
-Não iniciar aplicativo Android agora. Manter contratos do backend compatíveis com um futuro app. A versão web usa presença com página ativa e comunica limitações de suspensão/segundo plano, sem prometer rastreamento contínuo. O app futuro acrescentará recursos de dispositivo; não será necessário para operar os fluxos web acima.
+Decisão de 02/11/2026: iniciar o aplicativo do entregador pela API, mantendo a operação web independente. Entregue nesta etapa: Laravel Sanctum com tokens por dispositivo; rotas `/api/v1/courier` para login, perfil, lojas, painel (ofertas, corridas, tentativas, presença com código de estado), heartbeat, confirmação de presença, offline, aceite/recusa, detalhe e avanço da corrida (com código do cliente, recebedor e foto), retorno à loja, ocorrências, extrato e registro de dispositivo para push. As regras de presença, fila, aceite único e conclusão foram extraídas para `CourierPresence` e `RideProgress` e são compartilhadas pelo painel web e pela API. Reenvio de etapa já aplicada pela API é aceito sem efeito, para retentativas offline do aplicativo; o painel web mantém o 409.
+
+Pendente: aplicativo Flutter (serviço de localização em primeiro plano, fila local de operações com chave idempotente, consulta do painel a cada 5 s), provedor de push (o registro de dispositivo só armazena o token), expiração configurável de tokens e homologação em aparelho real. A versão web continua usando presença com página ativa e comunicando limitações de suspensão/segundo plano.

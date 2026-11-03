@@ -1,5 +1,13 @@
 ﻿# Histórico do CadapioWeb
 
+## 2026-11-02 — API do entregador para o aplicativo Android
+
+- Laravel Sanctum com token por dispositivo; login restrito a entregadores habilitados; sair e redefinição de senha revogam tokens e dispositivos.
+- Rotas `/api/v1/courier`: perfil, lojas, painel com presença codificada, heartbeat, presença, offline, aceite/recusa, detalhe e avanço de corrida, retorno, ocorrências, extrato e registro de dispositivo para push.
+- Regras de presença, fila e conclusão extraídas para serviços compartilhados entre painel web e API; retentativas idempotentes de etapa pela API.
+- Aplicativo Flutter e provedor de push continuam pendentes.
+- Limites de requisições com contador próprio por rota: a atualização automática dos painéis (pedidos, cozinha, alertas, iFood, operação, entregador, acompanhamento do cliente) não consome mais o limite das ações do mesmo usuário ou endereço.
+
 ## 2026-10-24 — Fundação funcional
 
 ### Segunda entrega — venda e produção web

@@ -68,33 +68,9 @@ class DeliveryRecordController extends Controller
 
     public function create(Request $request, int $id, DeliveryRecords $records): RedirectResponse
     {
-        $this->ride($id);
+        $ride = $this->ride($id);
         $data = $request->validate(['request_key' => 'required|uuid', 'kind' => ['required', Rule::in(array_keys(DeliveryRecords::KINDS))], 'description' => 'required|string|min:5|max:1000', 'photo' => DeliveryRecords::PHOTO_RULES]);
-        $path = null;
-        try {
-            DB::transaction(function () use ($request, $id, $records, $data, &$path): void {
-                $initial = $this->ride($id);
-                DB::table('tenants')->where('id', $initial->tenant_id)->lockForUpdate()->firstOrFail();
-                $ride = $this->ride($id);
-                DB::table('rides')->where('id', $ride->id)->lockForUpdate()->firstOrFail();
-                $existing = DB::table('delivery_incidents')->where('ride_id', $id)->where('request_key', $data['request_key'])->first();
-                if ($existing) {
-                    abort_unless($existing->author_id === $request->user()->id, 409);
-
-                    return;
-                }
-                $allowed = $request->user()->role === 'courier' ? ['assigned', 'collected', 'returning'] : ['searching', 'offered', 'broadcast', 'unassigned', 'assigned', 'collected', 'returning'];
-                abort_unless(in_array($ride->status, $allowed, true), 409, 'A corrida já foi encerrada.');
-                abort_if($request->user()->role === 'courier' && $data['kind'] === 'no_courier', 422);
-                $path = $records->photo($request->file('photo'), $ride->tenant_id);
-                $incidentId = DB::table('delivery_incidents')->insertGetId(['tenant_id' => $ride->tenant_id, 'ride_id' => $id, 'author_id' => $request->user()->id, 'request_key' => $data['request_key'], 'kind' => $data['kind'], 'description' => $data['description'], 'photo_path' => $path, 'created_at' => now(), 'updated_at' => now()]);
-                Audit::record('delivery.incident.created', ['incident_id' => $incidentId, 'ride_id' => $id, 'kind' => $data['kind']], $ride->tenant_id);
-            });
-        } catch (\Throwable $e) {
-            if ($path) {
-                Storage::disk('local')->delete($path);
-            }throw $e;
-        }
+        $records->recordIncident($request->user(), $ride, $data, $request->file('photo'));
 
         return back()->with('success', 'Ocorrência registrada. A situação da corrida e os valores foram preservados.');
     }

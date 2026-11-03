@@ -6,7 +6,7 @@ Plataforma de restaurantes em **Laravel 13 / PHP 8.4**, com múltiplas empresas 
 
 Esta versão contém a fundação, o fluxo inicial de venda/produção web, o novo painel e recepção/ações iFood de teste, ainda para piloto assistido. O escopo completo está em `docs/escopo.md`; os recursos descritos no escopo não devem ser confundidos com recursos já implementados.
 
-**Prioridade definida em 24/10/2026:** concluir os fluxos web primeiro. Android foi adiado e não é dependência da primeira entrega web. O backlog e o estado por módulo estão em `docs/status-web.md`.
+**Prioridade definida em 24/10/2026:** concluir os fluxos web primeiro. Android não é dependência da entrega web. **Em 02/11/2026 iniciou-se a fase do aplicativo do entregador pela API** (`/api/v1/courier`, autenticação por token Sanctum); o aplicativo Flutter ainda não existe. O backlog e o estado por módulo estão em `docs/status-web.md`.
 
 ### Implementado
 
@@ -35,7 +35,7 @@ Esta versão contém a fundação, o fluxo inicial de venda/produção web, o no
 - Interface usa **Blade + CSS/JS** e consulta periódica de atualizações, sem Vue/Inertia ou WebSockets. Som precisa de interação do operador para ativação; abas suspensas pelo navegador não garantem recebimento de alertas.
 - iFood recebe apenas pedidos explicitamente marcados como teste, em uma área separada. Aceite/preparo/pronto/despacho próprio/cancelamento estão implementados para teste e dependem de validação real; catálogo e operação de restaurantes reais não estão liberados. Configurar em **Superadmin → Integração iFood**; informar a chave somente no painel. Recebimento e ações têm ativações separadas. ACK é confirmação de leitura, não de aceite; `202` de comando também não confirma alteração de estado. Timeout, erro `5xx`, reinício durante envio e ausência de evento deixam resultado não confirmado e bloqueiam novas ações do pedido. Negociação, alteração de pedido/endereço, códigos de coleta/entrega e resolução assistida de comandos ambíguos ainda precisam ser concluídos antes da homologação. O piloto processa cinco eventos por ciclo e admite até 100 lojas por aplicativo. Pedidos de teste continuam fora do financeiro e das corridas freelancer.
 - O módulo é ativado por empresa nesta entrega; seleção granular de lojas, múltiplos usuários com permissões por loja, bloqueios locais de entregador e tabelas de regras editáveis ainda precisam ser desenvolvidos.
-- Painel web do motoboy serve ao piloto e exige renovar presença. **Aplicativo Android, localização contínua e push ainda não estão implementados**; não lançar operação autônoma com celular bloqueado usando esse painel.
+- Painel web do motoboy serve ao piloto e exige renovar presença. **A API do entregador está pronta para o aplicativo, mas o aplicativo Android, a localização contínua e o envio de push ainda não existem**; o registro de dispositivo apenas guarda o token de push, sem provedor configurado. Não lançar operação autônoma com celular bloqueado usando o painel web.
 - **WABA ainda é solicitação pendente**, sem Embedded Signup ou envio oficial. A conexão QR possui testes com HTTP simulado, mas exige homologação na versão do servidor Evolution. Verificação automática do número efetivamente pareado, desconexão/migração e mensagens transacionais/campanhas estão pendentes.
 - Pagamento é presencial/manual. Não há integração real com gateway, Pix dinâmico, estorno ou repasse ao freelancer.
 - Quilometragem de rota e cotação por corrida são informadas pela loja; ainda não há provedor de rotas. Não usamos distância em linha reta para calcular remuneração.
@@ -94,7 +94,7 @@ Para restaurar: criar ambiente isolado com a mesma versão, restaurar PostgreSQL
 1. Homologar imagem Coolify, concorrência real no PostgreSQL e instalação limpa.
    Prioridade adicionada: validar recepção e ações com loja iFood de teste, completar negociações, coleta/entrega e tratamento assistido de incertezas, antes de catálogo e produção. Sequência e aceite em `docs/escopo.md`, seção 16.1.
 2. Evoluir fluxo de ocorrências, segurança/comprovação de entrega, tabela de tarifas editável e configuração de despacho.
-3. Completar o painel web do entregador, atualização de presença com página ativa, ofertas e acertos validados em duas lojas e três entregadores. Android/localização em segundo plano ficam para depois.
+3. Completar o painel web do entregador, atualização de presença com página ativa, ofertas e acertos validados em duas lojas e três entregadores. Em seguida, construir o aplicativo Flutter sobre a API do entregador (localização em primeiro plano, push e fila offline com chave idempotente).
 4. Homologar Evolution QR e implementar onboarding WABA e outbox de mensagens.
 5. Implementar gateway, fiscal conforme cenário e os módulos operacionais restantes em fases.
 
@@ -105,6 +105,23 @@ Em Lojas → Configurar loja, enviar logo e capa, localizar o endereço da loja 
 Para geocodificação, criar uma chave no Geoapify e definir `GEOAPIFY_API_KEY` nas variáveis do Coolify antes do redeploy. O Compose repassa a chave ao servidor. Em Entrega e frete do cliente, escolher bairros/regiões ou raio. Por bairro, cadastrar bairro, cidade, UF e tarifa; o sistema identifica os dados no endereço localizado. Por raio, escolher frete fixo, faixas ou base + quilômetro. Fixo e quilômetro exigem alcance máximo; faixas usam o limite da maior faixa ativa. O raio é em linha reta, não distância de rota. O cliente começa pelo CEP obrigatório: ViaCEP preenche rua/bairro/cidade/UF, depois pede número e complemento. Os campos de endereço ficam ocultos até a busca; CEP genérico ou indisponibilidade permite completar manualmente. ViaCEP não exige chave; Geoapify continua validando a localização com número antes do frete. O cliente confirma o endereço, sem escolher bairro ou faixa. Bairros antigos precisam de cidade e UF para entrar no cálculo automático.
 
 O plano gratuito do Geoapify tem quota e exige atribuição: consultar [preços e condições](https://www.geoapify.com/pricing/). O app usa cache criptografado de 24 horas, limite global de consultas e orçamento padrão `GEOCODING_DAILY_LIMIT=2800`. Conferir consumo da conta e ajustar ao plano contratado. Chave nunca deve ser enviada ao navegador. Sem chave ou em falha da API, a entrega automática não aprova endereços; a retirada permanece disponível. Validar endereços reais e posição da loja antes do piloto.
+
+## API do entregador (base do aplicativo Android)
+
+Rotas em `routes/api.php`, prefixo `/api/v1/courier`, respostas sempre em JSON com `Cache-Control: private, no-store`. Autenticação por token pessoal (Laravel Sanctum) enviado em `Authorization: Bearer`. Somente contas com perfil `courier` e acesso habilitado obtêm token; sair ou redefinir a senha revoga os tokens e os dispositivos registrados.
+
+| Método | Rota | Função |
+|---|---|---|
+| POST | `/login` | `email`, `password`, `device_name` → token, perfil, presença e intervalos (heartbeat 30 s, presença 90 s, check-in 150 m, precisão 50 m) |
+| POST | `/logout` · GET `/me` · PUT `/devices` | Encerrar sessão do dispositivo; perfil e presença; registrar token de push (`platform`, `push_token`, `app_version`) |
+| GET | `/stores` · `/board` | Lojas com módulo ativo para check-in; ofertas, corridas, tentativas e presença (`code`, `label`, `renew`, fila) |
+| POST | `/heartbeat` · `/presence` · `/offline` | Mesmas regras do painel web: heartbeat só renova presença válida ou corrida ativa (409 quando suspensa); `presence` confirma disponibilidade com `store_id` opcional |
+| POST | `/offers/{id}/accept` · `/decline` | Aceite único e recusa com reposicionamento na fila |
+| GET/POST | `/rides/{id}` · `/rides/{id}/progress` | Detalhe com ocorrências e tentativas; `status` `collected`/`completed`, `expected_round`, `delivery_code`, `received_by`, `photo` (multipart). Reenviar a mesma etapa já aplicada responde 200 sem efeito, para retentativas offline |
+| POST | `/rides/{id}/return` · `/rides/{id}/incidents` | Retorno à loja e ocorrências com `request_key` idempotente |
+| GET | `/statement` | Extrato próprio por período (`start`, `end`, `timezone`, `store_id`, `settlement`, `page`) com totais |
+
+O envio de push ainda não está ligado a nenhum provedor: o aplicativo deve consultar `/board` para a lista válida de ofertas. Testes em `tests/Feature/CourierApiTest.php`.
 
 ## Recuperação de senha
 

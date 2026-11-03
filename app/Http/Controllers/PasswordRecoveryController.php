@@ -63,6 +63,8 @@ class PasswordRecoveryController extends Controller
             return Password::reset($data, function ($user, string $password): void {
                 $user->forceFill(['password' => Hash::make($password), 'remember_token' => Str::random(60)])->save();
                 DB::table('sessions')->where('user_id', $user->id)->delete();
+                DB::table('courier_devices')->where('user_id', $user->id)->delete();
+                $user->tokens()->delete();
                 Audit::record('account.password_reset', ['user_id' => $user->id], $user->tenant_id);
                 event(new PasswordReset($user));
             });
