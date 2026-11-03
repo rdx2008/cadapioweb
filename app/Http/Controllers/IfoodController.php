@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\IfoodClient;
+use App\Services\IfoodDiagnostics;
 use App\Services\IfoodOutbox;
 use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
@@ -14,9 +15,25 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IfoodController extends Controller
 {
+    public function diagnostics(Request $request, IfoodDiagnostics $diagnostics): StreamedResponse
+    {
+        $data = $request->validate(['merchant_id' => 'required|uuid', 'test_merchant_confirmed' => 'accepted']);
+        $report = $diagnostics->collect($this->application(), $data['merchant_id']);
+        Audit::record('ifood.diagnostics_collected', ['merchant_id' => strtolower($data['merchant_id']), 'statuses' => array_map(fn ($row) => $row['response']['status'] ?? null, $report['requests'])]);
+        $json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
+
+        return response()->streamDownload(function () use ($json): void {
+            echo $json;
+        }, 'ifood-diagnostico-'.now()->utc()->format('Ymd-His').'.json', [
+            'Content-Type' => 'application/json; charset=UTF-8', 'Cache-Control' => 'private, no-store',
+            'Referrer-Policy' => 'no-referrer', 'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function admin(): View
     {
         return view('integrations.ifood-admin', [

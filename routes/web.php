@@ -80,6 +80,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/{id}/incidents', [DeliveryRecordController::class, 'create'])->whereNumber('id')->middleware('throttle:10,1,deliveries-id-incidents:')->name('delivery-incidents.create');
     Route::middleware('access:admin')->group(function () {
         Route::get('/admin/ifood', [IfoodController::class, 'admin'])->name('ifood.admin');
+        Route::post('/admin/ifood/diagnostics', [IfoodController::class, 'diagnostics'])->middleware('throttle:2,1,admin-ifood-diagnostics:')->name('ifood.diagnostics');
         Route::post('/admin/ifood/configure', [IfoodController::class, 'configure'])->name('ifood.configure');
         Route::post('/admin/ifood/test', [IfoodController::class, 'test'])->middleware('throttle:6,1,admin-ifood-test:')->name('ifood.test');
         Route::post('/admin/ifood/connect', [IfoodController::class, 'connect'])->middleware('throttle:6,1,admin-ifood-connect:')->name('ifood.connect');

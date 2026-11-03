@@ -739,3 +739,7 @@ Tela interna para proprietário e operador autorizado por loja, catálogo compar
 ### 17.20. PDV em tela inteira e pedidos remotos
 
 Tela dedicada sem menu administrativo, catálogo e sacola com quantidade, entrega/pagamento em etapa própria. Origem balcão/telefone/WhatsApp, retirada ou entrega, CEP e frete calculado pelo endereço. Dinheiro/Pix/maquininha manuais ou link InfinitePay/PagBank da loja; cliente abre acompanhamento e inicia checkout externo, com confirmação do provedor obrigatória antes do preparo online. Operador copia/compartilha no WhatsApp e confirma o envio; sem mensagem automática. Motoboy escolhido é preferência sem reserva antecipada; pedido pronto exige solicitação explícita de despacho, com oferta/aceite e exclusividade global existentes. Indisponibilidade do escolhido não substitui silenciosamente por outro. Caixa por turno permanece como etapa seguinte.
+
+### 17.21. Diagnóstico iFood para suporte
+
+Download restrito ao superadmin, independente de vínculo, com consultas dos dados da loja e status, cURL sanitizada, resposta e cabeçalhos/identificadores de borda retornados. Timeouts, recusa e truncamento ficam explícitos; token/Client Secret/cookies são ocultados. Não vincula lojas nem inicia polling, ACK ou ações de pedido. Evidência real precisa ser coletada no servidor afetado após publicação; não presume a causa de um HTTP 403.

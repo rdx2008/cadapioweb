@@ -2,6 +2,16 @@
 
 Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
 
+## Evidências de requisição/resposta para suporte iFood — 03/11/2026
+
+Superadmin > Integração iFood oferece Baixar diagnóstico para o suporte, mesmo sem vínculo local. Exige aplicativo de teste configurado, Merchant UUID válido e confirmação explícita de loja de teste. POST privado com limite próprio de duas tentativas por minuto, sem consumir o limite das demais ações. Coleta duas consultas GET independentes, detalhes e /status, usando o mesmo construtor HTTP autenticado do cliente normal: Accept JSON, timeouts 5/10 segundos e redirecionamento desligado. Não repete HTTP automaticamente no diagnóstico; uma recusa em detalhes não impede consultar /status. Autenticação/cache seguem o fluxo existente.
+
+Download JSON privado/no-store com horário UTC, Client ID, Merchant UUID, método/URL/cabeçalhos da requisição, cURL POSIX com variável IFOOD_ACCESS_TOKEN no lugar do Bearer real, HTTP status, corpo e response.headers; preserva CF-Ray, referências no corpo e IDs de rastreamento retornados. Inclui estatísticas de transporte disponíveis, como IP remoto/tempo; sem resposta HTTP registra falha genérica de transporte, sem texto bruto de exceção. Corpos limitados a 64 KiB, com tamanho original e indicador de truncamento. Headers sensíveis, cookies e credenciais conhecidas são ocultados; token e Client Secret não são exportados, gravados no relatório de auditoria ou enviados a logs. O arquivo não contém o JWT e não é uma captura bruta sem sanitização. Compartilhar somente o relatório real gerado no servidor que apresenta a falha.
+
+Auditoria registra somente Merchant UUID e códigos HTTP. Coleta não vincula loja, habilita polling, confirma eventos ou altera pedidos; nenhum relatório é persistido pelo aplicativo. Não resolve nem identifica sozinho a origem do bloqueio. Mensagem genérica de 403 agora diferencia recusa HTTP de diagnóstico confirmado de autorização ou edge.
+
+Validação: 34 testes PHP de conexão, recebimento, ações e diagnóstico aprovados; quatro novos cobrem 403 HTML com reference/CF-Ray, consulta independente de status, ocultação de segredos/cookies, restrição de acesso/UUID/confirmação/limite, timeout, truncamento e ausência de redirecionamento/vínculo/polling. Pint e compilação de templates/rotas concluídos. Sem nova dependência ou migration. Coleta real no Coolify depende de publicação/redeploy e acionamento do botão; não foi feita chamada real ao iFood nesta validação.
+
 ## PDV em tela inteira, entrega e pagamento por link — 01/11/2026
 
 PDV fora do shell administrativo, com cabeçalho compacto, acesso ao painel/tela cheia, catálogo e categorias à esquerda e venda/quantidades/total à direita. Formulário de cliente, endereço e pagamento em etapa própria. Controles de quantidade no carrinho, limpeza com confirmação, aviso ao sair com itens e recuperação da sacola na edição. Responsivo; usa fotos reais cadastradas e placeholders quando ausentes, sem inventar fotos para produtos da loja.

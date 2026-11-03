@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -198,7 +199,7 @@ class IfoodClient
     {
         for ($attempt = 0; $attempt < 2; $attempt++) {
             try {
-                $request = Http::withToken($this->token($app))->acceptJson()->withHeaders($headers)->connectTimeout(5)->timeout(10)->withoutRedirecting();
+                $request = $this->authorizedRequest($this->token($app))->withHeaders($headers);
                 $response = $method === 'GET' ? $request->get(self::BASE.$path, $data) : $request->post(self::BASE.$path, $data);
             } catch (ConnectionException) {
                 $this->fail('Não foi possível conectar ao iFood. Tente novamente.');
@@ -215,6 +216,21 @@ class IfoodClient
         $this->fail('Autenticação iFood expirada. Verifique as credenciais.');
     }
 
+    public function merchantProbe(object $app, string $merchantId, bool $status, callable $capture): Response
+    {
+        if (! Str::isUuid($merchantId)) {
+            $this->fail('Merchant ID inválido.');
+        }
+
+        return $this->authorizedRequest($this->token($app))->beforeSending($capture)
+            ->get(self::BASE.'/merchant/v1.0/merchants/'.strtolower($merchantId).($status ? '/status' : ''));
+    }
+
+    private function authorizedRequest(string $token): PendingRequest
+    {
+        return Http::withToken($token)->acceptJson()->connectTimeout(5)->timeout(10)->withoutRedirecting();
+    }
+
     private function tokenKey(object $app): string
     {
         return 'ifood:token:'.$app->id.':'.$app->revision;
@@ -227,7 +243,7 @@ class IfoodClient
         }
         $message = match ($response->status()) {
             400, 401 => 'Credenciais ou solicitação iFood inválidas. Revise a configuração do aplicativo.',
-            403 => 'Aplicativo sem autorização para esta loja no iFood.',
+            403 => 'Requisição recusada pelo iFood. Confira a autorização e gere o diagnóstico para investigar possível bloqueio de rede.',
             404 => 'Loja não encontrada no iFood. Confira o Merchant ID.',
             429 => 'Limite de consultas iFood atingido. Aguarde antes de tentar novamente.',
             default => 'iFood indisponível ou resposta inesperada. Tente novamente mais tarde.',
