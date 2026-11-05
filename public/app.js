@@ -281,13 +281,35 @@ if (workspaceOverview) {
 } else {
     const matches = Array.from(document.querySelectorAll('[data-nav-link]')).filter((link) => {
         const destination = new URL(link.href);
-        return !destination.hash && (destination.pathname === window.location.pathname || window.location.pathname.startsWith(destination.pathname + '/') || (destination.pathname === '/catalog' && window.location.pathname.startsWith('/products/')));
+        const path=window.location.pathname;
+        if(destination.hash){
+            return (destination.hash==='#lojas' && path.startsWith('/stores/'))
+                || (destination.hash==='#pedidos' && path.startsWith('/orders/'))
+                || (destination.hash==='#empresas' && path.startsWith('/admin/tenants/'));
+        }
+        return destination.pathname === path || path.startsWith(destination.pathname + '/') || (destination.pathname === '/catalog' && path.startsWith('/products/'));
     }).sort((a, b) => new URL(b.href).pathname.length - new URL(a.href).pathname.length);
     if (matches[0]) {
         matches[0].classList.add('is-active');
         matches[0].setAttribute('aria-current', 'page');
     }
 }
+document.querySelectorAll('.nav-accordion').forEach(nav=>{
+    const sections=[...nav.querySelectorAll('[data-nav-section]')];
+    const revealActive=()=>{
+        const active=nav.querySelector('[aria-current="page"]')?.closest('[data-nav-section]');
+        sections.forEach(section=>{
+            section.classList.toggle('has-active-link',section===active);
+            section.open=section===active;
+        });
+    };
+    sections.forEach(section=>section.addEventListener('toggle',()=>{
+        if(section.open)sections.forEach(other=>{if(other!==section)other.open=false;});
+    }));
+    window.addEventListener('hashchange',revealActive);
+    revealActive();
+});
+
 document.querySelectorAll("[data-tracking-url]").forEach((panel) => {
     const labels = {
         pending: "Aguardando aceite",

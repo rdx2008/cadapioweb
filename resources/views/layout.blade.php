@@ -1,22 +1,44 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','CadapioWeb · Sua operação conectada')</title><link rel="stylesheet" href="/app.css?v=7">@if(in_array(auth()->user()?->role,['owner','admin'],true))<link rel="stylesheet" href="/tenant-theme.css?v=2">@endif<script src="/app.js?v=9" defer></script><script src="/menu-cart.js?v=3" defer></script><script src="/menu.js?v=9" defer></script><script src="/store-address.js?v=1" defer></script><link rel="stylesheet" href="/production.css?v=1"><script src="/production.js?v=1" defer></script>@stack('styles')</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('title','CadapioWeb · Sua operação conectada')</title><link rel="stylesheet" href="/app.css?v=7"><link rel="stylesheet" href="/navigation.css?v=1">@if(in_array(auth()->user()?->role,['owner','admin'],true))<link rel="stylesheet" href="/tenant-theme.css?v=2">@endif<script src="/app.js?v=10" defer></script><script src="/menu-cart.js?v=3" defer></script><script src="/menu.js?v=9" defer></script><script src="/store-address.js?v=1" defer></script><link rel="stylesheet" href="/production.css?v=1"><script src="/production.js?v=1" defer></script>@stack('styles')</head>
 <body><div class="shell">
 <aside class="sidebar">
     <a class="brand" href="/app">cadapio<span>web</span></a>
     <div class="workspace-card"><span class="workspace-avatar">@include('partials.icon',['name'=>auth()->user()?->role==='admin'?'users':'store'])</span><div><strong>{{ auth()->user()?->role==='admin'?'Administração':($tenant->name??auth()->user()?->name??'Bem-vindo') }}</strong><small>{{ auth()->user()?->role==='admin'?'Controle da plataforma':(auth()->check()?'Seu espaço de trabalho':'Sua operação conectada') }}</small></div></div>
     <div class="workspace">{{ auth()->user()?->role==='admin'?'PLATAFORMA':'OPERAÇÃO' }}</div>
-    <nav aria-label="Navegação principal">
+    <nav class="nav-accordion" aria-label="Navegação principal">
     @auth
         @php
         $nav = match(auth()->user()->role) {
-            'admin' => [['/admin','home','Visão geral'],['/admin/bi','chart','BI e crescimento'],['/admin#empresas','users','Empresas'],['/admin#entregadores','truck','Entregadores'],['/admin#evolution','chat','WhatsApp central'],['/admin/ifood','store','Integração iFood']],
-            'staff' => auth()->user()->staff_profile==='waiter'?[['/dining','store','Mesas e comandas']]:array_merge([['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha']],auth()->user()->staff_profile==='operator'?[['/pos','store','PDV'],['/cash','orders','Caixa'],['/dining','store','Mesas e comandas']]:[]),
+            'admin' => [
+                ['/admin','home','Visão geral'],
+                ['Gestão','chart', [['/admin#empresas','users','Empresas'],['/admin/bi','chart','BI e crescimento']]],
+                ['Operação','truck', [['/admin#entregadores','truck','Entregadores']]],
+                ['Integrações','chat', [['/admin#evolution','chat','WhatsApp central'],['/admin/ifood','store','Integração iFood']]],
+            ],
+            'staff' => auth()->user()->staff_profile==='waiter'?[['/dining','store','Mesas e comandas']]:(auth()->user()->staff_profile==='operator' ? [
+                ['Operação','orders', [['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/dining','store','Mesas e comandas']]],
+                ['/cash','orders','Caixa'],
+            ] : [['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha']]),
             'courier' => [['/courier','home','Meu painel'],['/courier#ofertas','truck','Ofertas de corrida'],['/courier#corridas','orders','Minhas corridas']],
-            default => [['/dashboard','home','Visão geral'],['/bi','chart','BI e crescimento'],['/dashboard#pedidos','orders','Pedidos'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/cash','orders','Caixa'],['/dining','store','Mesas e comandas'],['/catalog','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/deliveries','truck','Entregas'],['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood'],['/team','users','Equipe e acessos']],
+            default => [
+                ['/dashboard','home','Visão geral'],
+                ['Operação','orders', [['/dashboard#pedidos','orders','Pedidos'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/dining','store','Mesas e comandas'],['/deliveries','truck','Entregas']]],
+                ['Gestão','chart', [['/cash','orders','Caixa'],['/bi','chart','BI e crescimento']]],
+                ['Minha empresa','store', [['/catalog','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/team','users','Equipe e acessos']]],
+                ['Integrações','chat', [['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood']]],
+            ],
         };
         @endphp
-        @foreach($nav as [$href,$icon,$label])<a href="{{ $href }}" data-nav-link>@include('partials.icon',['name'=>$icon])<span>{{ $label }}</span>@if($label==='Pedidos'&&isset($summary))<span class="nav-count" data-summary="pending">{{ $summary['pending'] }}</span>@endif</a>@endforeach
+        @foreach($nav as [$target,$icon,$label])
+            @if(is_array($label))
+            <details class="nav-section" data-nav-section><summary>@include('partials.icon',['name'=>$icon])<span>{{ $target }}</span><i class="nav-chevron" aria-hidden="true"></i></summary><div class="nav-children">
+                @foreach($label as [$href,$childIcon,$childLabel])@include('partials.nav-link',['href'=>$href,'icon'=>$childIcon,'label'=>$childLabel])@endforeach
+            </div></details>
+            @else
+                @include('partials.nav-link',['href'=>$target,'icon'=>$icon,'label'=>$label])
+            @endif
+        @endforeach
     @else
         <a href="/">@include('partials.icon',['name'=>'home']) Conheça a plataforma</a><a href="/login">@include('partials.icon',['name'=>'users']) Entrar no sistema</a><a href="/entregadores/cadastro">@include('partials.icon',['name'=>'truck']) Sou entregador</a>
     @endauth

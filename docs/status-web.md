@@ -1,6 +1,12 @@
 # Estado e prioridades da versão web
 
-Atualizado em 05/11/2026 após perfil de garçom para atendimento no salão, branch `feat/platform-foundation`.
+Atualizado em 05/11/2026 após organização do menu em sanfona, branch `feat/platform-foundation`.
+
+## Menu em sanfona — 05/11/2026
+
+Painel da loja com Visão geral direta e grupos Operação (pedidos, cozinha, PDV, mesas e entregas), Gestão (caixa e BI), Minha empresa (cardápio, lojas e equipe) e Integrações (WhatsApp e iFood). Superadmin agrupa Gestão, Operação e Integrações. Operador agrupa os acessos operacionais; cozinha, garçom e entregador mantêm apenas seus poucos atalhos permitidos. Links, contadores e permissões existentes preservados.
+
+Grupos usam details/summary nativos, com abertura por teclado, foco visível e indicação da página atual. JavaScript mantém um grupo aberto por vez e abre o grupo da página/aba selecionada, inclusive ao navegar por hash. Páginas internas de loja e produto também mantêm o contexto do menu. No celular, grupos na vertical sem rolagem horizontal; barra de rolagem lateral continua discreta. Sem migração adicional. Conferido no Chrome local como proprietário e superadmin, em desktop e 390 px, incluindo teclado, troca de grupo, links por hash e abertura direta do catálogo, sem erros JavaScript. Dez testes PHP relacionados e sete JavaScript aprovados; Blade compilado.
 
 ## Perfil de garçom — 05/11/2026
 
