@@ -1,6 +1,16 @@
 # Estado e prioridades da versão web
 
-Atualizado em 05/11/2026 após recebimentos parciais e divisão por valor nas comandas, branch `feat/platform-foundation`.
+Atualizado em 05/11/2026 após união de comandas com preservação dos recebimentos, branch `feat/platform-foundation`.
+
+## União de comandas — 05/11/2026
+
+Comanda aberta pode ser unida a outra da mesma loja mediante conferência dos dois consumos, recebidos, saldos e destino. A origem é liberada e a conta fica na mesa de destino, com soma das pessoas (limite de 100). Motivo e confirmação explícitos; não há desfazer pelo painel. Mantém os pedidos e parcelas nos registros originais, sem copiar vendas nem alterar movimentos de caixa. A conta consolidada inclui cada pedido e recebimento uma vez, inclusive em uniões sucessivas. BI continua contando pedidos originais.
+
+A cozinha mostra o destino nos pedidos ainda em atendimento. Transferência posterior da conta também alcança os pedidos das comandas unidas; vias de produção já emitidas permanecem preservadas. Histórico de uniões com origem, destino, motivo, operador e horário, na tela e na impressão. A origem fica identificada como unida, com link para o destino e bloqueio de novos lançamentos. Não é encerramento financeiro da origem: somente a conta final recebe o total de fechamento. O mapa soma o consumo consolidado e libera a mesa de origem.
+
+Reenvio é idempotente; pagamentos, pedidos, situação ou mesa alterados após a conferência exigem nova revisão. Telas antigas de recebimento, transferência e encerramento também rejeitam o grupo alterado. Comandas de lojas diferentes, fechadas, mesas desativadas e acesso revogado são recusados. Cancelados parcialmente pagos continuam exigindo devolução manual no caixa antes de encerrar a conta consolidada. Auditoria e união são transacionais.
+
+Migration `2026_11_05_204710_add_dining_tab_merges` adiciona vínculos e histórico sem alterar o legado. Reversão bloqueada depois de existir união, preservando a composição da conta. Publicar com migrações. Validação: 54 testes relacionados aprovados, 965 asserções; conferência Chrome local em desktop e 390 px, sem erros JavaScript ou transbordamento. Cenário visual: R$ 24,90 + R$ 24,90 = R$ 49,80, mantendo R$ 24,90 recebidos e R$ 24,90 pendentes. Piloto físico e concorrência PostgreSQL continuam pendentes. iFood permanece pausado.
 
 ## Divisão da conta e recebimentos parciais — 05/11/2026
 

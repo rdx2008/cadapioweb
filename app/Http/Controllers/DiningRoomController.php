@@ -24,7 +24,19 @@ class DiningRoomController extends Controller
         abort_if(! empty($data['store_id']) && ! $store, 404);
         $tables = DB::table('dining_tables')->where('store_id', $store?->id ?? 0)->orderBy('name')->get();
         $tabs = DB::table('dining_tabs')->whereIn('active_table_id', $tables->pluck('id'))->get()->keyBy('current_table_id');
-        $orders = DB::table('orders')->whereIn('dining_tab_id', $tabs->pluck('id'))->where('status', '!=', 'cancelled')->get(['dining_tab_id', 'total_cents', 'payment_status'])->groupBy('dining_tab_id');
+        $owners = $tabs->pluck('id', 'id')->all();
+        $parents = array_keys($owners);
+        while ($parents !== []) {
+            $children = DB::table('dining_tabs')->where('store_id', $store->id)->whereIn('merged_into_tab_id', $parents)->get(['id', 'merged_into_tab_id']);
+            $parents = [];
+            foreach ($children as $child) {
+                if (! isset($owners[$child->id])) {
+                    $owners[$child->id] = $owners[$child->merged_into_tab_id];
+                    $parents[] = $child->id;
+                }
+            }
+        }
+        $orders = DB::table('orders')->whereIn('dining_tab_id', array_keys($owners))->where('status', '!=', 'cancelled')->get(['dining_tab_id', 'total_cents', 'payment_status'])->groupBy(fn ($order) => $owners[$order->dining_tab_id]);
         $history = DB::table('dining_tabs')->where('store_id', $store?->id ?? 0)->orderByDesc('id')->paginate(15);
 
         return response()->view('dining.index', compact('stores', 'store', 'tables', 'tabs', 'orders', 'history'))->header('Cache-Control', 'private, no-store');
@@ -76,11 +88,14 @@ class DiningRoomController extends Controller
         $user = $room->member($request->user());
         $tab = $room->tab($user, $id);
         $summary = $room->summary($tab);
-        $orders = DB::table('orders')->where('dining_tab_id', $id)->orderByDesc('id')->paginate(20);
+        $ids = $room->groupIds($tab);
+        $orders = DB::table('orders')->whereIn('dining_tab_id', $ids)->orderByDesc('id')->paginate(20);
         $store = DB::table('stores')->find($tab->store_id);
 
         return compact('tab', 'summary', 'orders', 'store') + ['operator' => DB::table('users')->find($tab->opened_by),
-            'settlements' => DB::table('dining_settlements')->join('users', 'users.id', '=', 'dining_settlements.user_id')->where('dining_tab_id', $id)->select('dining_settlements.*', 'users.name as operator_name')->orderBy('dining_settlements.id')->get(),
+            'settlements' => DB::table('dining_settlements')->join('users', 'users.id', '=', 'dining_settlements.user_id')->whereIn('dining_tab_id', $ids)->select('dining_settlements.*', 'users.name as operator_name')->orderBy('dining_settlements.id')->get(),
+            'mergeTargets' => $tab->closed_at ? collect() : DB::table('dining_tabs')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->whereNull('closed_at')->where('id', '!=', $id)->orderBy('table_name')->get(),
+            'merges' => DB::table('dining_merges')->join('users', 'users.id', '=', 'dining_merges.user_id')->where(fn ($q) => $q->whereIn('source_tab_id', $ids)->orWhereIn('target_tab_id', $ids))->select('dining_merges.*', 'users.name as operator_name')->orderBy('dining_merges.id')->get(),
             'destinations' => $tab->closed_at ? collect() : DB::table('dining_tables')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->where('enabled', true)
                 ->where('id', '!=', $tab->current_table_id)->whereNotIn('id', DB::table('dining_tabs')->whereNotNull('active_table_id')->select('active_table_id'))->orderBy('name')->get(['id', 'name', 'seats']),
             'transfers' => DB::table('dining_transfers')->join('users', 'users.id', '=', 'dining_transfers.user_id')->where('dining_tab_id', $tab->id)->select('dining_transfers.*', 'users.name as operator_name')->orderByDesc('dining_transfers.id')->get(),
@@ -122,7 +137,7 @@ class DiningRoomController extends Controller
             $user = $room->member($request->user(), true);
             $tab = $room->tab($user, $id, true);
             abort_if($tab->closed_at !== null, 409);
-            $order = DB::table('orders')->where('dining_tab_id', $id)->where('tenant_id', $user->tenant_id)->where('id', $orderId)->lockForUpdate()->firstOrFail();
+            $order = DB::table('orders')->whereIn('dining_tab_id', $room->groupIds($tab))->where('tenant_id', $user->tenant_id)->where('id', $orderId)->lockForUpdate()->firstOrFail();
             if ($order->status === 'completed') {
                 return;
             }
@@ -135,12 +150,43 @@ class DiningRoomController extends Controller
         return redirect()->route('dining.show', $id)->with('success', 'Pedido marcado como servido.');
     }
 
+    public function mergeReview(Request $request, int $id, DiningRoom $room): Response
+    {
+        $data = $request->validate(['target_tab_id' => 'required|integer|min:1']);
+        $user = $room->member($request->user());
+        $source = $room->tab($user, $id);
+        $target = $room->tab($user, (int) $data['target_tab_id']);
+        abort_unless($source->store_id === $target->store_id, 404);
+        abort_if($source->id === $target->id || $source->closed_at || $target->closed_at, 409, 'Escolha duas comandas abertas diferentes.');
+        $store = DB::table('stores')->find($source->store_id);
+        $sourceSummary = $room->summary($source);
+        $targetSummary = $room->summary($target);
+
+        return response()->view('dining.merge', compact('source', 'target', 'store', 'sourceSummary', 'targetSummary') + ['sourceHash' => $room->mergeHash($source, $sourceSummary), 'targetHash' => $room->mergeHash($target, $targetSummary)])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function merge(Request $request, int $id, DiningRoom $room): RedirectResponse
+    {
+        $data = $request->validate(['target_tab_id' => 'required|integer|min:1', 'source_hash' => 'required|string|size:64', 'target_hash' => 'required|string|size:64', 'reason' => 'required|string|max:500', 'request_key' => 'required|uuid', 'confirmed' => 'accepted']);
+        DB::transaction(function () use ($request, $id, $room, $data): void {
+            $user = $room->member($request->user(), true);
+            $source = $room->tab($user, $id, true);
+            $target = $room->tab($user, (int) $data['target_tab_id'], true);
+            $room->merge($source, $target, $user, $data['source_hash'], $data['target_hash'], trim($data['reason']), $data['request_key']);
+        }, 3);
+
+        return redirect()->route('dining.show', $data['target_tab_id'])->with('success', 'Comandas unidas. A mesa de origem foi liberada. Avise a equipe e confira as vias já impressas.');
+    }
+
     public function transfer(Request $request, int $id, DiningRoom $room): RedirectResponse
     {
-        $data = $request->validate(['from_table_id' => 'required|integer|min:1', 'to_table_id' => 'required|integer|min:1', 'reason' => 'required|string|max:500', 'confirmed' => 'accepted', 'request_key' => 'required|uuid']);
+        $data = $request->validate(['expected_review_hash' => 'sometimes|required|string|size:64', 'from_table_id' => 'required|integer|min:1', 'to_table_id' => 'required|integer|min:1', 'reason' => 'required|string|max:500', 'confirmed' => 'accepted', 'request_key' => 'required|uuid']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
             $user = $room->member($request->user(), true);
             $tab = $room->tab($user, $id, true);
+            if (isset($data['expected_review_hash']) && ! DB::table('dining_transfers')->where('request_key', $data['request_key'])->exists()) {
+                abort_unless(hash_equals($room->summary($tab)['review_hash'], $data['expected_review_hash']), 409, 'A comanda mudou. Atualize a tela antes de transferir.');
+            }
             $room->transfer($tab, $user, (int) $data['from_table_id'], (int) $data['to_table_id'], trim($data['reason']), $data['request_key']);
         }, 3);
 
@@ -149,12 +195,15 @@ class DiningRoomController extends Controller
 
     public function close(Request $request, int $id, DiningRoom $room): RedirectResponse
     {
-        $data = $request->validate(['request_key' => 'required|uuid', 'confirmed' => 'accepted', 'expected_table_id' => 'sometimes|required|integer|min:1']);
+        $data = $request->validate(['expected_review_hash' => 'sometimes|required|string|size:64', 'request_key' => 'required|uuid', 'confirmed' => 'accepted', 'expected_table_id' => 'sometimes|required|integer|min:1']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
             $user = $room->member($request->user(), true);
             $tab = $room->tab($user, $id, true);
             if ($tab->closed_at === null && isset($data['expected_table_id'])) {
                 abort_unless($tab->current_table_id === (int) $data['expected_table_id'], 409, 'A comanda foi transferida. Atualize a tela antes de encerrar.');
+            }
+            if ($tab->closed_at === null && isset($data['expected_review_hash'])) {
+                abort_unless(hash_equals($room->summary($tab)['review_hash'], $data['expected_review_hash']), 409, 'A comanda mudou. Atualize a tela antes de encerrar.');
             }
             $room->close($tab, $user, $data['request_key']);
         }, 3);

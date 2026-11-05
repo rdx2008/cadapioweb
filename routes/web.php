@@ -64,6 +64,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/dining/tabs/{id}/print', [DiningRoomController::class, 'print'])->whereNumber('id')->name('dining.print');
     Route::post('/dining/tabs/{id}/pay', [DiningRoomController::class, 'pay'])->whereNumber('id')->middleware('throttle:10,1,dining-pay:')->name('dining.pay');
     Route::post('/dining/tabs/{id}/transfer', [DiningRoomController::class, 'transfer'])->whereNumber('id')->middleware('throttle:10,1,dining-transfer:')->name('dining.transfer');
+    Route::get('/dining/tabs/{id}/merge', [DiningRoomController::class, 'mergeReview'])->whereNumber('id')->name('dining.merge-review');
+    Route::post('/dining/tabs/{id}/merge', [DiningRoomController::class, 'merge'])->whereNumber('id')->middleware('throttle:10,1,dining-merge:')->name('dining.merge');
     Route::post('/dining/tabs/{id}/orders/{orderId}/serve', [DiningRoomController::class, 'serve'])->whereNumber(['id', 'orderId'])->name('dining.serve');
     Route::post('/dining/tabs/{id}/close', [DiningRoomController::class, 'close'])->whereNumber('id')->middleware('throttle:10,1,dining-close:')->name('dining.close');
     Route::get('/cash', [CashRegisterController::class, 'index'])->name('cash.index');

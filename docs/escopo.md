@@ -758,7 +758,7 @@ Fechamento definitivo com dinheiro contado, esperado, diferença justificada, to
 
 Mapa por loja, mesas cadastradas pelo proprietário, atendimento compartilhado por mesa e acesso de operadores por loja. Abertura identificada, pessoas, tempo e consumo; histórico preservado e mesa liberada após encerramento. Pedidos lançados pelo PDV existente como consumo no local, enviados à cozinha com identificação de mesa/comanda e preço congelado. Conta agrupa pedidos e recebe integralmente o saldo atual por dinheiro/Pix manual/maquininha, em caixa aberto, com confirmação explícita, conferência de alteração de valores e proteção contra reenvio. Não cria cobrança externa. Encerramento exige saldo quitado, pedidos servidos/cancelados e devoluções de cancelados pagas registradas. Impressão parcial/final pelo navegador. Sem vínculos de mesa no legado.
 
-Continuam pendentes do salão: QR por sessão, atendimento/conta solicitados pelo cliente, perfil dedicado de garçom, comandas individuais, união de mesas, divisão por item, taxa de serviço e mapa em tempo real. Validação física e concorrência PostgreSQL permanecem para piloto.
+Continuam pendentes do salão: QR por sessão, atendimento/conta solicitados pelo cliente, perfil dedicado de garçom, comandas individuais, divisão por item, taxa de serviço e mapa em tempo real. Validação física e concorrência PostgreSQL permanecem para piloto.
 
 ### 17.24. Transferência integral de comanda
 
@@ -767,3 +767,7 @@ Transferência para mesa livre e ativa da mesma loja, com motivo e confirmação
 ### 17.25. Divisão por valor e recebimentos parciais na comanda
 
 Recebimentos parciais em dinheiro/Pix manual/maquininha, uma forma e valor por confirmação, com sugestão de divisão do saldo entre pessoas em centavos. Parcelas abatem pedidos por ordem de lançamento; pedido só fica pago ao completar seu total, sem alterar consumo ou preparo. Caixa aberto obrigatório, registro no turno atual, histórico de parcelas na conta e impressão. Proteções contra valor acima do saldo, revisão antiga, reenvio e confirmação por fora da comanda. Cancelamento exige devolução manual do recebido nas formas originais, de maneira transacional; turno fechado permanece imutável. Não inclui atribuição de itens/pessoas, pagamento dividido por link ou estorno bancário. BI de vendas pagas mantém o critério de pedidos integralmente quitados; caixa registra cada parcela. Migração preserva histórico e bloqueia reversão incompatível após divisão de entradas.
+
+### 17.26. União de comandas
+
+Conferência de duas comandas abertas da mesma loja, com consumo, recebido, saldo e destino; motivo e confirmação antes da união. Origem liberada e identificada como unida, destino consolida pedidos e pagamentos sem copiá-los, inclusive em uniões sucessivas. Pessoas somadas até 100. Cozinha atualiza o destino nos pedidos em atendimento; transferência posterior alcança o grupo. Histórico na tela e impressão, preservação das vias já emitidas e dos movimentos dos turnos de caixa. Origem bloqueia novos pedidos e aponta ao destino. Saldo, serviço e devoluções pendentes de qualquer integrante impedem encerramento da conta consolidada. Idempotência, conferência de alterações e autoria transacional. Sem desfazer união no painel; manter a migração aplicada após uso.

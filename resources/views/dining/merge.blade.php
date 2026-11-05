@@ -1,0 +1,12 @@
+@extends('pos.layout')
+@section('content')
+@php($money=fn($value)=>'R$ '.number_format($value/100,2,',','.'))
+<div class="cash-page"><a href="{{ route('dining.show',$source->id) }}">← Voltar à comanda</a><h1>Conferir união de comandas</h1><p>{{ $store->name }} · Os pedidos e pagamentos já registrados serão preservados.</p>
+<div class="cash-metrics">
+@foreach([[$source,$sourceSummary,'Origem · será liberada'],[$target,$targetSummary,'Destino · mantém a conta']] as [$bill,$totals,$label])
+<section class="card"><small>{{ $label }}</small><h2>{{ $bill->table_name }} · #{{ $bill->id }}</h2><p>{{ $bill->guest_label }} · {{ $bill->guests }} pessoa(s)</p><p>Consumo: {{ $money($totals['total']) }}</p><p>Recebido: {{ $money($totals['paid']) }}</p><p>Saldo: <strong>{{ $money($totals['pending']) }}</strong></p></section>
+@endforeach
+<section class="card"><small>Depois da união</small><h2>{{ $target->table_name }} · #{{ $target->id }}</h2><p>{{ $source->guests+$target->guests }} pessoa(s)</p><p>Consumo: {{ $money($sourceSummary['total']+$targetSummary['total']) }}</p><p>Recebido: {{ $money($sourceSummary['paid']+$targetSummary['paid']) }}</p><p>Saldo: <strong>{{ $money($sourceSummary['pending']+$targetSummary['pending']) }}</strong></p></section></div>
+<section class="card"><h2>Confirmar destino</h2><p>A conta ficará na {{ $target->table_name }}. A {{ $source->table_name }} ficará livre para outro atendimento. Pedidos em preparo passam a mostrar o destino na cozinha; confira as vias já impressas.</p><p>Esta união não pode ser desfeita pelo painel. Para trocar apenas de mesa sem juntar contas, use a transferência.</p>
+<form class="stack-form" method="post" action="{{ route('dining.merge',$source->id) }}">@csrf<input type="hidden" name="target_tab_id" value="{{ $target->id }}"><input type="hidden" name="source_hash" value="{{ $sourceHash }}"><input type="hidden" name="target_hash" value="{{ $targetHash }}"><input type="hidden" name="request_key" value="{{ (string)Illuminate\Support\Str::uuid() }}"><label>Motivo<input name="reason" required maxlength="500" placeholder="Ex.: os grupos vão pagar juntos"></label><label class="cash-check"><input type="checkbox" name="confirmed" value="1" required>Conferi as duas contas e o destino. Vou avisar a equipe.</label><button>Unir na {{ $target->table_name }}</button><a href="{{ route('dining.show',$source->id) }}">Voltar sem unir</a></form></section></div>
+@endsection

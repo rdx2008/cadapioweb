@@ -319,6 +319,188 @@ class DiningRoomTest extends TestCase
         $this->assertSame(500, json_decode(DB::table('cash_sessions')->find($first->id)->closing_totals, true)['cash']['sales']);
     }
 
+    private function anotherTab(array $f, string $name = 'Mesa 2'): array
+    {
+        $table = $this->spareTable($f, $name);
+        $this->post('/dining/tables/'.$table.'/open', ['guests' => 2, 'guest_label' => 'Outro grupo', 'request_key' => (string) Str::uuid()])->assertRedirect()->assertSessionHasNoErrors();
+
+        return array_replace($f, ['table' => DB::table('dining_tables')->find($table), 'tab' => DB::table('dining_tabs')->where('active_table_id', $table)->firstOrFail()]);
+    }
+
+    private function mergePayload(array $source, array $target): array
+    {
+        $preview = $this->get('/dining/tabs/'.$source['tab']->id.'/merge?target_tab_id='.$target['tab']->id)->assertOk();
+
+        return ['target_tab_id' => $target['tab']->id, 'source_hash' => $preview->viewData('sourceHash'), 'target_hash' => $preview->viewData('targetHash'), 'reason' => 'Grupos vao pagar juntos', 'confirmed' => 1, 'request_key' => (string) Str::uuid()];
+    }
+
+    public function test_merging_preserves_original_orders_and_partial_receipts_then_pays_and_serves_combined_bill(): void
+    {
+        $source = $this->fixture();
+        $target = $this->anotherTab($source);
+        $first = $this->orderForTab($source);
+        $second = $this->orderForTab($target);
+        $this->post('/dining/tabs/'.$source['tab']->id.'/pay', $this->payment($source, 'pix') + ['amount' => '10'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$target['tab']->id.'/pay', $this->payment($target, 'card') + ['amount' => '5'])->assertRedirect()->assertSessionHasNoErrors();
+        $cashBefore = DB::table('cash_entries')->get();
+        $settlementsBefore = DB::table('dining_settlements')->get();
+        $draft = $this->draft($source);
+        $merge = $this->mergePayload($source, $target);
+        $url = '/dining/tabs/'.$source['tab']->id.'/merge';
+        $this->post($url, $merge)->assertRedirect('/dining/tabs/'.$target['tab']->id)->assertSessionHasNoErrors();
+        $this->post($url, $merge)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertEquals($cashBefore, DB::table('cash_entries')->get());
+        $this->assertEquals($settlementsBefore, DB::table('dining_settlements')->get());
+        $this->assertDatabaseHas('orders', ['id' => $first->id, 'dining_tab_id' => $source['tab']->id, 'dining_label' => 'Mesa 2 · Comanda #'.$target['tab']->id, 'total_cents' => 3000, 'payment_status' => 'partial']);
+        $this->assertDatabaseHas('dining_tabs', ['id' => $source['tab']->id, 'active_table_id' => null, 'merged_into_tab_id' => $target['tab']->id, 'closing_total_cents' => null]);
+        $this->assertDatabaseHas('dining_tabs', ['id' => $target['tab']->id, 'guests' => 4, 'closed_at' => null]);
+        $summary = app(DiningRoom::class)->summary($target['tab']);
+        $this->assertSame(6000, $summary['total']);
+        $this->assertSame(1500, $summary['paid']);
+        $this->assertSame(4500, $summary['pending']);
+        $this->get('/dining')->assertOk()->assertSee('60,00')->assertSee('Unida à #'.$target['tab']->id);
+        $this->get('/dining/tabs/'.$source['tab']->id)->assertOk()->assertSee('Abrir comanda de destino')->assertDontSee('Confirmar valor recebido');
+        $this->get('/dining/tabs/'.$target['tab']->id.'/print')->assertOk()->assertSee('60,00')->assertSee('Histórico de uniões')->assertSee('10,00')->assertSee('5,00');
+        $this->post('/pos/'.$source['store'].'/review/'.$draft['key'].'/confirm', ['review_hash' => $draft['review_hash']])->assertConflict();
+        $this->post('/dining/tabs/'.$target['tab']->id.'/pay', $this->payment($target))->assertRedirect()->assertSessionHasNoErrors();
+        foreach ([$first, $second] as $order) {
+            DB::table('orders')->where('id', $order->id)->update(['status' => 'ready']);
+            $this->post('/dining/tabs/'.$target['tab']->id.'/orders/'.$order->id.'/serve')->assertRedirect()->assertSessionHasNoErrors();
+        }
+        $this->post('/dining/tabs/'.$target['tab']->id.'/close', ['confirmed' => 1, 'request_key' => (string) Str::uuid()])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('dining_tabs', ['id' => $target['tab']->id, 'closing_total_cents' => 6000]);
+        $this->assertSame(6000, (int) DB::table('cash_entries')->where('kind', 'sale')->sum('amount_cents'));
+        $this->assertDatabaseCount('orders', 2);
+        $this->assertDatabaseCount('dining_merges', 1);
+    }
+
+    public function test_chained_merges_and_later_transfer_include_each_original_order_and_receipt_once(): void
+    {
+        $first = $this->fixture();
+        $second = $this->anotherTab($first);
+        $third = $this->anotherTab($first, 'Mesa 3');
+        foreach ([$first, $second, $third] as $f) {
+            $this->orderForTab($f);
+            $this->post('/dining/tabs/'.$f['tab']->id.'/pay', $this->payment($f) + ['amount' => '1'])->assertRedirect()->assertSessionHasNoErrors();
+        }
+        $merge = $this->mergePayload($first, $second);
+        $this->post('/dining/tabs/'.$first['tab']->id.'/merge', $merge)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$second['tab']->id.'/merge', $this->mergePayload($second, $third))->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$first['tab']->id.'/merge', $merge)->assertRedirect()->assertSessionHasNoErrors();
+        $summary = app(DiningRoom::class)->summary($third['tab']);
+        $this->assertSame(9000, $summary['total']);
+        $this->assertSame(300, $summary['paid']);
+        $this->assertCount(3, $summary['orders']);
+        $page = $this->get('/dining/tabs/'.$third['tab']->id)->assertOk();
+        $this->assertCount(3, $page->viewData('settlements'));
+        $this->assertCount(2, $page->viewData('merges'));
+        $free = $this->spareTable($first, 'Mesa 4');
+        $this->post('/dining/tabs/'.$third['tab']->id.'/transfer', $this->transferPayload($third['table']->id, $free))->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(3, DB::table('orders')->where('dining_label', 'Mesa 4 · Comanda #'.$third['tab']->id)->count());
+        $this->assertDatabaseCount('cash_entries', 3);
+        $this->assertDatabaseCount('dining_merges', 2);
+    }
+
+    public function test_merge_rejects_stale_amounts_and_old_empty_bill_payment_transfer_and_closing_reviews(): void
+    {
+        $source = $this->fixture();
+        $target = $this->anotherTab($source);
+        $this->orderForTab($source);
+        $merge = $this->mergePayload($source, $target);
+        $this->post('/dining/tabs/'.$source['tab']->id.'/pay', $this->payment($source) + ['amount' => '1'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$source['tab']->id.'/merge', $merge)->assertSessionHasErrors('merge');
+        $oldPayment = $this->payment($target);
+        $oldHash = app(DiningRoom::class)->summary($target['tab'])['review_hash'];
+        $merge = $this->mergePayload($source, $target);
+        $this->post('/dining/tabs/'.$source['tab']->id.'/merge', $merge)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$source['tab']->id.'/merge', array_replace($merge, ['reason' => 'Changed']))->assertConflict();
+        $this->post('/dining/tabs/'.$target['tab']->id.'/pay', $oldPayment)->assertSessionHasErrors('payment');
+        $free = $this->spareTable($source, 'Mesa 3');
+        $this->post('/dining/tabs/'.$target['tab']->id.'/transfer', $this->transferPayload($target['table']->id, $free) + ['expected_review_hash' => $oldHash])->assertConflict();
+        $this->post('/dining/tabs/'.$target['tab']->id.'/close', ['confirmed' => 1, 'request_key' => (string) Str::uuid(), 'expected_review_hash' => $oldHash])->assertConflict();
+        $this->assertDatabaseCount('dining_merges', 1);
+        $this->assertDatabaseCount('cash_entries', 1);
+    }
+
+    public function test_merge_requires_two_open_tables_in_same_store_and_fresh_operator_access(): void
+    {
+        $source = $this->fixture();
+        $target = $this->anotherTab($source);
+        $merge = $this->mergePayload($source, $target);
+        $url = '/dining/tabs/'.$source['tab']->id.'/merge';
+        $this->post($url, array_replace($merge, ['confirmed' => 0]))->assertSessionHasErrors('confirmed');
+        $otherStore = $this->store($source['tenant'], 'other');
+        DB::table('dining_tabs')->where('id', $target['tab']->id)->update(['store_id' => $otherStore]);
+        $this->post($url, $merge)->assertNotFound();
+        $this->get($url.'?target_tab_id='.$target['tab']->id)->assertNotFound();
+        DB::table('dining_tabs')->where('id', $target['tab']->id)->update(['store_id' => $source['store']]);
+        $operator = User::factory()->create(['tenant_id' => $source['tenant'], 'role' => 'staff', 'staff_profile' => 'operator']);
+        $this->actingAs($operator)->post($url, $merge)->assertNotFound();
+        DB::table('user_store_access')->insert(['tenant_id' => $source['tenant'], 'store_id' => $source['store'], 'user_id' => $operator->id]);
+        $this->post($url, $merge)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('dining_merges', ['source_tab_id' => $source['tab']->id, 'user_id' => $operator->id]);
+        $this->actingAs($this->owner($this->tenant('foreign')))->post($url, $merge)->assertNotFound();
+        $this->actingAs($operator);
+        DB::table('users')->where('id', $operator->id)->update(['access_enabled' => false]);
+        $this->post($url, $merge)->assertForbidden();
+    }
+
+    public function test_merged_cancelled_partial_receipt_still_requires_refund_before_combined_bill_can_close(): void
+    {
+        $source = $this->fixture();
+        $target = $this->anotherTab($source);
+        $cancelled = $this->orderForTab($source);
+        $active = $this->orderForTab($target);
+        $this->post('/dining/tabs/'.$source['tab']->id.'/pay', $this->payment($source) + ['amount' => '5'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/orders/'.$cancelled->id.'/status', ['status' => 'cancelled', 'cancellation_reason' => 'Desistiu'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$source['tab']->id.'/merge', $this->mergePayload($source, $target))->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1, app(DiningRoom::class)->summary($target['tab'])['refunds_pending']);
+        $this->assertSame(3000, app(DiningRoom::class)->summary($target['tab'])['total']);
+        $this->post('/dining/tabs/'.$target['tab']->id.'/pay', $this->payment($target))->assertRedirect()->assertSessionHasNoErrors();
+        DB::table('orders')->where('id', $active->id)->update(['status' => 'completed']);
+        $close = ['confirmed' => 1, 'request_key' => (string) Str::uuid()];
+        $this->post('/dining/tabs/'.$target['tab']->id.'/close', $close)->assertSessionHasErrors('tab');
+        $cash = DB::table('cash_sessions')->first();
+        $this->post('/cash/'.$cash->id.'/refunds', ['order_id' => $cancelled->id, 'note' => 'Devolucao conferida', 'confirmed' => 1, 'request_key' => (string) Str::uuid()])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$target['tab']->id.'/close', $close)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('dining_tabs', ['id' => $target['tab']->id, 'closing_total_cents' => 3000]);
+        $this->assertDatabaseHas('orders', ['id' => $cancelled->id, 'dining_tab_id' => $source['tab']->id, 'status' => 'cancelled']);
+    }
+
+    public function test_merge_rejects_same_closed_disabled_or_oversized_destination_and_changed_target_balance(): void
+    {
+        $source = $this->fixture();
+        $target = $this->anotherTab($source);
+        $url = '/dining/tabs/'.$source['tab']->id.'/merge';
+        $merge = $this->mergePayload($source, $target);
+        $this->post($url, array_replace($merge, ['target_tab_id' => $source['tab']->id]))->assertUnprocessable();
+        $this->orderForTab($target);
+        $this->post($url, $merge)->assertSessionHasErrors('merge');
+        $merge = $this->mergePayload($source, $target);
+        DB::table('dining_tables')->where('id', $target['table']->id)->update(['enabled' => false]);
+        $this->post($url, $merge)->assertConflict();
+        DB::table('dining_tables')->where('id', $target['table']->id)->update(['enabled' => true]);
+        DB::table('dining_tabs')->where('id', $target['tab']->id)->update(['guests' => 100]);
+        $this->post($url, $this->mergePayload($source, $target))->assertUnprocessable();
+        DB::table('dining_tabs')->where('id', $target['tab']->id)->update(['closed_at' => now()]);
+        $this->post($url, $merge)->assertConflict();
+        $this->assertDatabaseCount('dining_merges', 0);
+    }
+
+    public function test_merge_audit_failure_rolls_back_group_occupancy_and_kitchen_label(): void
+    {
+        $source = $this->fixture();
+        $target = $this->anotherTab($source);
+        $order = $this->orderForTab($source);
+        $merge = $this->mergePayload($source, $target);
+        DB::unprepared("CREATE TRIGGER fail_merge BEFORE INSERT ON audit_events WHEN NEW.action = 'dining.merged' BEGIN SELECT RAISE(ABORT, 'audit failed'); END");
+        $this->post('/dining/tabs/'.$source['tab']->id.'/merge', $merge)->assertStatus(500);
+        $this->assertDatabaseCount('dining_merges', 0);
+        $this->assertDatabaseHas('dining_tabs', ['id' => $source['tab']->id, 'active_table_id' => $source['table']->id, 'merged_into_tab_id' => null, 'closed_at' => null]);
+        $this->assertDatabaseHas('dining_tabs', ['id' => $target['tab']->id, 'guests' => 2]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'dining_label' => 'Mesa 1 · Comanda #'.$source['tab']->id]);
+    }
+
     private function spareTable(array $f, string $name = 'Mesa 2'): int
     {
         return DB::table('dining_tables')->insertGetId(['tenant_id' => $f['tenant'], 'store_id' => $f['store'], 'name' => $name, 'name_key' => mb_strtolower($name), 'seats' => 6, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()]);

@@ -39,9 +39,31 @@ class DiningRoom
         return $tab;
     }
 
+    public function groupIds(object $tab): array
+    {
+        $ids = [$tab->id];
+        $parents = $ids;
+        while ($parents !== []) {
+            $children = DB::table('dining_tabs')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->whereIn('merged_into_tab_id', $parents)->pluck('id')->all();
+            $parents = array_values(array_diff($children, $ids));
+            $ids = array_merge($ids, $parents);
+        }
+        sort($ids);
+
+        return $ids;
+    }
+
+    public function mergeHash(object $tab, ?array $summary = null): string
+    {
+        $summary ??= $this->summary($tab);
+
+        return hash('sha256', json_encode([$tab->id, $tab->current_table_id, $tab->guests, $tab->closed_at, $summary['review_hash'], $summary['orders']->map(fn ($o) => [$o->id, $o->status, $o->payment_status, $o->total_cents, $o->received_cents])->all()], JSON_THROW_ON_ERROR));
+    }
+
     public function summary(object $tab): array
     {
-        $orders = DB::table('orders')->where('dining_tab_id', $tab->id)->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->orderBy('id')->get();
+        $ids = $this->groupIds($tab);
+        $orders = DB::table('orders')->whereIn('dining_tab_id', $ids)->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->orderBy('id')->get();
         $valid = $orders->where('status', '!=', 'cancelled');
         $receipts = DB::table('cash_entries')->whereIn('order_id', $orders->pluck('id'))->where('kind', 'sale')->selectRaw('order_id, SUM(amount_cents) as amount')->groupBy('order_id')->pluck('amount', 'order_id');
         foreach ($orders as $order) {
@@ -53,7 +75,7 @@ class DiningRoom
 
         return ['orders' => $orders, 'total' => (int) $valid->sum('total_cents'), 'paid' => (int) $valid->sum('received_cents'),
             'pending' => (int) $pending->sum('balance_cents'), 'pending_orders' => $pending, 'unfinished' => $valid->where('status', '!=', 'completed')->count(), 'refunds_pending' => $refunds,
-            'review_hash' => hash('sha256', json_encode([$tab->current_table_id, $pending->map(fn ($o) => [$o->id, $o->total_cents, $o->payment_status, $o->received_cents])->values()->all()], JSON_THROW_ON_ERROR))];
+            'review_hash' => hash('sha256', json_encode([$tab->current_table_id, $ids, $pending->map(fn ($o) => [$o->id, $o->total_cents, $o->payment_status, $o->received_cents])->values()->all()], JSON_THROW_ON_ERROR))];
     }
 
     public function open(object $table, object $user, string $guest, int $guests, string $key): int
@@ -93,7 +115,7 @@ class DiningRoom
         abort_unless($target->enabled, 409, 'A mesa de destino está desativada.');
         abort_if(DB::table('dining_tabs')->where('active_table_id', $to)->exists(), 409, 'A mesa de destino já está ocupada. Escolha uma mesa livre.');
         DB::table('dining_tabs')->where('id', $tab->id)->update(['active_table_id' => $to, 'current_table_id' => $to, 'table_name' => $target->name, 'updated_at' => now()]);
-        DB::table('orders')->where('tenant_id', $tab->tenant_id)->where('dining_tab_id', $tab->id)->whereIn('status', ['accepted', 'preparing', 'ready'])
+        DB::table('orders')->where('tenant_id', $tab->tenant_id)->whereIn('dining_tab_id', $this->groupIds($tab))->whereIn('status', ['accepted', 'preparing', 'ready'])
             ->update(['dining_label' => $target->name.' · Comanda #'.$tab->id, 'updated_at' => now()]);
         DB::table('dining_transfers')->insert(['tenant_id' => $tab->tenant_id, 'store_id' => $tab->store_id, 'dining_tab_id' => $tab->id, 'user_id' => $user->id,
             'from_table_id' => $from, 'to_table_id' => $to, 'from_name' => $tab->table_name, 'to_name' => $target->name, 'reason' => $reason, 'request_key' => $key, 'created_at' => now()]);
@@ -110,7 +132,7 @@ class DiningRoom
         }
         abort_if($tab->closed_at !== null, 409, 'Esta comanda já foi encerrada.');
         DB::table('stores')->where('id', $tab->store_id)->lockForUpdate()->firstOrFail();
-        DB::table('orders')->where('dining_tab_id', $tab->id)->orderBy('id')->lockForUpdate()->get();
+        DB::table('orders')->whereIn('dining_tab_id', $this->groupIds($tab))->orderBy('id')->lockForUpdate()->get();
         $summary = $this->summary($tab);
         if (! hash_equals($summary['review_hash'], $hash)) {
             throw ValidationException::withMessages(['payment' => 'O consumo ou recebimento mudou. Atualize a comanda e confira o saldo antes de receber.']);
@@ -140,6 +162,33 @@ class DiningRoom
         DB::table('dining_settlements')->insert(['dining_tab_id' => $tab->id, 'user_id' => $user->id, 'request_key' => $key, 'review_hash' => $hash,
             'payment_method' => $method, 'amount_cents' => $amount, 'order_ids' => json_encode($orderIds, JSON_THROW_ON_ERROR), 'created_at' => now()]);
         Audit::record('dining.paid', ['tab_id' => $tab->id, 'amount_cents' => $amount, 'payment_method' => $method], $tab->tenant_id);
+    }
+
+    public function merge(object $source, object $target, object $user, string $sourceHash, string $targetHash, string $reason, string $key): void
+    {
+        $existing = DB::table('dining_merges')->where('request_key', $key)->first();
+        if ($existing) {
+            abort_unless($existing->source_tab_id === $source->id && $existing->target_tab_id === $target->id && $existing->user_id === $user->id && $existing->reason === $reason && hash_equals($existing->source_hash, $sourceHash) && hash_equals($existing->target_hash, $targetHash), 409);
+
+            return;
+        }
+        abort_unless($source->tenant_id === $target->tenant_id && $source->store_id === $target->store_id, 404);
+        abort_if($source->id === $target->id, 422, 'Escolha outra comanda para unir.');
+        abort_if($source->closed_at !== null || $target->closed_at !== null, 409, 'As duas comandas precisam estar abertas. Atualize a conferência.');
+        DB::table('stores')->where('id', $source->store_id)->lockForUpdate()->firstOrFail();
+        $tables = DB::table('dining_tables')->where('store_id', $source->store_id)->whereIn('id', [$source->active_table_id, $target->active_table_id])->orderBy('id')->lockForUpdate()->get();
+        abort_unless($tables->count() === 2 && $tables->every(fn ($table) => (bool) $table->enabled), 409, 'Confira as mesas ativas antes de unir.');
+        if (! hash_equals($this->mergeHash($source), $sourceHash) || ! hash_equals($this->mergeHash($target), $targetHash)) {
+            throw ValidationException::withMessages(['merge' => 'As comandas mudaram. Refaça a conferência antes de unir.']);
+        }
+        abort_if($source->guests + $target->guests > 100, 422, 'A união excede o limite de 100 pessoas por comanda.');
+        $sourceIds = $this->groupIds($source);
+        DB::table('orders')->whereIn('dining_tab_id', $sourceIds)->orderBy('id')->lockForUpdate()->get();
+        DB::table('dining_tabs')->where('id', $source->id)->update(['active_table_id' => null, 'merged_into_tab_id' => $target->id, 'closed_at' => now(), 'closed_by' => $user->id, 'updated_at' => now()]);
+        DB::table('dining_tabs')->where('id', $target->id)->update(['guests' => $source->guests + $target->guests, 'updated_at' => now()]);
+        DB::table('orders')->whereIn('dining_tab_id', $sourceIds)->whereIn('status', ['accepted', 'preparing', 'ready'])->update(['dining_label' => $target->table_name.' · Comanda #'.$target->id, 'updated_at' => now()]);
+        DB::table('dining_merges')->insert(['tenant_id' => $source->tenant_id, 'store_id' => $source->store_id, 'source_tab_id' => $source->id, 'target_tab_id' => $target->id, 'user_id' => $user->id, 'from_name' => $source->table_name, 'to_name' => $target->table_name, 'reason' => $reason, 'source_hash' => $sourceHash, 'target_hash' => $targetHash, 'request_key' => $key, 'created_at' => now()]);
+        Audit::record('dining.merged', ['source_tab_id' => $source->id, 'target_tab_id' => $target->id, 'reason' => $reason], $source->tenant_id);
     }
 
     public function close(object $tab, object $user, string $key): void
