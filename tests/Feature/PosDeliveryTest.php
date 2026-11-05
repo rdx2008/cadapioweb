@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\CashRegister;
 use App\Services\DispatchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -22,6 +23,7 @@ class PosDeliveryTest extends TestCase
         $tenant = $this->tenant();
         $store = $this->store($tenant);
         $this->actingAs($this->owner($tenant));
+        app(CashRegister::class)->open(DB::table('stores')->find($store), auth()->id(), 0, (string) Str::uuid());
         DB::table('stores')->where('id', $store)->update(['delivery_mode' => 'radius', 'delivery_pricing' => 'fixed', 'delivery_max_meters' => 5000, 'delivery_fixed_cents' => 500]);
         $product = DB::table('products')->insertGetId(['tenant_id' => $tenant, 'store_id' => $store, 'name' => 'Food', 'category' => 'Menu', 'price_cents' => 3000]);
         $fields = ['street' => 'Rua A', 'number' => '10', 'neighborhood' => 'Centro', 'city' => 'Sao Paulo', 'state' => 'SP', 'postcode' => '01001000'];
@@ -60,7 +62,10 @@ class PosDeliveryTest extends TestCase
     public function test_online_sale_cannot_be_forged_paid_and_reserves_without_external_request(): void
     {
         $f = $this->fixture(true);
+        $session = DB::table('cash_sessions')->where('open_store_id', $f['store'])->firstOrFail();
+        app(CashRegister::class)->close($session, auth()->id(), 0, '', (string) Str::uuid());
         $order = $this->confirm($f);
+        $this->assertDatabaseCount('cash_entries', 0);
         $this->assertSame('pending', $order->payment_status);
         $this->assertDatabaseHas('payment_attempts', ['order_id' => $order->id, 'state' => 'reserved', 'amount_cents' => 3500]);
         $this->post('/orders/'.$order->id.'/status', ['status' => 'preparing'])->assertConflict();

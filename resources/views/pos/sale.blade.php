@@ -4,7 +4,8 @@
 <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key',(string)Illuminate\Support\Str::uuid()) }}">
 @php($cartSeed=['cart_lines'=>old('cart_lines'),'items'=>[],'choices'=>[],'variants'=>[]])
 <div data-cart-payload></div><script type="application/json" data-cart-seed>@json($cartSeed)</script>
-<div class="pos-workspace"><section class="pos-catalog"><label class="pos-search">Buscar produto<input type="search" data-menu-search placeholder="Buscar produto pelo nome" autocomplete="off"></label>
+<div class="pos-workspace"><section class="pos-catalog"><p class="notice">@if($cashSession)Caixa #{{ $cashSession->id }} aberto. <a href="{{ route('cash.show',$cashSession->id) }}">Acompanhar turno</a>@else
+Caixa fechado. <a href="{{ route('cash.index') }}">Abra o caixa</a> antes de confirmar um recebimento presencial.@endif</p><label class="pos-search">Buscar produto<input type="search" data-menu-search placeholder="Buscar produto pelo nome" autocomplete="off"></label>
 <nav class="pos-categories" aria-label="Categorias"><button type="button" data-pos-category="" aria-pressed="true">Todos</button>@foreach($products->groupBy('category') as $category=>$rows)<button type="button" data-pos-category="category-{{ $loop->index }}" aria-pressed="false">{{ $category }}</button>@endforeach</nav><p class="muted">Toque em um produto para adicionar.</p><p data-search-empty hidden class="empty">Nenhum produto encontrado.</p>
 @include('partials.menu-products')
 <p class="muted">Produtos com opções abrem uma janela para você escolher.</p><a href="{{ route('pos.index') }}">Trocar loja / iniciar outra venda</a></section>

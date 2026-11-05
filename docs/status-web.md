@@ -1,6 +1,16 @@
 # Estado e prioridades da versão web
 
-Atualizado em 24/10/2026 após o envio inicial de ações iFood de teste e a correção do botão Sair, branch `feat/platform-foundation`.
+Atualizado em 05/11/2026 após o caixa por turno do PDV, branch `feat/platform-foundation`.
+
+## Caixa por turno do PDV — 05/11/2026
+
+Menu Caixa no painel e atalho na frente de caixa para proprietário e operador autorizado por loja. Um turno compartilhado aberto por loja, fundo de troco inicial, recebimentos separados em dinheiro/Pix manual/maquininha, suprimentos, sangrias com motivo e limite pelo dinheiro esperado. Recebimento presencial de pedido do PDV exige turno aberto; pedido pendente ou por link pode ser criado sem caixa. O recebimento posterior entra no turno aberto no momento da conferência, uma única vez. Troco é líquido: a entrada corresponde ao total do pedido, não ao valor entregue antes do troco.
+
+Fechamento exige contagem explícita do dinheiro, confirmação e justificativa quando houver diferença. Salva totais congelados, contado/esperado/diferença, responsável e horário; movimentos posteriores não alteram o turno fechado. Histórico paginado por loja e conferência para impressão pelo navegador. Cancelamento preserva o recebimento; devolução integral manual exige pedido cancelado com recebimento no caixa e confirmação de que o valor foi devolvido, inclusive de turno anterior. Não aciona banco, Pix, maquininha ou gateway. Mantém autoria e auditoria transacional; chaves de reenvio evitam duplicar abertura, movimentos, recebimentos, devolução e fechamento. Trava por empresa/loja e restrição única impedem dois turnos abertos na mesma loja.
+
+Escopo deste caixa: recebimentos manuais do PDV registrados após publicação. Vendas antigas já pagas não são inseridas retroativamente. Pedidos do cardápio, pagamentos por link, iFood e acertos de motoboy seguem suas áreas e não entram no saldo da gaveta. Sem divisão de pagamento, várias gavetas por loja, reabertura de turno, TEF, conciliação bancária ou fiscal nesta entrega.
+
+Migration `2026_11_05_025518_create_cash_register_tables` cria `cash_sessions` e `cash_entries`, sem preencher dados históricos. Publicar com migrações e reiniciar os processos existentes conforme o fluxo normal do Compose. Validação: regressão geral com 301 testes PHP aprovados e 1 consulta externa opcional ignorada; após ajustes finais de reenvio e mensagem, 15 testes de caixa/PDV aprovados novamente. Pint, Blade e rotas compilados. Chrome local: abrir, suprimento, fechar e imprimir, em desktop e 390 px sem erro JavaScript ou transbordamento da página. Evidências em outputs/caixa-turno-desktop.png, caixa-turno-mobile.png e caixa-fechamento.png. Concorrência PostgreSQL e piloto físico continuam pendentes. Nenhuma alteração na integração iFood.
 
 ## Evidências de requisição/resposta para suporte iFood — 03/11/2026
 

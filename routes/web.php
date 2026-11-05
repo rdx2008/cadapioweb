@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BusinessIntelligenceController;
+use App\Http\Controllers\CashRegisterController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
@@ -54,6 +55,13 @@ Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])-
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1,webhooks-evolution-id:');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
+    Route::get('/cash', [CashRegisterController::class, 'index'])->name('cash.index');
+    Route::post('/cash', [CashRegisterController::class, 'open'])->middleware('throttle:10,1,cash-open:')->name('cash.open');
+    Route::get('/cash/{id}', [CashRegisterController::class, 'show'])->whereNumber('id')->name('cash.show');
+    Route::get('/cash/{id}/print', [CashRegisterController::class, 'print'])->whereNumber('id')->name('cash.print');
+    Route::post('/cash/{id}/movements', [CashRegisterController::class, 'movement'])->whereNumber('id')->middleware('throttle:20,1,cash-movements:')->name('cash.movement');
+    Route::post('/cash/{id}/refunds', [CashRegisterController::class, 'refund'])->whereNumber('id')->middleware('throttle:10,1,cash-refunds:')->name('cash.refund');
+    Route::post('/cash/{id}/close', [CashRegisterController::class, 'close'])->whereNumber('id')->middleware('throttle:10,1,cash-close:')->name('cash.close');
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
     Route::get('/pos/orders/{orderId}', [PosController::class, 'result'])->whereNumber('orderId')->name('pos.result');
     Route::post('/pos/orders/{orderId}/dispatch', [PosController::class, 'dispatch'])->whereNumber('orderId')->middleware('throttle:10,1,pos-orders-orderId-dispatch:')->name('pos.dispatch');

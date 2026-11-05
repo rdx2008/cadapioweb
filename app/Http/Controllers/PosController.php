@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CashRegister;
 use App\Services\CheckoutPayment;
 use App\Services\CheckoutQuote;
 use App\Services\DeliveryCoverage;
@@ -60,7 +61,7 @@ class PosController extends Controller
     {
         $store = $this->store($request, $id);
 
-        return response()->view('pos.sale', app(MenuCatalog::class)->data($store) + ['store' => $store, 'methods' => app(CheckoutPayment::class)->methods($store), 'drivers' => $this->drivers($id), 'stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
+        return response()->view('pos.sale', app(MenuCatalog::class)->data($store) + ['cashSession' => app(CashRegister::class)->current($id), 'store' => $store, 'methods' => app(CheckoutPayment::class)->methods($store), 'drivers' => $this->drivers($id), 'stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
     }
 
     private function drivers(int $storeId): Collection
@@ -196,6 +197,9 @@ class PosController extends Controller
                 DB::table('order_items')->insert($item + ['order_id' => $orderId]);
             }
             app(OnlinePayment::class)->reserve(DB::table('orders')->find($orderId));
+            if ($draft['data']['received'] === 'yes') {
+                app(CashRegister::class)->receipt(DB::table('orders')->find($orderId), $request->user()->id);
+            }
             Audit::record('pos.sale', ['order_id' => $orderId, 'total_cents' => $quote['total_cents'], 'payment_method' => $quote['payment_method'], 'received' => $draft['data']['received'] === 'yes'], $store->tenant_id);
 
             return $orderId;

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\CashRegister;
 use App\Services\StoreAvailability;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ class PosCheckoutTest extends TestCase
         $owner = $this->owner($tenant);
         $product = DB::table('products')->insertGetId(['tenant_id' => $tenant, 'store_id' => $store, 'name' => 'Sandwich', 'category' => 'Food', 'price_cents' => 1500, 'available' => true]);
         $this->actingAs($owner);
+        app(CashRegister::class)->open(DB::table('stores')->find($store), $owner->id, 0, (string) Str::uuid());
         $key = (string) Str::uuid();
         $data = ['idempotency_key' => $key, 'payment_method' => 'cash', 'received' => 'yes', 'change_for' => '50,00', 'cart_lines' => [['product_id' => $product, 'quantity' => 2]]];
 
@@ -39,7 +41,7 @@ class PosCheckoutTest extends TestCase
     {
         $f = $this->fixture();
         $this->get('/pos')->assertOk()->assertSee('Loja loja');
-        $this->get('/pos/'.$f['store'])->assertOk()->assertSee('Sandwich')->assertDontSee('online_infinitepay');
+        $this->get('/pos/'.$f['store'])->assertOk()->assertSee('Sandwich')->assertDontSee('online_infinitepay')->assertSee('Acompanhar turno')->assertDontSee('Caixa fechado.')->assertDontSee('@else');
         $hash = $this->prepare($f);
         $this->assertDatabaseCount('orders', 0);
         $this->post('/pos/'.$f['store'].'/review/'.$f['key'].'/confirm', $hash)->assertRedirect();
@@ -132,6 +134,7 @@ class PosCheckoutTest extends TestCase
         $this->post('/pos/'.$f['store'].'/review/'.$f['key'].'/confirm', $hash)->assertStatus(500);
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('order_items', 0);
+        $this->assertDatabaseCount('cash_entries', 0);
     }
 
     public function test_variant_and_required_options_are_priced_on_server_and_frozen(): void
