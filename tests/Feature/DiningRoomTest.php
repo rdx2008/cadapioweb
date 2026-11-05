@@ -200,6 +200,134 @@ class DiningRoomTest extends TestCase
         $this->post('/dining/tabs/'.$f['tab']->id.'/close', $close)->assertSessionHasNoErrors();
     }
 
+    private function spareTable(array $f, string $name = 'Mesa 2'): int
+    {
+        return DB::table('dining_tables')->insertGetId(['tenant_id' => $f['tenant'], 'store_id' => $f['store'], 'name' => $name, 'name_key' => mb_strtolower($name), 'seats' => 6, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    private function transferPayload(int $from, int $to): array
+    {
+        return ['from_table_id' => $from, 'to_table_id' => $to, 'reason' => 'Grupo pediu mesa maior', 'confirmed' => 1, 'request_key' => (string) Str::uuid()];
+    }
+
+    public function test_transfer_preserves_bill_and_receipts_updates_live_kitchen_and_keeps_old_print_copy(): void
+    {
+        $f = $this->fixture();
+        $destination = $this->spareTable($f);
+        $order = $this->orderForTab($f);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/pay', $this->payment($f))->assertSessionHasNoErrors();
+        $this->post('/orders/'.$order->id.'/status', ['status' => 'preparing'])->assertSessionHasNoErrors();
+        $print = $this->post('/orders/'.$order->id.'/print-jobs', ['kind' => 'production', 'paper' => '80', 'request_key' => (string) Str::uuid()])->assertRedirect();
+        $receipts = DB::table('cash_entries')->get();
+        $settlement = DB::table('dining_settlements')->first();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $destination))->assertRedirect('/dining/tabs/'.$f['tab']->id)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('dining_tabs', ['id' => $f['tab']->id, 'dining_table_id' => $f['table']->id, 'current_table_id' => $destination, 'active_table_id' => $destination, 'table_name' => 'Mesa 2', 'guest_label' => 'Ana']);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'dining_tab_id' => $f['tab']->id, 'dining_label' => 'Mesa 2 · Comanda #'.$f['tab']->id, 'total_cents' => 3000, 'payment_status' => 'paid', 'status' => 'preparing']);
+        $this->assertEquals($receipts, DB::table('cash_entries')->get());
+        $this->assertEquals($settlement, DB::table('dining_settlements')->first());
+        $this->get('/kitchen?stage=preparing')->assertOk()->assertSee('Mesa 2')->assertDontSee('Ana');
+        $this->get($print->headers->get('Location'))->assertOk()->assertSee('MESA 1')->assertDontSee('MESA 2');
+        $newPrint = $this->post('/orders/'.$order->id.'/print-jobs', ['kind' => 'production', 'paper' => '80', 'request_key' => (string) Str::uuid()])->assertRedirect();
+        $this->get($newPrint->headers->get('Location'))->assertOk()->assertSee('MESA 2');
+        $tabs = $this->get('/dining')->assertOk()->viewData('tabs');
+        $this->assertFalse($tabs->has($f['table']->id));
+        $this->assertEquals($f['tab']->id, $tabs->get($destination)->id);
+        $this->get('/dining/tabs/'.$f['tab']->id)->assertOk()->assertSee('Histórico de transferências')->assertSee('Grupo pediu mesa maior');
+        $this->get('/dining/tabs/'.$f['tab']->id.'/print')->assertOk()->assertSee('Histórico de mesas:')->assertSee('Mesa 2');
+        $this->post('/dining/tables/'.$f['table']->id.'/open', ['guests' => 2, 'guest_label' => 'Ana', 'request_key' => $f['key']])->assertRedirect('/dining/tabs/'.$f['tab']->id);
+        $this->assertDatabaseCount('dining_tabs', 1);
+        $newOrder = $this->orderForTab($f);
+        $this->assertSame('Mesa 2 · Comanda #'.$f['tab']->id, $newOrder->dining_label);
+        $this->assertDatabaseHas('audit_events', ['action' => 'dining.transferred', 'tenant_id' => $f['tenant']]);
+    }
+
+    public function test_transfer_rejects_occupied_disabled_foreign_same_or_closed_table(): void
+    {
+        $f = $this->fixture();
+        $target = $this->spareTable($f);
+        $this->post('/dining/tables/'.$target.'/open', ['guests' => 1, 'request_key' => (string) Str::uuid()])->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $target))->assertConflict();
+        $otherTab = DB::table('dining_tabs')->where('active_table_id', $target)->first();
+        $this->post('/dining/tabs/'.$otherTab->id.'/close', ['confirmed' => 1, 'request_key' => (string) Str::uuid()])->assertSessionHasNoErrors();
+        DB::table('dining_tables')->where('id', $target)->update(['enabled' => false]);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $target))->assertConflict();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $f['table']->id))->assertUnprocessable();
+        $otherStore = $this->store($f['tenant'], 'other');
+        $foreign = $this->spareTable(['tenant' => $f['tenant'], 'store' => $otherStore]);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $foreign))->assertNotFound();
+        $foreignTenant = $this->tenant('foreign');
+        $foreignTable = $this->spareTable(['tenant' => $foreignTenant, 'store' => $this->store($foreignTenant, 'foreign')]);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $foreignTable))->assertNotFound();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/close', ['confirmed' => 1, 'request_key' => (string) Str::uuid()])->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $target))->assertConflict();
+        $this->assertDatabaseCount('dining_transfers', 0);
+    }
+
+    public function test_retried_transfer_never_moves_back_after_another_transfer_and_stale_source_is_blocked(): void
+    {
+        $f = $this->fixture();
+        $second = $this->spareTable($f);
+        $third = $this->spareTable($f, 'Mesa 3');
+        $first = $this->transferPayload($f['table']->id, $second);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $first)->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($second, $third))->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $first)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('dining_tabs', ['id' => $f['tab']->id, 'current_table_id' => $third, 'active_table_id' => $third]);
+        $this->assertDatabaseCount('dining_transfers', 2);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', array_replace($first, ['reason' => 'Changed reason']))->assertConflict();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $second))->assertConflict();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/close', ['expected_table_id' => $f['table']->id, 'confirmed' => 1, 'request_key' => (string) Str::uuid()])->assertConflict();
+    }
+
+    public function test_transfer_invalidates_old_sale_review_and_payment_review_without_changing_the_balance(): void
+    {
+        $f = $this->fixture();
+        $target = $this->spareTable($f);
+        $this->orderForTab($f);
+        $draft = $this->draft($f);
+        $payment = $this->payment($f);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $target))->assertSessionHasNoErrors();
+        $this->post('/pos/'.$f['store'].'/review/'.$draft['key'].'/confirm', ['review_hash' => $draft['review_hash']])->assertRedirect('/pos/'.$f['store'].'?tab='.$f['tab']->id)->assertSessionHasErrors('tab');
+        $this->assertDatabaseCount('orders', 1);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/pay', $payment)->assertSessionHasErrors('payment');
+        $this->assertDatabaseCount('cash_entries', 0);
+        $f['tab'] = DB::table('dining_tabs')->find($f['tab']->id);
+        $this->assertSame(3000, app(DiningRoom::class)->summary($f['tab'])['pending']);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/pay', $this->payment($f))->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('cash_entries', 1);
+    }
+
+    public function test_transfer_is_authorized_per_store_and_records_the_actual_operator(): void
+    {
+        $f = $this->fixture();
+        $target = $this->spareTable($f);
+        $operator = User::factory()->create(['tenant_id' => $f['tenant'], 'role' => 'staff', 'staff_profile' => 'operator']);
+        $payload = $this->transferPayload($f['table']->id, $target);
+        $this->actingAs($operator)->post('/dining/tabs/'.$f['tab']->id.'/transfer', $payload)->assertNotFound();
+        DB::table('user_store_access')->insert(['tenant_id' => $f['tenant'], 'user_id' => $operator->id, 'store_id' => $f['store']]);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $payload)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('dining_transfers', ['dining_tab_id' => $f['tab']->id, 'user_id' => $operator->id]);
+        DB::table('user_store_access')->where('user_id', $operator->id)->delete();
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $payload)->assertNotFound();
+        $foreignTenant = $this->tenant('foreign');
+        $this->actingAs($this->owner($foreignTenant))->post('/dining/tabs/'.$f['tab']->id.'/transfer', $payload)->assertNotFound();
+        DB::table('users')->where('id', $operator->id)->update(['access_enabled' => false]);
+        $this->actingAs($operator)->post('/dining/tabs/'.$f['tab']->id.'/transfer', $payload)->assertForbidden();
+    }
+
+    public function test_failed_transfer_audit_rolls_back_occupation_and_kitchen_label(): void
+    {
+        $f = $this->fixture();
+        $target = $this->spareTable($f);
+        $order = $this->orderForTab($f);
+        DB::statement("CREATE TRIGGER fail_transfer_audit BEFORE INSERT ON audit_events WHEN NEW.action = 'dining.transferred' BEGIN SELECT RAISE(FAIL, 'audit unavailable'); END");
+        $this->post('/dining/tabs/'.$f['tab']->id.'/transfer', $this->transferPayload($f['table']->id, $target))->assertStatus(500);
+        $this->assertDatabaseHas('dining_tabs', ['id' => $f['tab']->id, 'current_table_id' => $f['table']->id, 'active_table_id' => $f['table']->id]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'dining_label' => 'Mesa 1 · Comanda #'.$f['tab']->id]);
+        $this->assertDatabaseCount('dining_transfers', 0);
+        $this->assertDatabaseCount('cash_entries', 0);
+    }
+
     public function test_disabled_tenant_and_stale_credentials_cannot_read_or_mutate_dining_room(): void
     {
         $f = $this->fixture();

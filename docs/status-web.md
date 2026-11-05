@@ -14,6 +14,12 @@ Migration `2026_11_05_032901_create_dining_room_tables`: mesas, atendimentos e h
 
 Validação: 309 testes PHP aprovados e 1 consulta externa opcional ignorada na regressão geral; depois dos ajustes finais, 22 testes de mesas/PDV/impressão aprovados. 30 testes JavaScript aprovados. Pint e caches de views/rotas conferidos. Chrome local: cadastrar mesas, abrir comanda, lançar item no PDV, cozinha, servir, receber no caixa, encerrar, verificar mesa livre e imprimir a conta; desktop e 390 px sem erros JS ou transbordamento de página. Evidências em outputs/mapa-mesas.png, mesa-comanda-desktop.png, mesa-comanda-mobile.png e mesa-conta-fechada.png. Piloto físico e concorrência PostgreSQL permanecem pendentes.
 
+## Transferência de mesas — 05/11/2026
+
+Comanda aberta pode ser transferida integralmente para uma mesa livre e ativa da mesma loja. Preserva pedidos, valores e recebimentos; libera a origem e atualiza a identificação dos pedidos ainda em atendimento na cozinha. Registra origem, destino, motivo e operador no histórico e na conferência impressa. Vias de produção já emitidas permanecem preservadas e precisam ser conferidas pela equipe.
+
+Reenvio da mesma transferência não move a comanda novamente. Revisões antigas de pedido, recebimento e encerramento exigem atualização quando a mesa muda. A migration `2026_11_05_121643_add_dining_table_transfers` preenche a mesa atual das comandas existentes sem inventar histórico de mudanças. Validação: 42 testes relacionados aprovados, 620 asserções; Pint e conferência visual local em desktop e celular. Piloto físico e concorrência PostgreSQL continuam pendentes. União de mesas e pagamentos parciais permanecem fora desta etapa. iFood permanece pausado.
+
 ## Caixa por turno do PDV — 05/11/2026
 
 Menu Caixa no painel e atalho na frente de caixa para proprietário e operador autorizado por loja. Um turno compartilhado aberto por loja, fundo de troco inicial, recebimentos separados em dinheiro/Pix manual/maquininha, suprimentos, sangrias com motivo e limite pelo dinheiro esperado. Recebimento presencial de pedido do PDV exige turno aberto; pedido pendente ou por link pode ser criado sem caixa. O recebimento posterior entra no turno aberto no momento da conferência, uma única vez. Troco é líquido: a entrada corresponde ao total do pedido, não ao valor entregue antes do troco.

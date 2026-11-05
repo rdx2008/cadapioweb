@@ -135,6 +135,7 @@ class PosController extends Controller
             abort_unless($data['mode'] === 'dine_in' && in_array($data['payment_method'], ['cash', 'pix', 'card'], true), 422, 'Pedidos de mesa usam consumo no local e pagamento presencial.');
             $data['customer_name'] = $tab->guest_label ?: $tab->table_name;
             $data['dining_label'] = $tab->table_name.' · Comanda #'.$tab->id;
+            $data['dining_table_id'] = $tab->current_table_id;
             $data['pos_channel'] = 'counter';
         } else {
             abort_if($data['mode'] === 'dine_in', 422, 'Abra a comanda da mesa antes de lançar o pedido.');
@@ -191,6 +192,10 @@ class PosController extends Controller
             }
             $draft = $this->draft($request, $id, $key);
             $tab = ! empty($draft['data']['dining_tab_id']) ? app(DiningRoom::class)->requireOpen($store->tenant_id, $id, (int) $draft['data']['dining_tab_id'], true) : null;
+            if ($tab && ($draft['data']['dining_table_id'] ?? null) !== $tab->current_table_id) {
+                $request->session()->flashInput($draft['data']);
+                throw ValidationException::withMessages(['tab' => 'A comanda foi transferida. Confira a nova mesa e revise o pedido antes de confirmar.'])->redirectTo(route('pos.sale', ['id' => $id, 'tab' => $tab->id]));
+            }
             $request->validate(['review_hash' => 'required|string|size:64']);
             abort_unless(hash_equals(hash('sha256', json_encode($draft, JSON_THROW_ON_ERROR)), $request->input('review_hash')), 409, 'A revisão mudou. Abra a revisão atual antes de confirmar.');
             $quote = $calculator->calculate($store, $draft['data'], true);

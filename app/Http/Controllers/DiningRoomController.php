@@ -22,7 +22,7 @@ class DiningRoomController extends Controller
         $store = ! empty($data['store_id']) ? $stores->firstWhere('id', (int) $data['store_id']) : $stores->first();
         abort_if(! empty($data['store_id']) && ! $store, 404);
         $tables = DB::table('dining_tables')->where('store_id', $store?->id ?? 0)->orderBy('name')->get();
-        $tabs = DB::table('dining_tabs')->whereIn('active_table_id', $tables->pluck('id'))->get()->keyBy('dining_table_id');
+        $tabs = DB::table('dining_tabs')->whereIn('active_table_id', $tables->pluck('id'))->get()->keyBy('current_table_id');
         $orders = DB::table('orders')->whereIn('dining_tab_id', $tabs->pluck('id'))->where('status', '!=', 'cancelled')->get(['dining_tab_id', 'total_cents', 'payment_status'])->groupBy('dining_tab_id');
         $history = DB::table('dining_tabs')->where('store_id', $store?->id ?? 0)->orderByDesc('id')->paginate(15);
 
@@ -78,6 +78,9 @@ class DiningRoomController extends Controller
         $store = DB::table('stores')->find($tab->store_id);
 
         return compact('tab', 'summary', 'orders', 'store') + ['operator' => DB::table('users')->find($tab->opened_by),
+            'destinations' => $tab->closed_at ? collect() : DB::table('dining_tables')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->where('enabled', true)
+                ->where('id', '!=', $tab->current_table_id)->whereNotIn('id', DB::table('dining_tabs')->whereNotNull('active_table_id')->select('active_table_id'))->orderBy('name')->get(['id', 'name', 'seats']),
+            'transfers' => DB::table('dining_transfers')->join('users', 'users.id', '=', 'dining_transfers.user_id')->where('dining_tab_id', $tab->id)->select('dining_transfers.*', 'users.name as operator_name')->orderByDesc('dining_transfers.id')->get(),
             'methods' => array_intersect_key(app(CheckoutPayment::class)->methods($store), array_flip(['cash', 'pix', 'card'])),
             'items' => DB::table('order_items')->whereIn('order_id', $orders->pluck('id'))->orderBy('id')->get()->groupBy('order_id')];
     }
@@ -127,12 +130,28 @@ class DiningRoomController extends Controller
         return redirect()->route('dining.show', $id)->with('success', 'Pedido marcado como servido.');
     }
 
-    public function close(Request $request, int $id, DiningRoom $room): RedirectResponse
+    public function transfer(Request $request, int $id, DiningRoom $room): RedirectResponse
     {
-        $data = $request->validate(['request_key' => 'required|uuid', 'confirmed' => 'accepted']);
+        $data = $request->validate(['from_table_id' => 'required|integer|min:1', 'to_table_id' => 'required|integer|min:1', 'reason' => 'required|string|max:500', 'confirmed' => 'accepted', 'request_key' => 'required|uuid']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
             $user = $room->member($request->user(), true);
-            $room->close($room->tab($user, $id, true), $user, $data['request_key']);
+            $tab = $room->tab($user, $id, true);
+            $room->transfer($tab, $user, (int) $data['from_table_id'], (int) $data['to_table_id'], trim($data['reason']), $data['request_key']);
+        }, 3);
+
+        return redirect()->route('dining.show', $id)->with('success', 'Comanda transferida. Avise a equipe sobre a nova mesa e confira as vias já impressas.');
+    }
+
+    public function close(Request $request, int $id, DiningRoom $room): RedirectResponse
+    {
+        $data = $request->validate(['request_key' => 'required|uuid', 'confirmed' => 'accepted', 'expected_table_id' => 'sometimes|required|integer|min:1']);
+        DB::transaction(function () use ($request, $id, $room, $data): void {
+            $user = $room->member($request->user(), true);
+            $tab = $room->tab($user, $id, true);
+            if ($tab->closed_at === null && isset($data['expected_table_id'])) {
+                abort_unless($tab->current_table_id === (int) $data['expected_table_id'], 409, 'A comanda foi transferida. Atualize a tela antes de encerrar.');
+            }
+            $room->close($tab, $user, $data['request_key']);
         }, 3);
 
         return redirect()->route('dining.show', $id)->with('success', 'Comanda encerrada. Mesa liberada para novo atendimento.');

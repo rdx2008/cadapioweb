@@ -48,7 +48,7 @@ class DiningRoom
 
         return ['orders' => $orders, 'total' => (int) $valid->sum('total_cents'), 'paid' => (int) $valid->where('payment_status', 'paid')->sum('total_cents'),
             'pending' => (int) $pending->sum('total_cents'), 'pending_orders' => $pending, 'unfinished' => $valid->where('status', '!=', 'completed')->count(), 'refunds_pending' => $refunds,
-            'review_hash' => hash('sha256', json_encode($pending->map(fn ($o) => [$o->id, $o->total_cents, $o->payment_status])->values()->all(), JSON_THROW_ON_ERROR))];
+            'review_hash' => hash('sha256', json_encode([$tab->current_table_id, $pending->map(fn ($o) => [$o->id, $o->total_cents, $o->payment_status])->values()->all()], JSON_THROW_ON_ERROR))];
     }
 
     public function open(object $table, object $user, string $guest, int $guests, string $key): int
@@ -63,11 +63,36 @@ class DiningRoom
         }
         abort_unless($current->enabled, 409, 'Ative a mesa antes de iniciar um atendimento.');
         abort_if(DB::table('dining_tabs')->where('active_table_id', $table->id)->exists(), 409, 'Esta mesa já tem uma comanda aberta.');
-        $id = DB::table('dining_tabs')->insertGetId(['tenant_id' => $table->tenant_id, 'store_id' => $table->store_id, 'dining_table_id' => $table->id, 'active_table_id' => $table->id,
+        $id = DB::table('dining_tabs')->insertGetId(['tenant_id' => $table->tenant_id, 'store_id' => $table->store_id, 'dining_table_id' => $table->id, 'current_table_id' => $table->id, 'active_table_id' => $table->id,
             'table_name' => $current->name, 'guest_label' => $guest ?: null, 'guests' => $guests, 'opened_by' => $user->id, 'request_key' => $key, 'opened_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         Audit::record('dining.open', ['tab_id' => $id, 'table_id' => $table->id], $table->tenant_id);
 
         return $id;
+    }
+
+    public function transfer(object $tab, object $user, int $from, int $to, string $reason, string $key): void
+    {
+        $existing = DB::table('dining_transfers')->where('request_key', $key)->first();
+        if ($existing) {
+            abort_unless($existing->dining_tab_id === $tab->id && $existing->user_id === $user->id && $existing->from_table_id === $from && $existing->to_table_id === $to && $existing->reason === $reason, 409);
+
+            return;
+        }
+        abort_if($tab->closed_at !== null, 409, 'Esta comanda já foi encerrada.');
+        abort_unless($tab->current_table_id === $from && $tab->active_table_id === $from, 409, 'A mesa desta comanda mudou. Atualize a tela antes de transferir.');
+        abort_if($from === $to, 422, 'Escolha uma mesa de destino diferente.');
+        DB::table('stores')->where('tenant_id', $tab->tenant_id)->where('id', $tab->store_id)->lockForUpdate()->firstOrFail();
+        $tables = DB::table('dining_tables')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->whereIn('id', [$from, $to])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $target = $tables->get($to);
+        abort_unless($target, 404);
+        abort_unless($target->enabled, 409, 'A mesa de destino está desativada.');
+        abort_if(DB::table('dining_tabs')->where('active_table_id', $to)->exists(), 409, 'A mesa de destino já está ocupada. Escolha uma mesa livre.');
+        DB::table('dining_tabs')->where('id', $tab->id)->update(['active_table_id' => $to, 'current_table_id' => $to, 'table_name' => $target->name, 'updated_at' => now()]);
+        DB::table('orders')->where('tenant_id', $tab->tenant_id)->where('dining_tab_id', $tab->id)->whereIn('status', ['accepted', 'preparing', 'ready'])
+            ->update(['dining_label' => $target->name.' · Comanda #'.$tab->id, 'updated_at' => now()]);
+        DB::table('dining_transfers')->insert(['tenant_id' => $tab->tenant_id, 'store_id' => $tab->store_id, 'dining_tab_id' => $tab->id, 'user_id' => $user->id,
+            'from_table_id' => $from, 'to_table_id' => $to, 'from_name' => $tab->table_name, 'to_name' => $target->name, 'reason' => $reason, 'request_key' => $key, 'created_at' => now()]);
+        Audit::record('dining.transferred', ['tab_id' => $tab->id, 'from_table_id' => $from, 'to_table_id' => $to, 'reason' => $reason], $tab->tenant_id);
     }
 
     public function pay(object $tab, object $user, string $method, string $hash, string $key): void
