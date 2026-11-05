@@ -29,7 +29,7 @@ class PosController extends Controller
     private function member(Request $request, bool $lock = false): object
     {
         $user = DB::table('users')->where('id', $request->user()->id)->when($lock, fn ($q) => $q->lockForUpdate())->firstOrFail();
-        abort_unless($user->access_enabled && $user->tenant_id && $user->tenant_id === $request->user()->tenant_id && ($user->role === 'owner' || ($user->role === 'staff' && $user->staff_profile === 'operator')), 403);
+        abort_unless($user->access_enabled && $user->tenant_id && $user->tenant_id === $request->user()->tenant_id && ($user->role === 'owner' || ($user->role === 'staff' && in_array($user->staff_profile, ['operator', 'waiter'], true))), 403);
         if ($lock) {
             DB::table('tenants')->where('id', $user->tenant_id)->lockForUpdate()->firstOrFail();
         }
@@ -43,6 +43,20 @@ class PosController extends Controller
         return DB::table('stores')->where('tenant_id', $user->tenant_id)->when($user->role === 'staff', fn ($q) => $q->whereIn('id', DB::table('user_store_access')->where('user_id', $user->id)->where('tenant_id', $user->tenant_id)->select('store_id')));
     }
 
+    private function waiter(Request $request): bool
+    {
+        $user = $this->member($request);
+
+        return $user->role === 'staff' && $user->staff_profile === 'waiter';
+    }
+
+    private function restrictWaiterDraft(Request $request, array $data): void
+    {
+        if ($this->waiter($request)) {
+            abort_unless(! empty($data['dining_tab_id']) && ($data['mode'] ?? null) === 'dine_in' && ($data['received'] ?? null) === 'no' && empty($data['change_for_cents']) && in_array($data['payment_method'] ?? null, ['cash', 'pix', 'card'], true), 403, 'O garçom pode lançar somente consumo em uma comanda aberta, sem receber pagamentos.');
+        }
+    }
+
     private function store(Request $request, int $id, bool $lock = false): object
     {
         return $this->stores($this->member($request, $lock))->where('id', $id)->when($lock, fn ($q) => $q->lockForUpdate())->firstOrFail();
@@ -53,8 +67,12 @@ class PosController extends Controller
         return $request->user()->role === 'owner' ? url('/orders/'.$id) : url('/operation/orders/'.$id);
     }
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
+        if ($this->waiter($request)) {
+            return redirect()->route('dining.index');
+        }
+
         return response()->view('pos.index', ['stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
     }
 
@@ -63,12 +81,14 @@ class PosController extends Controller
         $store = $this->store($request, $id);
         $data = $request->validate(['tab' => 'nullable|integer|min:1']);
         $tab = ! empty($data['tab']) ? app(DiningRoom::class)->requireOpen($store->tenant_id, $id, (int) $data['tab']) : null;
+        $waiter = $this->waiter($request);
+        abort_if($waiter && ! $tab, 403, 'Abra uma comanda antes de lançar o pedido.');
         $methods = app(CheckoutPayment::class)->methods($store);
         if ($tab) {
             $methods = array_intersect_key($methods, array_flip(['cash', 'pix', 'card']));
         }
 
-        return response()->view('pos.sale', app(MenuCatalog::class)->data($store) + ['tab' => $tab, 'cashSession' => app(CashRegister::class)->current($id), 'store' => $store, 'methods' => $methods, 'drivers' => $this->drivers($id), 'stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
+        return response()->view($waiter ? 'pos.waiter-sale' : 'pos.sale', app(MenuCatalog::class)->data($store) + ['waiter' => $waiter, 'tab' => $tab, 'cashSession' => $waiter ? null : app(CashRegister::class)->current($id), 'store' => $store, 'methods' => $methods, 'drivers' => $waiter ? collect() : $this->drivers($id), 'stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
     }
 
     private function drivers(int $storeId): Collection
@@ -87,6 +107,7 @@ class PosController extends Controller
 
     public function postcode(Request $request, int $id): JsonResponse
     {
+        abort_if($this->waiter($request), 403);
         $store = $this->store($request, $id);
 
         return app(MenuController::class)->postcode($request, $store->slug);
@@ -94,6 +115,7 @@ class PosController extends Controller
 
     public function delivery(Request $request, int $id): JsonResponse
     {
+        abort_if($this->waiter($request), 403);
         $store = $this->store($request, $id);
 
         return app(MenuController::class)->delivery($request, $store->slug, app(DeliveryCoverage::class));
@@ -126,6 +148,7 @@ class PosController extends Controller
             'cart_lines.*.combo_choices' => 'sometimes|array|max:10', 'cart_lines.*.combo_choices.*' => 'array|max:10', 'cart_lines.*.combo_choices.*.*' => 'integer|min:1',
             'cart_lines.*.choices' => 'sometimes|array|max:20', 'cart_lines.*.choices.*' => 'array|max:99', 'cart_lines.*.choices.*.*' => 'integer|min:1',
         ]);
+        $this->restrictWaiterDraft($request, $data);
         $data['customer_name'] = trim($data['customer_name'] ?? '') ?: 'Cliente de balcão';
         $data['phone'] = $data['phone'] ?? '';
         $data['mode'] ??= 'pickup';
@@ -161,6 +184,7 @@ class PosController extends Controller
     {
         $draft = $request->session()->get('pos.'.$key);
         abort_unless($draft && $draft['store_id'] === $id && $draft['user_id'] === $request->user()->id && $draft['created_at'] >= now()->subMinutes(30)->timestamp, 419);
+        $this->restrictWaiterDraft($request, $draft['data']);
 
         return $draft;
     }
@@ -169,7 +193,7 @@ class PosController extends Controller
     {
         $store = $this->store($request, $id);
 
-        return response()->view('pos.review', ['store' => $store, 'key' => $key, 'draft' => $this->draft($request, $id, $key)])->header('Cache-Control', 'private, no-store');
+        return response()->view('pos.review', ['waiter' => $this->waiter($request), 'store' => $store, 'key' => $key, 'draft' => $this->draft($request, $id, $key)])->header('Cache-Control', 'private, no-store');
     }
 
     public function edit(Request $request, int $id, string $key): RedirectResponse
@@ -187,6 +211,7 @@ class PosController extends Controller
             $existing = DB::table('orders')->where('store_id', $id)->where('idempotency_key', $key)->first();
             if ($existing) {
                 abort_unless($existing->source === 'pos' && $existing->created_by === $request->user()->id, 409);
+                abort_if($this->waiter($request) && (! $existing->dining_tab_id || $existing->mode !== 'dine_in'), 403);
 
                 return $existing->id;
             }
@@ -229,6 +254,10 @@ class PosController extends Controller
             return $orderId;
         }, 3);
 
+        if ($this->waiter($request)) {
+            return redirect()->route('dining.show', DB::table('orders')->where('id', $orderId)->value('dining_tab_id'))->with('success', 'Pedido enviado à cozinha e acrescentado à comanda.');
+        }
+
         return redirect()->route('pos.result', $orderId)->with('success', 'Pedido registrado. Pagamentos por link precisam ser confirmados antes do preparo.');
     }
 
@@ -236,18 +265,22 @@ class PosController extends Controller
     {
         $user = $this->member($request);
 
-        return DB::table('orders')->where('tenant_id', $user->tenant_id)->whereIn('store_id', $this->stores($user)->select('id'))->where('source', 'pos')->where('id', $id)->firstOrFail();
+        return DB::table('orders')->where('tenant_id', $user->tenant_id)->whereIn('store_id', $this->stores($user)->select('id'))->where('source', 'pos')->when($user->staff_profile === 'waiter', fn ($q) => $q->where('mode', 'dine_in')->whereNotNull('dining_tab_id'))->where('id', $id)->firstOrFail();
     }
 
-    public function result(Request $request, int $orderId): Response
+    public function result(Request $request, int $orderId): Response|RedirectResponse
     {
         $order = $this->order($request, $orderId);
+        if ($this->waiter($request)) {
+            return redirect()->route('dining.show', $order->dining_tab_id);
+        }
 
         return response()->view('pos.result', ['order' => $order, 'store' => $this->store($request, $order->store_id), 'detailUrl' => $this->detail($request, $orderId), 'drivers' => $this->drivers($order->store_id), 'ride' => DB::table('rides')->where('order_id', $orderId)->first(), 'courierEnabled' => DB::table('tenants')->where('id', $order->tenant_id)->value('courier_module') === 'active'])->header('Cache-Control', 'private, no-store')->header('Referrer-Policy', 'no-referrer');
     }
 
     public function dispatch(Request $request, int $orderId): RedirectResponse
     {
+        abort_if($this->waiter($request), 403);
         if ($request->input('preferred_driver_id') === 'auto') {
             $request->merge(['preferred_driver_id' => null]);
         }

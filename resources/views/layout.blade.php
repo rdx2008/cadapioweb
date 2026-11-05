@@ -11,7 +11,7 @@
         @php
         $nav = match(auth()->user()->role) {
             'admin' => [['/admin','home','Visão geral'],['/admin/bi','chart','BI e crescimento'],['/admin#empresas','users','Empresas'],['/admin#entregadores','truck','Entregadores'],['/admin#evolution','chat','WhatsApp central'],['/admin/ifood','store','Integração iFood']],
-            'staff' => array_merge([['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha']],auth()->user()->staff_profile==='operator'?[['/pos','store','PDV'],['/cash','orders','Caixa'],['/dining','store','Mesas e comandas']]:[]),
+            'staff' => auth()->user()->staff_profile==='waiter'?[['/dining','store','Mesas e comandas']]:array_merge([['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha']],auth()->user()->staff_profile==='operator'?[['/pos','store','PDV'],['/cash','orders','Caixa'],['/dining','store','Mesas e comandas']]:[]),
             'courier' => [['/courier','home','Meu painel'],['/courier#ofertas','truck','Ofertas de corrida'],['/courier#corridas','orders','Minhas corridas']],
             default => [['/dashboard','home','Visão geral'],['/bi','chart','BI e crescimento'],['/dashboard#pedidos','orders','Pedidos'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/cash','orders','Caixa'],['/dining','store','Mesas e comandas'],['/catalog','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/deliveries','truck','Entregas'],['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood'],['/team','users','Equipe e acessos']],
         };

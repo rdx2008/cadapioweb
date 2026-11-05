@@ -1,6 +1,16 @@
 # Estado e prioridades da versão web
 
-Atualizado em 05/11/2026 após união de comandas com preservação dos recebimentos, branch `feat/platform-foundation`.
+Atualizado em 05/11/2026 após perfil de garçom para atendimento no salão, branch `feat/platform-foundation`.
+
+## Perfil de garçom — 05/11/2026
+
+Proprietário cria ou altera o perfil Garçom em Equipe e acessos, selecionando as lojas permitidas. Usa o campo de perfil existente, sem migração adicional. Login direciona às mesas, com tela própria para abrir comanda, consultar consumo/itens e estado de preparo, lançar pelo catálogo compartilhado e marcar como servido somente quando pronto. Comandas unidas mantêm atendimento e link ao destino. Saída da conta permanece acessível no celular.
+
+Lançamento do garçom exige comanda aberta, consumo no local e recebimento pendente. Não permite balcão/telefone/entrega, troco, recebimento confirmado, checkout online, consulta de endereço ou despacho. Revisão e confirmação revalidam perfil e lojas no banco, inclusive rascunho anterior criado como operador; reenvio não duplica pedido. Cozinha e autoria são as mesmas do PDV. Catálogo reutiliza opções, variações, pizza e combos existentes.
+
+Garçom vê preços e consumo, mas não saldo/parcelas/recebidos, caixa, BI, pedidos remotos, configurações ou equipe. Receber, encerrar, transferir e unir contas continuam exclusivos do proprietário/operador. Impressão do garçom limitada à produção de pedidos de mesa nas lojas atribuídas; vias de conferência e impressão financeira da comanda são recusadas pelo servidor. Não permite cancelar nem alterar preparo; marcar servido exige pedido pronto. Alterar permissões encerra sessões como antes.
+
+Validação: 59 testes PHP relacionados aprovados, 1.076 asserções, e 11 testes JavaScript aprovados; Pint e compilação Blade conferidos. Chrome local: criar perfil pelo proprietário, sair, entrar como garçom, consultar comanda consolidada, escolher item, revisar, confirmar e sair; desktop e 390 px sem erros JavaScript ou transbordamento. Conferidos bloqueios de pagamentos forjados, impressão indevida, revogação, suspensão, lojas diferentes e mudança de perfil entre revisão/confirmação. Piloto físico continua pendente. QR público, chamada de atendimento/conta pelo cliente e avisos automáticos ao garçom são etapas seguintes. iFood permanece pausado.
 
 ## União de comandas — 05/11/2026
 

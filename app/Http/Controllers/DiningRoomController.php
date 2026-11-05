@@ -39,7 +39,9 @@ class DiningRoomController extends Controller
         $orders = DB::table('orders')->whereIn('dining_tab_id', array_keys($owners))->where('status', '!=', 'cancelled')->get(['dining_tab_id', 'total_cents', 'payment_status'])->groupBy(fn ($order) => $owners[$order->dining_tab_id]);
         $history = DB::table('dining_tabs')->where('store_id', $store?->id ?? 0)->orderByDesc('id')->paginate(15);
 
-        return response()->view('dining.index', compact('stores', 'store', 'tables', 'tabs', 'orders', 'history'))->header('Cache-Control', 'private, no-store');
+        $waiter = $user->role === 'staff' && $user->staff_profile === 'waiter';
+
+        return response()->view('dining.index', compact('stores', 'store', 'tables', 'tabs', 'orders', 'history', 'waiter'))->header('Cache-Control', 'private, no-store');
     }
 
     public function saveTable(Request $request, DiningRoom $room, ?int $id = null): RedirectResponse
@@ -92,7 +94,9 @@ class DiningRoomController extends Controller
         $orders = DB::table('orders')->whereIn('dining_tab_id', $ids)->orderByDesc('id')->paginate(20);
         $store = DB::table('stores')->find($tab->store_id);
 
-        return compact('tab', 'summary', 'orders', 'store') + ['operator' => DB::table('users')->find($tab->opened_by),
+        $waiter = $user->role === 'staff' && $user->staff_profile === 'waiter';
+
+        return compact('tab', 'summary', 'orders', 'store', 'waiter') + ['operator' => DB::table('users')->find($tab->opened_by),
             'settlements' => DB::table('dining_settlements')->join('users', 'users.id', '=', 'dining_settlements.user_id')->whereIn('dining_tab_id', $ids)->select('dining_settlements.*', 'users.name as operator_name')->orderBy('dining_settlements.id')->get(),
             'mergeTargets' => $tab->closed_at ? collect() : DB::table('dining_tabs')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->whereNull('closed_at')->where('id', '!=', $id)->orderBy('table_name')->get(),
             'merges' => DB::table('dining_merges')->join('users', 'users.id', '=', 'dining_merges.user_id')->where(fn ($q) => $q->whereIn('source_tab_id', $ids)->orWhereIn('target_tab_id', $ids))->select('dining_merges.*', 'users.name as operator_name')->orderBy('dining_merges.id')->get(),
@@ -105,11 +109,14 @@ class DiningRoomController extends Controller
 
     public function show(Request $request, int $id, DiningRoom $room): Response
     {
-        return response()->view('dining.show', $this->data($request, $id, $room))->header('Cache-Control', 'private, no-store');
+        $data = $this->data($request, $id, $room);
+
+        return response()->view($data['waiter'] ? 'dining.waiter-show' : 'dining.show', $data)->header('Cache-Control', 'private, no-store');
     }
 
     public function print(Request $request, int $id, DiningRoom $room): Response
     {
+        $room->member($request->user(), false, true);
         $data = $this->data($request, $id, $room);
         $data['orders'] = $data['summary']['orders'];
         $data['items'] = DB::table('order_items')->whereIn('order_id', $data['orders']->pluck('id'))->orderBy('id')->get()->groupBy('order_id');
@@ -123,7 +130,7 @@ class DiningRoomController extends Controller
         MoneyInput::normalize($request, ['amount' => 'amount_cents']);
         $data = $request->validate(['amount_cents' => 'sometimes|required|integer|min:1|max:100000000', 'payment_method' => 'required|in:cash,pix,card', 'review_hash' => 'required|string|size:64', 'request_key' => 'required|uuid', 'confirmed' => 'accepted']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
-            $user = $room->member($request->user(), true);
+            $user = $room->member($request->user(), true, true);
             $tab = $room->tab($user, $id, true);
             $room->pay($tab, $user, $data['payment_method'], $data['review_hash'], $data['request_key'], isset($data['amount_cents']) ? (int) $data['amount_cents'] : null);
         }, 3);
@@ -153,7 +160,7 @@ class DiningRoomController extends Controller
     public function mergeReview(Request $request, int $id, DiningRoom $room): Response
     {
         $data = $request->validate(['target_tab_id' => 'required|integer|min:1']);
-        $user = $room->member($request->user());
+        $user = $room->member($request->user(), false, true);
         $source = $room->tab($user, $id);
         $target = $room->tab($user, (int) $data['target_tab_id']);
         abort_unless($source->store_id === $target->store_id, 404);
@@ -169,7 +176,7 @@ class DiningRoomController extends Controller
     {
         $data = $request->validate(['target_tab_id' => 'required|integer|min:1', 'source_hash' => 'required|string|size:64', 'target_hash' => 'required|string|size:64', 'reason' => 'required|string|max:500', 'request_key' => 'required|uuid', 'confirmed' => 'accepted']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
-            $user = $room->member($request->user(), true);
+            $user = $room->member($request->user(), true, true);
             $source = $room->tab($user, $id, true);
             $target = $room->tab($user, (int) $data['target_tab_id'], true);
             $room->merge($source, $target, $user, $data['source_hash'], $data['target_hash'], trim($data['reason']), $data['request_key']);
@@ -182,7 +189,7 @@ class DiningRoomController extends Controller
     {
         $data = $request->validate(['expected_review_hash' => 'sometimes|required|string|size:64', 'from_table_id' => 'required|integer|min:1', 'to_table_id' => 'required|integer|min:1', 'reason' => 'required|string|max:500', 'confirmed' => 'accepted', 'request_key' => 'required|uuid']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
-            $user = $room->member($request->user(), true);
+            $user = $room->member($request->user(), true, true);
             $tab = $room->tab($user, $id, true);
             if (isset($data['expected_review_hash']) && ! DB::table('dining_transfers')->where('request_key', $data['request_key'])->exists()) {
                 abort_unless(hash_equals($room->summary($tab)['review_hash'], $data['expected_review_hash']), 409, 'A comanda mudou. Atualize a tela antes de transferir.');
@@ -197,7 +204,7 @@ class DiningRoomController extends Controller
     {
         $data = $request->validate(['expected_review_hash' => 'sometimes|required|string|size:64', 'request_key' => 'required|uuid', 'confirmed' => 'accepted', 'expected_table_id' => 'sometimes|required|integer|min:1']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
-            $user = $room->member($request->user(), true);
+            $user = $room->member($request->user(), true, true);
             $tab = $room->tab($user, $id, true);
             if ($tab->closed_at === null && isset($data['expected_table_id'])) {
                 abort_unless($tab->current_table_id === (int) $data['expected_table_id'], 409, 'A comanda foi transferida. Atualize a tela antes de encerrar.');

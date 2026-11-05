@@ -9,10 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class DiningRoom
 {
-    public function member(object $actor, bool $lock = false): object
+    public function member(object $actor, bool $lock = false, bool $manage = false): object
     {
         $user = DB::table('users')->where('id', $actor->id)->when($lock, fn ($q) => $q->lockForUpdate())->firstOrFail();
-        abort_unless($user->access_enabled && $user->tenant_id && $user->tenant_id === $actor->tenant_id && ($user->role === 'owner' || ($user->role === 'staff' && $user->staff_profile === 'operator')), 403);
+        abort_unless($user->access_enabled && $user->tenant_id && $user->tenant_id === $actor->tenant_id && ($user->role === 'owner' || ($user->role === 'staff' && in_array($user->staff_profile, $manage ? ['operator'] : ['operator', 'waiter'], true))), 403);
         if ($lock) {
             DB::table('tenants')->where('id', $user->tenant_id)->lockForUpdate()->firstOrFail();
         }

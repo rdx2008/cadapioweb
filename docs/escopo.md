@@ -758,7 +758,7 @@ Fechamento definitivo com dinheiro contado, esperado, diferença justificada, to
 
 Mapa por loja, mesas cadastradas pelo proprietário, atendimento compartilhado por mesa e acesso de operadores por loja. Abertura identificada, pessoas, tempo e consumo; histórico preservado e mesa liberada após encerramento. Pedidos lançados pelo PDV existente como consumo no local, enviados à cozinha com identificação de mesa/comanda e preço congelado. Conta agrupa pedidos e recebe integralmente o saldo atual por dinheiro/Pix manual/maquininha, em caixa aberto, com confirmação explícita, conferência de alteração de valores e proteção contra reenvio. Não cria cobrança externa. Encerramento exige saldo quitado, pedidos servidos/cancelados e devoluções de cancelados pagas registradas. Impressão parcial/final pelo navegador. Sem vínculos de mesa no legado.
 
-Continuam pendentes do salão: QR por sessão, atendimento/conta solicitados pelo cliente, perfil dedicado de garçom, comandas individuais, divisão por item, taxa de serviço e mapa em tempo real. Validação física e concorrência PostgreSQL permanecem para piloto.
+Continuam pendentes do salão: QR por sessão, atendimento/conta solicitados pelo cliente, comandas individuais, divisão por item, taxa de serviço e mapa em tempo real. Validação física e concorrência PostgreSQL permanecem para piloto.
 
 ### 17.24. Transferência integral de comanda
 
@@ -771,3 +771,7 @@ Recebimentos parciais em dinheiro/Pix manual/maquininha, uma forma e valor por c
 ### 17.26. União de comandas
 
 Conferência de duas comandas abertas da mesma loja, com consumo, recebido, saldo e destino; motivo e confirmação antes da união. Origem liberada e identificada como unida, destino consolida pedidos e pagamentos sem copiá-los, inclusive em uniões sucessivas. Pessoas somadas até 100. Cozinha atualiza o destino nos pedidos em atendimento; transferência posterior alcança o grupo. Histórico na tela e impressão, preservação das vias já emitidas e dos movimentos dos turnos de caixa. Origem bloqueia novos pedidos e aponta ao destino. Saldo, serviço e devoluções pendentes de qualquer integrante impedem encerramento da conta consolidada. Idempotência, conferência de alterações e autoria transacional. Sem desfazer união no painel; manter a migração aplicada após uso.
+
+### 17.27. Perfil de garçom
+
+Perfil configurável pelo proprietário em Equipe e acessos, limitado às lojas selecionadas. Entrada direto nas mesas, abertura de comanda, consulta de consumo e itens, lançamento com catálogo completo e revisão, serviço de pedidos prontos e impressão de produção. Tela em desktop/celular sem caixa ou controles financeiros. Sem pedidos remotos, checkout online, troco, recebimento, cancelamento, fechamento, transferência/união, configurações ou acesso a outras lojas. Servidor revalida acesso na confirmação e impede aproveitar rascunho de operador após mudança de perfil para receber valores. Não inclui QR público nem chamadas do cliente nesta etapa. Sem migração adicional.

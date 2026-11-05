@@ -25,7 +25,7 @@ class TeamController extends Controller
     public function create(Request $request): RedirectResponse
     {
         $data = $request->validate(['name' => 'required|string|max:120', 'email' => 'required|email|max:190|unique:users', 'password' => 'required|string|min:12|max:200|confirmed',
-            'staff_profile' => 'required|in:operator,kitchen', 'stores' => 'required|array|min:1|max:100', 'stores.*' => 'required|integer|distinct']);
+            'staff_profile' => 'required|in:operator,kitchen,waiter', 'stores' => 'required|array|min:1|max:100', 'stores.*' => 'required|integer|distinct']);
         $this->validateStores($request, $data['stores']);
         DB::transaction(function () use ($request, $data): void {
             $user = new User;
@@ -46,7 +46,7 @@ class TeamController extends Controller
 
     public function update(Request $request, int $id): RedirectResponse
     {
-        $data = $request->validate(['staff_profile' => 'required|in:operator,kitchen', 'access_enabled' => 'required|boolean',
+        $data = $request->validate(['staff_profile' => 'required|in:operator,kitchen,waiter', 'access_enabled' => 'required|boolean',
             'stores' => [Rule::requiredIf($request->boolean('access_enabled')), 'nullable', 'array', 'max:100'], 'stores.*' => 'required|integer|distinct']);
         $stores = $data['stores'] ?? [];
         $this->validateStores($request, $stores);

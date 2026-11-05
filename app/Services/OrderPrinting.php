@@ -17,9 +17,10 @@ class OrderPrinting
         $member = DB::table('users')->where('id', $user->id)->firstOrFail();
         abort_unless($member->access_enabled && in_array($member->role, ['owner', 'staff'], true) && $member->tenant_id === $order->tenant_id && app(TenantState::class)->active($order->tenant_id), 403);
         if ($member->role === 'staff') {
-            abort_unless(in_array($member->staff_profile, ['operator', 'kitchen'], true), 403);
+            abort_unless(in_array($member->staff_profile, ['operator', 'kitchen', 'waiter'], true), 403);
             abort_unless(DB::table('user_store_access')->where('user_id', $member->id)->where('tenant_id', $order->tenant_id)->where('store_id', $order->store_id)->exists(), 404);
             abort_if($member->staff_profile === 'kitchen' && $kind !== 'production', 403);
+            abort_if($member->staff_profile === 'waiter' && ($kind !== 'production' || $order->mode !== 'dine_in' || ! $order->dining_tab_id), 403);
         }
     }
 

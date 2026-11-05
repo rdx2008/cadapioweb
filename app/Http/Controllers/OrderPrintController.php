@@ -28,7 +28,9 @@ class OrderPrintController extends Controller
         $printing->authorize($request->user(), $order, $print->kind);
         $snapshot = json_decode(Crypt::decryptString($print->payload), true, 512, JSON_THROW_ON_ERROR);
         $currentNotice = $printing->notice($order);
+        $profile = DB::table('users')->where('id', $request->user()->id)->value('staff_profile');
+        $backUrl = $profile === 'waiter' ? route('dining.show', $order->dining_tab_id) : ($request->user()->role === 'owner' ? '/orders/'.$order->id : '/operation/orders/'.$order->id);
 
-        return response()->view('orders.print', compact('print', 'snapshot', 'currentNotice'))->header('Cache-Control', 'private, no-store')->header('Referrer-Policy', 'no-referrer');
+        return response()->view('orders.print', compact('print', 'snapshot', 'currentNotice', 'backUrl'))->header('Cache-Control', 'private, no-store')->header('Referrer-Policy', 'no-referrer');
     }
 }

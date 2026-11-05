@@ -1,6 +1,6 @@
 @extends('pos.layout')
 @section('content')
-<div class="cash-page"><div class="cash-heading"><div><span class="pill">ATENDIMENTO NO SALÃO</span><h1>Mesas e comandas</h1><p>Abra a mesa, lance os pedidos e acompanhe o consumo até o fechamento.</p></div><a class="button outline" href="{{ route('pos.index') }}">Ir para o PDV</a></div>
+<div class="cash-page"><div class="cash-heading"><div><span class="pill">ATENDIMENTO NO SALÃO</span><h1>Mesas e comandas</h1><p>Abra a mesa, lance os pedidos e acompanhe o consumo até o fechamento.</p></div>@if(!$waiter)<a class="button outline" href="{{ route('pos.index') }}">Ir para o PDV</a>@endif</div>
 <form method="get" class="dining-filter"><label>Loja<select name="store_id">@foreach($stores as $unit)<option value="{{ $unit->id }}" @selected($unit->id===$store?->id)>{{ $unit->name }}</option>@endforeach</select></label><button>Ver mesas</button></form>
 @if($store)
 <div class="cash-heading"><h2>{{ $store->name }}</h2><span>{{ $tabs->count() }} ocupadas · {{ $tables->where('enabled',true)->count()-$tabs->count() }} livres</span></div>

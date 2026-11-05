@@ -12,6 +12,7 @@ document.querySelectorAll('[data-pos-cart]').forEach(form=>{
     form.querySelector('[data-pos-back]').addEventListener('click',()=>checkout.close());
     form.querySelector('[data-pos-clear]').addEventListener('click',()=>{if(confirm('Limpar todos os produtos desta venda?'))form.dispatchEvent(new Event('pos-clear'));});
     const update=()=>{
+        if(form.dataset.posWaiter==='1')return;
         const delivery=mode.value==='delivery',online=payment.value.startsWith('online_');
         form.querySelector('[name=customer_name]').required=delivery;
         form.querySelector('[name=phone]').required=delivery;

@@ -31,7 +31,7 @@ class PlatformController extends Controller
     public function home()
     {
         return redirect(match (auth()->user()->role) {
-            'admin' => '/admin','courier' => '/courier','staff' => '/operation',default => '/dashboard'
+            'admin' => '/admin','courier' => '/courier','staff' => auth()->user()->staff_profile === 'waiter' ? '/dining' : '/operation',default => '/dashboard'
         });
     }
 
