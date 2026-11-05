@@ -49,17 +49,19 @@ class CashRegister
         }, 3);
     }
 
-    public function receipt(object $order, int $userId): void
+    public function receipt(object $order, int $userId, ?int $partial = null): void
     {
         if ($order->source !== 'pos' || ! in_array($order->payment_method, ['cash', 'pix', 'card'], true)) {
             return;
         }
         $this->lockStore($order->tenant_id, $order->store_id);
-        if (DB::table('cash_entries')->where('order_id', $order->id)->where('kind', 'sale')->exists()) {
+        $received = (int) DB::table('cash_entries')->where('order_id', $order->id)->where('kind', 'sale')->sum('amount_cents');
+        if ($partial === null && $received > 0) {
             return;
         }
+        abort_if($partial !== null && ($order->mode !== 'dine_in' || ! $order->dining_tab_id || $partial < 1 || $partial > $order->total_cents - $received), 409, 'Confira o saldo do pedido antes de receber.');
         $session = $this->active($order->store_id);
-        $this->insert($session, $userId, 'sale', $order->total_cents, $order->payment_method, 'Recebimento do pedido #'.$order->id, (string) Str::uuid(), $order->id);
+        $this->insert($session, $userId, 'sale', $partial ?? $order->total_cents, $order->payment_method, 'Recebimento do pedido #'.$order->id, (string) Str::uuid(), $order->id);
     }
 
     private function insert(object $session, int $userId, string $kind, int $amount, string $method, string $note, string $key, ?int $orderId = null): void
@@ -110,9 +112,9 @@ class CashRegister
             $this->lockStore($session->tenant_id, $session->store_id);
             $current = DB::table('cash_sessions')->where('id', $session->id)->lockForUpdate()->firstOrFail();
             $order = DB::table('orders')->where('tenant_id', $session->tenant_id)->where('store_id', $session->store_id)->where('id', $orderId)->lockForUpdate()->firstOrFail();
-            $sale = DB::table('cash_entries')->where('order_id', $orderId)->where('kind', 'sale')->first();
-            abort_unless($sale && $order->status === 'cancelled', 409, 'Somente pedidos cancelados com recebimento registrado no caixa podem ter devolução.');
-            $existing = DB::table('cash_entries')->where('order_id', $orderId)->where('kind', 'refund')->first();
+            $sales = DB::table('cash_entries')->where('order_id', $orderId)->where('kind', 'sale')->get();
+            abort_unless($sales->isNotEmpty() && $order->status === 'cancelled', 409, 'Somente pedidos cancelados com recebimento registrado no caixa podem ter devolução.');
+            $existing = DB::table('cash_entries')->where('order_id', $orderId)->where('kind', 'refund')->orderBy('id')->first();
             if ($existing) {
                 abort_unless($existing->request_key === $key && $existing->cash_session_id === $session->id && $existing->user_id === $userId && $existing->note === $note, 409, 'A devolução deste pedido já foi registrada.');
 
@@ -120,10 +122,13 @@ class CashRegister
             }
             abort_if(DB::table('cash_entries')->where('request_key', $key)->exists(), 409);
             abort_if($current->closed_at !== null, 409, 'Este caixa já foi fechado.');
-            if ($sale->payment_method === 'cash' && $sale->amount_cents > $this->totals($current)['expected']) {
+            if ($sales->where('payment_method', 'cash')->sum('amount_cents') > $this->totals($current)['expected']) {
                 throw ValidationException::withMessages(['cash' => 'Dinheiro insuficiente no caixa para registrar esta devolução.']);
             }
-            $this->insert($current, $userId, 'refund', $sale->amount_cents, $sale->payment_method, $note, $key, $orderId);
+            foreach ($sales->groupBy('payment_method') as $method => $receipts) {
+                $this->insert($current, $userId, 'refund', (int) $receipts->sum('amount_cents'), $method, $note, $key, $orderId);
+                $key = (string) Str::uuid();
+            }
         }, 3);
     }
 

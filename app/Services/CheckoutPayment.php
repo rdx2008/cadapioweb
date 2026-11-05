@@ -6,11 +6,11 @@ use Illuminate\Validation\ValidationException;
 
 class CheckoutPayment
 {
-    public const LABELS = ['cash' => 'Dinheiro', 'card' => 'Cartão na entrega/retirada', 'pix' => 'Pix na entrega/retirada'];
+    public const LABELS = ['cash' => 'Dinheiro', 'card' => 'Cartão na entrega/retirada', 'pix' => 'Pix na entrega/retirada', 'mixed' => 'Pagamento dividido na comanda'];
 
     public function methods(object $store): array
     {
-        $methods = array_filter(self::LABELS, fn ($key) => (bool) $store->{'accepts_'.$key}, ARRAY_FILTER_USE_KEY);
+        $methods = array_filter(array_intersect_key(self::LABELS, array_flip(['cash', 'pix', 'card'])), fn ($key) => (bool) $store->{'accepts_'.$key}, ARRAY_FILTER_USE_KEY);
         foreach (app(OnlinePayment::class)->accounts($store->id) as $account) {
             $methods['online_'.$account->provider] = OnlinePayment::LABELS['online_'.$account->provider];
         }

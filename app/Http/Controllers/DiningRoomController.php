@@ -6,6 +6,7 @@ use App\Services\CheckoutPayment;
 use App\Services\DiningRoom;
 use App\Services\OnlinePayment;
 use App\Support\Audit;
+use App\Support\MoneyInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -71,6 +72,7 @@ class DiningRoomController extends Controller
 
     private function data(Request $request, int $id, DiningRoom $room): array
     {
+        $request->validate(['split_people' => 'sometimes|required|integer|min:1|max:100']);
         $user = $room->member($request->user());
         $tab = $room->tab($user, $id);
         $summary = $room->summary($tab);
@@ -78,6 +80,7 @@ class DiningRoomController extends Controller
         $store = DB::table('stores')->find($tab->store_id);
 
         return compact('tab', 'summary', 'orders', 'store') + ['operator' => DB::table('users')->find($tab->opened_by),
+            'settlements' => DB::table('dining_settlements')->join('users', 'users.id', '=', 'dining_settlements.user_id')->where('dining_tab_id', $id)->select('dining_settlements.*', 'users.name as operator_name')->orderBy('dining_settlements.id')->get(),
             'destinations' => $tab->closed_at ? collect() : DB::table('dining_tables')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->where('enabled', true)
                 ->where('id', '!=', $tab->current_table_id)->whereNotIn('id', DB::table('dining_tabs')->whereNotNull('active_table_id')->select('active_table_id'))->orderBy('name')->get(['id', 'name', 'seats']),
             'transfers' => DB::table('dining_transfers')->join('users', 'users.id', '=', 'dining_transfers.user_id')->where('dining_tab_id', $tab->id)->select('dining_transfers.*', 'users.name as operator_name')->orderByDesc('dining_transfers.id')->get(),
@@ -101,11 +104,13 @@ class DiningRoomController extends Controller
 
     public function pay(Request $request, int $id, DiningRoom $room): RedirectResponse
     {
-        $data = $request->validate(['payment_method' => 'required|in:cash,pix,card', 'review_hash' => 'required|string|size:64', 'request_key' => 'required|uuid', 'confirmed' => 'accepted']);
+        $request->validate(['amount' => 'sometimes|required|string']);
+        MoneyInput::normalize($request, ['amount' => 'amount_cents']);
+        $data = $request->validate(['amount_cents' => 'sometimes|required|integer|min:1|max:100000000', 'payment_method' => 'required|in:cash,pix,card', 'review_hash' => 'required|string|size:64', 'request_key' => 'required|uuid', 'confirmed' => 'accepted']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
             $user = $room->member($request->user(), true);
             $tab = $room->tab($user, $id, true);
-            $room->pay($tab, $user, $data['payment_method'], $data['review_hash'], $data['request_key']);
+            $room->pay($tab, $user, $data['payment_method'], $data['review_hash'], $data['request_key'], isset($data['amount_cents']) ? (int) $data['amount_cents'] : null);
         }, 3);
 
         return redirect()->route('dining.show', $id)->with('success', 'Recebimento registrado no caixa.');

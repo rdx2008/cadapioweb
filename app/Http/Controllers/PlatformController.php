@@ -176,6 +176,7 @@ class PlatformController extends Controller
             DB::table('tenants')->where('id', $this->tid())->lockForUpdate()->firstOrFail();
             $o = DB::table('orders')->where('tenant_id', $this->tid())->where('id', $id)->lockForUpdate()->firstOrFail();
             abort_if(app(OnlinePayment::class)->isOnline($o), 409, 'Pagamento online só pode ser confirmado pela consulta ao provedor.');
+            abort_if($o->dining_tab_id !== null, 409, 'Registre o recebimento na comanda para conferir o saldo e as parcelas.');
             abort_if($o->payment_method === 'cash' && DB::table('rides')->where('order_id', $id)->whereNotIn('status', ['completed', 'cancelled', 'returned'])->exists(), 409, 'Recebimento já integra a proposta de corrida. Trate o acerto da entrega antes de alterar.');
             abort_if($o->status === 'cancelled', 409);
             if ($o->payment_status === 'paid') {

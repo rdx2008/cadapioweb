@@ -43,12 +43,17 @@ class DiningRoom
     {
         $orders = DB::table('orders')->where('dining_tab_id', $tab->id)->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->orderBy('id')->get();
         $valid = $orders->where('status', '!=', 'cancelled');
+        $receipts = DB::table('cash_entries')->whereIn('order_id', $orders->pluck('id'))->where('kind', 'sale')->selectRaw('order_id, SUM(amount_cents) as amount')->groupBy('order_id')->pluck('amount', 'order_id');
+        foreach ($orders as $order) {
+            $order->received_cents = $order->payment_status === 'paid' ? $order->total_cents : (int) $receipts->get($order->id, 0);
+            $order->balance_cents = max(0, $order->total_cents - $order->received_cents);
+        }
         $pending = $valid->where('payment_status', '!=', 'paid');
-        $refunds = DB::table('cash_entries')->whereIn('order_id', $orders->where('status', 'cancelled')->pluck('id'))->where('kind', 'sale')->whereNotIn('order_id', DB::table('cash_entries')->where('kind', 'refund')->select('order_id'))->count();
+        $refunds = DB::table('cash_entries')->whereIn('order_id', $orders->where('status', 'cancelled')->pluck('id'))->where('kind', 'sale')->whereNotIn('order_id', DB::table('cash_entries')->where('kind', 'refund')->select('order_id'))->distinct()->count('order_id');
 
-        return ['orders' => $orders, 'total' => (int) $valid->sum('total_cents'), 'paid' => (int) $valid->where('payment_status', 'paid')->sum('total_cents'),
-            'pending' => (int) $pending->sum('total_cents'), 'pending_orders' => $pending, 'unfinished' => $valid->where('status', '!=', 'completed')->count(), 'refunds_pending' => $refunds,
-            'review_hash' => hash('sha256', json_encode([$tab->current_table_id, $pending->map(fn ($o) => [$o->id, $o->total_cents, $o->payment_status])->values()->all()], JSON_THROW_ON_ERROR))];
+        return ['orders' => $orders, 'total' => (int) $valid->sum('total_cents'), 'paid' => (int) $valid->sum('received_cents'),
+            'pending' => (int) $pending->sum('balance_cents'), 'pending_orders' => $pending, 'unfinished' => $valid->where('status', '!=', 'completed')->count(), 'refunds_pending' => $refunds,
+            'review_hash' => hash('sha256', json_encode([$tab->current_table_id, $pending->map(fn ($o) => [$o->id, $o->total_cents, $o->payment_status, $o->received_cents])->values()->all()], JSON_THROW_ON_ERROR))];
     }
 
     public function open(object $table, object $user, string $guest, int $guests, string $key): int
@@ -95,11 +100,11 @@ class DiningRoom
         Audit::record('dining.transferred', ['tab_id' => $tab->id, 'from_table_id' => $from, 'to_table_id' => $to, 'reason' => $reason], $tab->tenant_id);
     }
 
-    public function pay(object $tab, object $user, string $method, string $hash, string $key): void
+    public function pay(object $tab, object $user, string $method, string $hash, string $key, ?int $amount = null): void
     {
         $existing = DB::table('dining_settlements')->where('request_key', $key)->first();
         if ($existing) {
-            abort_unless($existing->dining_tab_id === $tab->id && $existing->user_id === $user->id && $existing->payment_method === $method && hash_equals($existing->review_hash, $hash), 409);
+            abort_unless($existing->dining_tab_id === $tab->id && $existing->user_id === $user->id && $existing->payment_method === $method && ($amount === null || $existing->amount_cents === $amount) && hash_equals($existing->review_hash, $hash), 409);
 
             return;
         }
@@ -111,17 +116,30 @@ class DiningRoom
             throw ValidationException::withMessages(['payment' => 'O consumo ou recebimento mudou. Atualize a comanda e confira o saldo antes de receber.']);
         }
         abort_if($summary['pending_orders']->isEmpty(), 409, 'Não há pedidos pendentes de recebimento.');
+        $amount ??= $summary['pending'];
+        if ($amount < 1 || $amount > $summary['pending']) {
+            throw ValidationException::withMessages(['amount' => 'Informe um valor maior que zero e até o saldo restante da comanda.']);
+        }
         $store = DB::table('stores')->find($tab->store_id);
         abort_unless(in_array($method, ['cash', 'pix', 'card'], true) && $store->{'accepts_'.$method}, 422, 'Escolha uma forma de pagamento habilitada na loja.');
+        $remaining = $amount;
+        $orderIds = [];
         foreach ($summary['pending_orders'] as $order) {
+            if ($remaining === 0) {
+                break;
+            }
             abort_unless($order->source === 'pos' && $order->mode === 'dine_in' && ! str_starts_with($order->payment_method, 'online_'), 409);
+            $portion = min($remaining, $order->balance_cents);
             $order->payment_method = $method;
-            app(CashRegister::class)->receipt($order, $user->id);
-            DB::table('orders')->where('id', $order->id)->update(['payment_method' => $method, 'payment_status' => 'paid', 'change_for_cents' => null, 'updated_at' => now()]);
+            app(CashRegister::class)->receipt($order, $user->id, $portion);
+            $methods = DB::table('cash_entries')->where('order_id', $order->id)->where('kind', 'sale')->distinct()->pluck('payment_method');
+            DB::table('orders')->where('id', $order->id)->update(['payment_method' => $methods->count() > 1 ? 'mixed' : $method, 'payment_status' => $portion === $order->balance_cents ? 'paid' : 'partial', 'change_for_cents' => null, 'updated_at' => now()]);
+            $orderIds[] = $order->id;
+            $remaining -= $portion;
         }
         DB::table('dining_settlements')->insert(['dining_tab_id' => $tab->id, 'user_id' => $user->id, 'request_key' => $key, 'review_hash' => $hash,
-            'payment_method' => $method, 'amount_cents' => $summary['pending'], 'order_ids' => json_encode($summary['pending_orders']->pluck('id')->values()->all(), JSON_THROW_ON_ERROR), 'created_at' => now()]);
-        Audit::record('dining.paid', ['tab_id' => $tab->id, 'amount_cents' => $summary['pending'], 'payment_method' => $method], $tab->tenant_id);
+            'payment_method' => $method, 'amount_cents' => $amount, 'order_ids' => json_encode($orderIds, JSON_THROW_ON_ERROR), 'created_at' => now()]);
+        Audit::record('dining.paid', ['tab_id' => $tab->id, 'amount_cents' => $amount, 'payment_method' => $method], $tab->tenant_id);
     }
 
     public function close(object $tab, object $user, string $key): void

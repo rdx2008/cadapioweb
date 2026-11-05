@@ -200,6 +200,125 @@ class DiningRoomTest extends TestCase
         $this->post('/dining/tabs/'.$f['tab']->id.'/close', $close)->assertSessionHasNoErrors();
     }
 
+    public function test_partial_receipts_split_methods_preserve_exact_balance_and_close_only_when_paid(): void
+    {
+        $f = $this->fixture();
+        $order = $this->orderForTab($f);
+        $url = '/dining/tabs/'.$f['tab']->id;
+        $first = $this->payment($f, 'pix') + ['amount' => '10,01'];
+        $this->post($url.'/pay', $first)->assertSessionHasNoErrors();
+        $this->post($url.'/pay', $first)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'partial']);
+        $this->assertSame(1001, app(DiningRoom::class)->summary($f['tab'])['paid']);
+        $this->assertSame(1999, app(DiningRoom::class)->summary($f['tab'])['pending']);
+        $this->post($url.'/pay', array_replace($first, ['amount' => '10,02']))->assertConflict();
+        $this->post($url.'/pay', array_replace($first, ['request_key' => (string) Str::uuid()]))->assertSessionHasErrors('payment');
+        DB::table('orders')->where('id', $order->id)->update(['status' => 'completed']);
+        $this->post($url.'/close', ['confirmed' => 1, 'request_key' => (string) Str::uuid()])->assertSessionHasErrors('tab');
+        $this->post('/orders/'.$order->id.'/paid')->assertConflict();
+        $this->post($url.'/pay', $this->payment($f, 'card') + ['amount' => '9.99'])->assertSessionHasNoErrors();
+        $this->post($url.'/pay', $this->payment($f, 'cash') + ['amount' => '10'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'paid', 'payment_method' => 'mixed', 'total_cents' => 3000]);
+        $this->assertDatabaseCount('cash_entries', 3);
+        $this->assertDatabaseCount('dining_settlements', 3);
+        $totals = app(CashRegister::class)->totals(DB::table('cash_sessions')->first());
+        $this->assertSame(1000, $totals['expected']);
+        $this->assertSame(1001, $totals['pix']['sales']);
+        $this->assertSame(999, $totals['card']['sales']);
+        $this->get($url)->assertOk()->assertSee('Histórico de recebimentos')->assertSee('Pix conferido');
+        $this->get($url.'/print')->assertOk()->assertSee('10,01')->assertSee('9,99');
+        $this->post($url.'/close', ['confirmed' => 1, 'request_key' => (string) Str::uuid()])->assertSessionHasNoErrors();
+    }
+
+    public function test_partial_allocation_spans_orders_and_does_not_pay_new_consumption_on_retry(): void
+    {
+        $f = $this->fixture();
+        $first = $this->orderForTab($f);
+        $second = $this->orderForTab($f);
+        $pay = $this->payment($f) + ['amount' => '40'];
+        $this->post('/dining/tabs/'.$f['tab']->id.'/pay', $pay)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('orders', ['id' => $first->id, 'payment_status' => 'paid']);
+        $this->assertDatabaseHas('orders', ['id' => $second->id, 'payment_status' => 'partial']);
+        $this->assertDatabaseHas('cash_entries', ['order_id' => $second->id, 'amount_cents' => 1000]);
+        $third = $this->orderForTab($f);
+        $this->post('/dining/tabs/'.$f['tab']->id.'/pay', $pay)->assertSessionHasNoErrors();
+        $this->assertSame(5000, app(DiningRoom::class)->summary($f['tab'])['pending']);
+        $this->assertDatabaseHas('orders', ['id' => $third->id, 'payment_status' => 'pending']);
+        $this->assertDatabaseCount('cash_entries', 2);
+        $this->get('/dining/tabs/'.$f['tab']->id.'?split_people=3')->assertOk()->assertSee('16,67')->assertSee('16,66');
+        $this->get('/dining/tabs/'.$f['tab']->id.'?split_people=0')->assertSessionHasErrors('split_people');
+    }
+
+    public function test_cancelled_partial_receipt_refunds_only_received_amounts_in_original_methods_once(): void
+    {
+        $f = $this->fixture();
+        $order = $this->orderForTab($f);
+        $url = '/dining/tabs/'.$f['tab']->id;
+        $this->post($url.'/pay', $this->payment($f) + ['amount' => '5'])->assertSessionHasNoErrors();
+        $this->post($url.'/pay', $this->payment($f, 'pix') + ['amount' => '7'])->assertSessionHasNoErrors();
+        $this->post('/orders/'.$order->id.'/status', ['status' => 'cancelled', 'cancellation_reason' => 'Cliente desistiu'])->assertSessionHasNoErrors();
+        $summary = app(DiningRoom::class)->summary($f['tab']);
+        $this->assertSame(0, $summary['pending']);
+        $this->assertSame(1, $summary['refunds_pending']);
+        $cash = DB::table('cash_sessions')->first();
+        $this->get('/cash/'.$cash->id)->assertOk()->assertSee('12,00')->assertSee('Formas divididas');
+        $refund = ['order_id' => $order->id, 'note' => 'Devolvido nas formas originais', 'confirmed' => 1, 'request_key' => (string) Str::uuid()];
+        $this->post('/cash/'.$cash->id.'/refunds', $refund)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/cash/'.$cash->id.'/refunds', $refund)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('cash_entries', ['order_id' => $order->id, 'kind' => 'refund', 'payment_method' => 'cash', 'amount_cents' => 500]);
+        $this->assertDatabaseHas('cash_entries', ['order_id' => $order->id, 'kind' => 'refund', 'payment_method' => 'pix', 'amount_cents' => 700]);
+        $this->assertDatabaseCount('cash_entries', 4);
+        $this->assertSame(0, app(CashRegister::class)->totals($cash)['expected']);
+        $this->post($url.'/close', ['confirmed' => 1, 'request_key' => (string) Str::uuid()])->assertSessionHasNoErrors();
+    }
+
+    public function test_partial_receipts_require_cash_valid_amount_method_and_fresh_authorization(): void
+    {
+        $f = $this->fixture(false);
+        $this->orderForTab($f);
+        $url = '/dining/tabs/'.$f['tab']->id.'/pay';
+        $this->post($url, $this->payment($f) + ['amount' => '10'])->assertSessionHasErrors('cash');
+        $this->assertDatabaseCount('dining_settlements', 0);
+        app(CashRegister::class)->open(DB::table('stores')->find($f['store']), $f['owner']->id, 0, (string) Str::uuid());
+        foreach (['', '0', '-1', '30,01', '1,001', 'abc'] as $amount) {
+            $this->post($url, $this->payment($f) + ['amount' => $amount])->assertSessionHasErrors();
+        }
+        DB::table('stores')->where('id', $f['store'])->update(['accepts_pix' => false]);
+        $this->post($url, $this->payment($f, 'pix') + ['amount' => '10'])->assertUnprocessable();
+        $this->get('/cardapio/loja')->assertDontSee('value="mixed"', false);
+        $foreign = $this->owner($this->tenant('foreign'));
+        $this->actingAs($foreign)->post($url, $this->payment($f) + ['amount' => '10'])->assertNotFound();
+        $this->actingAs($f['owner']);
+        DB::table('users')->where('id', $f['owner']->id)->update(['access_enabled' => false]);
+        $this->post($url, $this->payment($f) + ['amount' => '10'])->assertForbidden();
+        $this->assertDatabaseCount('cash_entries', 0);
+    }
+
+    public function test_partial_receipts_across_shifts_and_refund_failure_preserve_all_ledger_entries(): void
+    {
+        $f = $this->fixture();
+        $order = $this->orderForTab($f);
+        $url = '/dining/tabs/'.$f['tab']->id.'/pay';
+        $this->post($url, $this->payment($f) + ['amount' => '5'])->assertRedirect()->assertSessionHasNoErrors();
+        $first = DB::table('cash_sessions')->first();
+        app(CashRegister::class)->close($first, $f['owner']->id, 500, '', (string) Str::uuid());
+        $second = app(CashRegister::class)->open(DB::table('stores')->find($f['store']), $f['owner']->id, 500, (string) Str::uuid());
+        $this->post($url, $this->payment($f, 'pix') + ['amount' => '5'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post($url, $this->payment($f, 'pix') + ['amount' => '5'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1500, app(DiningRoom::class)->summary($f['tab'])['pending']);
+        $this->assertSame(500, json_decode(DB::table('cash_sessions')->find($first->id)->closing_totals, true)['cash']['sales']);
+        $this->post('/orders/'.$order->id.'/status', ['status' => 'cancelled', 'cancellation_reason' => 'Desistiu'])->assertRedirect()->assertSessionHasNoErrors();
+        $refund = ['order_id' => $order->id, 'note' => 'Conferido', 'confirmed' => 1, 'request_key' => (string) Str::uuid()];
+        DB::unprepared("CREATE TRIGGER fail_pix_refund BEFORE INSERT ON cash_entries WHEN NEW.kind = 'refund' AND NEW.payment_method = 'pix' BEGIN SELECT RAISE(ABORT, 'refund failed'); END");
+        $this->post('/cash/'.$second.'/refunds', $refund)->assertStatus(500);
+        $this->assertSame(0, DB::table('cash_entries')->where('kind', 'refund')->count());
+        DB::unprepared('DROP TRIGGER fail_pix_refund');
+        $this->post('/cash/'.$second.'/refunds', $refund)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1500, (int) DB::table('cash_entries')->where('kind', 'refund')->sum('amount_cents'));
+        $this->assertSame(0, app(CashRegister::class)->totals(DB::table('cash_sessions')->find($second))['expected']);
+        $this->assertSame(500, json_decode(DB::table('cash_sessions')->find($first->id)->closing_totals, true)['cash']['sales']);
+    }
+
     private function spareTable(array $f, string $name = 'Mesa 2'): int
     {
         return DB::table('dining_tables')->insertGetId(['tenant_id' => $f['tenant'], 'store_id' => $f['store'], 'name' => $name, 'name_key' => mb_strtolower($name), 'seats' => 6, 'enabled' => true, 'created_at' => now(), 'updated_at' => now()]);

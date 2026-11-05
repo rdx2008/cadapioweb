@@ -71,7 +71,7 @@ class CashRegisterController extends Controller
             'operator' => DB::table('users')->find($session->opened_by), 'closer' => $session->closed_by ? DB::table('users')->find($session->closed_by) : null,
             'totals' => $session->closed_at ? json_decode($session->closing_totals, true, flags: JSON_THROW_ON_ERROR) : $cash->totals($session),
             'entries' => DB::table('cash_entries')->join('users', 'users.id', '=', 'cash_entries.user_id')->where('cash_session_id', $id)->select('cash_entries.*', 'users.name as operator_name')->orderByDesc('cash_entries.id')->paginate(40),
-            'refundable' => $session->closed_at ? collect() : DB::table('cash_entries')->join('orders', 'orders.id', '=', 'cash_entries.order_id')->where('cash_entries.store_id', $session->store_id)->where('kind', 'sale')->where('orders.status', 'cancelled')->whereNotIn('orders.id', $refunds)->select('orders.id', 'cash_entries.amount_cents', 'cash_entries.payment_method')->orderByDesc('orders.id')->limit(30)->get()];
+            'refundable' => $session->closed_at ? collect() : DB::table('cash_entries')->join('orders', 'orders.id', '=', 'cash_entries.order_id')->where('cash_entries.store_id', $session->store_id)->where('kind', 'sale')->where('orders.status', 'cancelled')->whereNotIn('orders.id', $refunds)->selectRaw("orders.id, SUM(cash_entries.amount_cents) as amount_cents, CASE WHEN COUNT(DISTINCT cash_entries.payment_method) > 1 THEN 'mixed' ELSE MIN(cash_entries.payment_method) END as payment_method")->groupBy('orders.id')->orderByDesc('orders.id')->limit(30)->get()];
     }
 
     public function show(Request $request, int $id, CashRegister $cash): Response

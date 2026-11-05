@@ -1,6 +1,16 @@
 # Estado e prioridades da versão web
 
-Atualizado em 05/11/2026 após mesas e comandas iniciais integradas ao PDV, branch `feat/platform-foundation`.
+Atualizado em 05/11/2026 após recebimentos parciais e divisão por valor nas comandas, branch `feat/platform-foundation`.
+
+## Divisão da conta e recebimentos parciais — 05/11/2026
+
+Na comanda aberta, o operador informa o valor recebido e uma forma por vez: dinheiro, Pix conferido ou maquininha habilitada na loja. Sugestão de divisão do saldo entre pessoas, calculada em centavos com distribuição do restante; é uma conferência por valor, sem atribuição de itens a pessoas. Após cada parcela, saldo e histórico são atualizados. Recebimentos abatem os pedidos mais antigos primeiro, e só a quitação integral marca o pedido como pago. Pedidos com mais de uma forma ficam identificados como pagamento dividido. O BI continua medindo vendas de pedidos integralmente pagos; movimentos financeiros parciais são conferidos no caixa.
+
+Cada parcela entra no turno aberto do momento, mantendo pedido, operador e forma. Turnos fechados preservam os totais anteriores. Reenvio não duplica parcela; revisão desatualizada, valor acima do saldo, forma desativada e ausência de caixa são recusados. Recebimento de pedido de mesa passa exclusivamente pela comanda, inclusive para operadores. Não altera produção nem libera encerramento com saldo aberto.
+
+Cancelamento preserva os recebimentos, exige devolução manual explícita apenas do que foi efetivamente recebido e registra os valores nas formas originais. Devolução com várias formas é transacional, mesmo em turno posterior; falha não deixa devolução pela metade. Histórico de parcelas aparece na conta e na impressão de conferência. Não inclui estorno bancário, link de pagamento para divisão, divisão por item ou taxa de serviço.
+
+Migration `2026_11_05_150720_allow_partial_dining_receipts` permite múltiplas entradas do mesmo pedido, mantendo UUID único e travas transacionais. Não altera valores históricos. Após existirem entradas divididas, o rollback desta migration é bloqueado para preservar os registros; manter a migration e aplicar correções futuras. Publicar com migrações antes de usar a nova versão. Validação: 51 testes relacionados aprovados, 810 asserções, cobrindo mesas, caixa, PDV, impressão, BI e operadores; Pint e compilação Blade aprovados. Chrome local em desktop e 390 px, sem erros JavaScript ou transbordamento. Conferido R$ 24,90 em R$ 8,30 Pix + R$ 16,60 maquininha. Piloto físico e concorrência PostgreSQL permanecem pendentes. iFood continua pausado.
 
 ## Mesas e comandas iniciais — 05/11/2026
 
