@@ -6,6 +6,7 @@ use App\Services\CashRegister;
 use App\Services\CheckoutPayment;
 use App\Services\CheckoutQuote;
 use App\Services\DeliveryCoverage;
+use App\Services\DiningRoom;
 use App\Services\DispatchService;
 use App\Services\FareCalculator;
 use App\Services\MenuCatalog;
@@ -60,8 +61,14 @@ class PosController extends Controller
     public function sale(Request $request, int $id): Response
     {
         $store = $this->store($request, $id);
+        $data = $request->validate(['tab' => 'nullable|integer|min:1']);
+        $tab = ! empty($data['tab']) ? app(DiningRoom::class)->requireOpen($store->tenant_id, $id, (int) $data['tab']) : null;
+        $methods = app(CheckoutPayment::class)->methods($store);
+        if ($tab) {
+            $methods = array_intersect_key($methods, array_flip(['cash', 'pix', 'card']));
+        }
 
-        return response()->view('pos.sale', app(MenuCatalog::class)->data($store) + ['cashSession' => app(CashRegister::class)->current($id), 'store' => $store, 'methods' => app(CheckoutPayment::class)->methods($store), 'drivers' => $this->drivers($id), 'stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
+        return response()->view('pos.sale', app(MenuCatalog::class)->data($store) + ['tab' => $tab, 'cashSession' => app(CashRegister::class)->current($id), 'store' => $store, 'methods' => $methods, 'drivers' => $this->drivers($id), 'stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
     }
 
     private function drivers(int $storeId): Collection
@@ -99,7 +106,8 @@ class PosController extends Controller
         $data = $request->validate([
             'customer_name' => 'nullable|string|max:120', 'phone' => 'nullable|string|min:8|max:25',
             'payment_method' => 'required|in:cash,card,pix,online_infinitepay,online_pagbank', 'received' => 'required|in:yes,no',
-            'mode' => 'sometimes|required|in:pickup,delivery', 'pos_channel' => 'sometimes|required|in:counter,phone,whatsapp',
+            'mode' => 'sometimes|required|in:pickup,delivery,dine_in', 'pos_channel' => 'sometimes|required|in:counter,phone,whatsapp',
+            'dining_tab_id' => 'nullable|integer|min:1',
             'preferred_driver_id' => 'nullable|integer|min:1',
             'address' => 'nullable|string|max:500', 'address_complement' => 'nullable|string|max:120', 'delivery_token' => 'nullable|string|max:5000',
             'address_fields' => 'nullable|array:street,number,neighborhood,city,state,postcode',
@@ -122,6 +130,15 @@ class PosController extends Controller
         $data['phone'] = $data['phone'] ?? '';
         $data['mode'] ??= 'pickup';
         $data['pos_channel'] ??= 'counter';
+        if (! empty($data['dining_tab_id'])) {
+            $tab = app(DiningRoom::class)->requireOpen($store->tenant_id, $id, (int) $data['dining_tab_id']);
+            abort_unless($data['mode'] === 'dine_in' && in_array($data['payment_method'], ['cash', 'pix', 'card'], true), 422, 'Pedidos de mesa usam consumo no local e pagamento presencial.');
+            $data['customer_name'] = $tab->guest_label ?: $tab->table_name;
+            $data['dining_label'] = $tab->table_name.' · Comanda #'.$tab->id;
+            $data['pos_channel'] = 'counter';
+        } else {
+            abort_if($data['mode'] === 'dine_in', 422, 'Abra a comanda da mesa antes de lançar o pedido.');
+        }
         if ($data['mode'] === 'delivery') {
             $request->validate(['customer_name' => 'required|string|max:120', 'phone' => 'required|string|min:8|max:25']);
             $fields = $data['address_fields'];
@@ -159,7 +176,7 @@ class PosController extends Controller
         $this->store($request, $id);
         $request->session()->flashInput($this->draft($request, $id, $key)['data']);
 
-        return redirect()->route('pos.sale', $id);
+        return redirect()->route('pos.sale', ['id' => $id, 'tab' => $this->draft($request, $id, $key)['data']['dining_tab_id'] ?? null]);
     }
 
     public function confirm(Request $request, int $id, string $key, CheckoutQuote $calculator): RedirectResponse
@@ -173,17 +190,19 @@ class PosController extends Controller
                 return $existing->id;
             }
             $draft = $this->draft($request, $id, $key);
+            $tab = ! empty($draft['data']['dining_tab_id']) ? app(DiningRoom::class)->requireOpen($store->tenant_id, $id, (int) $draft['data']['dining_tab_id'], true) : null;
             $request->validate(['review_hash' => 'required|string|size:64']);
             abort_unless(hash_equals(hash('sha256', json_encode($draft, JSON_THROW_ON_ERROR)), $request->input('review_hash')), 409, 'A revisão mudou. Abra a revisão atual antes de confirmar.');
             $quote = $calculator->calculate($store, $draft['data'], true);
             $this->preferred($store, $draft['data']['preferred_driver_id'] ?? null);
             if (! hash_equals($calculator->fingerprint($draft['quote']), $calculator->fingerprint($quote))) {
                 $request->session()->flashInput($draft['data']);
-                throw ValidationException::withMessages(['cart' => 'O catálogo ou pagamento mudou. Revise os valores antes de confirmar.'])->redirectTo(route('pos.sale', $id));
+                throw ValidationException::withMessages(['cart' => 'O catálogo ou pagamento mudou. Revise os valores antes de confirmar.'])->redirectTo(route('pos.sale', ['id' => $id, 'tab' => $draft['data']['dining_tab_id'] ?? null]));
             }
             $orderId = DB::table('orders')->insertGetId([
                 'public_id' => (string) Str::uuid(), 'tenant_id' => $store->tenant_id, 'store_id' => $id,
                 'idempotency_key' => $key, 'source' => 'pos', 'created_by' => $request->user()->id,
+                'dining_tab_id' => $tab?->id, 'dining_label' => $tab ? $tab->table_name.' · Comanda #'.$tab->id : null,
                 'customer_name' => $draft['data']['customer_name'], 'phone' => $draft['data']['phone'], 'mode' => $draft['data']['mode'],
                 'pos_channel' => $draft['data']['pos_channel'], 'preferred_driver_id' => $draft['data']['preferred_driver_id'] ?? null,
                 'address' => $quote['delivery_address'], 'delivery_zone_name' => $quote['delivery_zone_name'],

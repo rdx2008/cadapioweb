@@ -11,6 +11,7 @@ use App\Http\Controllers\DeliveryAlertController;
 use App\Http\Controllers\DeliveryExceptionController;
 use App\Http\Controllers\DeliveryRecordController;
 use App\Http\Controllers\DeliveryStatementController;
+use App\Http\Controllers\DiningRoomController;
 use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\MenuController;
@@ -55,6 +56,15 @@ Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])-
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1,webhooks-evolution-id:');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
+    Route::get('/dining', [DiningRoomController::class, 'index'])->name('dining.index');
+    Route::post('/dining/tables', [DiningRoomController::class, 'saveTable'])->middleware('throttle:20,1,dining-tables:')->name('dining.tables.create');
+    Route::post('/dining/tables/{id}', [DiningRoomController::class, 'saveTable'])->whereNumber('id')->name('dining.tables.update');
+    Route::post('/dining/tables/{id}/open', [DiningRoomController::class, 'open'])->whereNumber('id')->middleware('throttle:20,1,dining-open:')->name('dining.open');
+    Route::get('/dining/tabs/{id}', [DiningRoomController::class, 'show'])->whereNumber('id')->name('dining.show');
+    Route::get('/dining/tabs/{id}/print', [DiningRoomController::class, 'print'])->whereNumber('id')->name('dining.print');
+    Route::post('/dining/tabs/{id}/pay', [DiningRoomController::class, 'pay'])->whereNumber('id')->middleware('throttle:10,1,dining-pay:')->name('dining.pay');
+    Route::post('/dining/tabs/{id}/orders/{orderId}/serve', [DiningRoomController::class, 'serve'])->whereNumber(['id', 'orderId'])->name('dining.serve');
+    Route::post('/dining/tabs/{id}/close', [DiningRoomController::class, 'close'])->whereNumber('id')->middleware('throttle:10,1,dining-close:')->name('dining.close');
     Route::get('/cash', [CashRegisterController::class, 'index'])->name('cash.index');
     Route::post('/cash', [CashRegisterController::class, 'open'])->middleware('throttle:10,1,cash-open:')->name('cash.open');
     Route::get('/cash/{id}', [CashRegisterController::class, 'show'])->whereNumber('id')->name('cash.show');

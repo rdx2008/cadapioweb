@@ -33,7 +33,7 @@ document.querySelectorAll('[data-pos-cart]').forEach(form=>{
     };
     form.querySelectorAll('[data-pos-category]').forEach(button=>button.addEventListener('click',()=>{selected=button.dataset.posCategory;form.querySelectorAll('[data-pos-category]').forEach(other=>other.setAttribute('aria-pressed',String(other===button)));filter();}));
     search.addEventListener('input',filter);
-    if(form.querySelector('[name=customer_name]').value||form.querySelector('[name=address]').value)checkout.showModal();
+    if(form.dataset.posRestore==='1')checkout.showModal();
 });
 document.querySelector('[data-pos-copy]')?.addEventListener('click',async()=>{
     const field=document.querySelector('[data-pos-share-link]'),message=document.querySelector('[data-pos-copy-status]');

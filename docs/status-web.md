@@ -1,6 +1,18 @@
 # Estado e prioridades da versão web
 
-Atualizado em 05/11/2026 após o caixa por turno do PDV, branch `feat/platform-foundation`.
+Atualizado em 05/11/2026 após mesas e comandas iniciais integradas ao PDV, branch `feat/platform-foundation`.
+
+## Mesas e comandas iniciais — 05/11/2026
+
+Menu Mesas e comandas no painel e atalho Mesas na frente de caixa. Proprietário cadastra, edita e desativa mesas por loja; nomes únicos sem diferenciar maiúsculas/minúsculas, limite de 200 mesas por loja. Operador autorizado pode iniciar e acompanhar atendimentos nas lojas atribuídas. Mapa com livre/ocupada/desativada, tempo aberto, pessoas e consumo sem cancelamentos; histórico paginado. Um atendimento compartilhado por mesa, abertura com UUID e identificação opcional do grupo. Mesa ocupada não pode ser editada/desativada; encerramento libera para novo grupo, preservando o atendimento anterior.
+
+Lançamentos pelo catálogo completo do PDV, revisão e confirmação existentes, com identificação da comanda, modo interno `dine_in`, sem frete ou despacho. Aceitos entram na cozinha com mesa/comanda e sem nome do grupo na fila de produção; preços e opções permanecem congelados por pedido. Comanda fechada entre revisão e confirmação bloqueia novo lançamento. A identificação também aparece nas vias de impressão e na operação; BI distingue consumo no local. Modal de conferência abre somente ao continuar ou restaurar uma edição, não pelo nome pré-preenchido da mesa.
+
+Conta mostra consumo, recebido e saldo, por pedidos e itens. Um recebimento integral do saldo atual por vez, em dinheiro/Pix manual/maquininha habilitados na loja, exigindo caixa aberto e confirmação explícita. Consolida os pedidos pendentes sem duplicar entradas: cada recebimento mantém seu pedido/autoria no caixa. Hash da conferência rejeita alteração de consumo/recebimento após abrir a tela; UUID de recebimento não captura lançamentos novos ao ser reenviado. Não inicia cobrança externa. Pedidos prontos podem ser marcados como servidos. Encerramento bloqueado por saldo, pedidos não servidos e devoluções de cancelados pagos ainda não registradas. Conta parcial ou encerrada pode ser impressa pelo navegador, sem valor fiscal.
+
+Migration `2026_11_05_032901_create_dining_room_tables`: mesas, atendimentos e histórico de recebimentos; colunas opcionais em pedidos existentes, sem vínculos artificiais no legado. Controle de acesso revalidado no banco, auditoria e alterações financeiras transacionais. Sem QR público, perfil de garçom separado, comandas individuais por pessoa, transferência/união, taxa de serviço, pagamento parcial/dividido, pagamento por link nesta modalidade ou atualização automática do mapa nesta etapa. iFood permanece sem alterações.
+
+Validação: 309 testes PHP aprovados e 1 consulta externa opcional ignorada na regressão geral; depois dos ajustes finais, 22 testes de mesas/PDV/impressão aprovados. 30 testes JavaScript aprovados. Pint e caches de views/rotas conferidos. Chrome local: cadastrar mesas, abrir comanda, lançar item no PDV, cozinha, servir, receber no caixa, encerrar, verificar mesa livre e imprimir a conta; desktop e 390 px sem erros JS ou transbordamento de página. Evidências em outputs/mapa-mesas.png, mesa-comanda-desktop.png, mesa-comanda-mobile.png e mesa-conta-fechada.png. Piloto físico e concorrência PostgreSQL permanecem pendentes.
 
 ## Caixa por turno do PDV — 05/11/2026
 
