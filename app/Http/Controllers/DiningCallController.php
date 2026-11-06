@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Services\DiningCalls;
 use App\Services\DiningRoom;
 use App\Support\Audit;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -54,7 +56,26 @@ class DiningCallController extends Controller
         $tab = $room->tab($user, $id);
         abort_if($tab->closed_at !== null || $tab->guest_token === null, 404);
 
-        return $this->page('dining.guest-link', ['tab' => $tab, 'store' => DB::table('stores')->find($tab->store_id), 'waiter' => $user->staff_profile === 'waiter', 'url' => route('dining.guest', Crypt::decryptString($tab->guest_token)), 'canRotate' => $user->role === 'owner' || $user->staff_profile === 'operator']);
+        $url = route('dining.guest', Crypt::decryptString($tab->guest_token));
+
+        return $this->page('dining.guest-link', ['tab' => $tab, 'store' => DB::table('stores')->find($tab->store_id), 'waiter' => $user->staff_profile === 'waiter', 'url' => $url, 'qr' => $this->qr($url), 'canRotate' => $user->role === 'owner' || $user->staff_profile === 'operator']);
+    }
+
+    private function qr(string $url): string
+    {
+        return (new SvgWriter)->write(new QrCode(data: $url, size: 320, margin: 40))->getDataUri();
+    }
+
+    public function printLink(Request $request, int $id, DiningRoom $room): Response
+    {
+        $user = $room->member($request->user());
+        $tab = $room->tab($user, $id);
+        abort_if($tab->closed_at !== null || $tab->guest_token === null, 404);
+        $data = $request->validate(['revision' => 'required|string|size:64']);
+        abort_unless(hash_equals($tab->guest_token_hash, $data['revision']), 409, 'O link mudou. Abra novamente o link do cliente para imprimir.');
+        $url = route('dining.guest', Crypt::decryptString($tab->guest_token));
+
+        return $this->page('dining.guest-print', ['tab' => $tab, 'store' => DB::table('stores')->find($tab->store_id), 'qr' => $this->qr($url)]);
     }
 
     public function rotate(Request $request, int $id, DiningRoom $room, DiningCalls $calls): RedirectResponse

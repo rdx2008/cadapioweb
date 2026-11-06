@@ -1,3 +1,4 @@
+document.querySelector('[data-dining-print]')?.addEventListener('click',()=>window.print());
 document.querySelector('[data-dining-copy]')?.addEventListener('click',async()=>{
     const field=document.querySelector('[data-dining-guest-link]'),message=document.querySelector('[data-dining-copy-status]');
     try{await navigator.clipboard.writeText(field.value);message.textContent='Link copiado. Compartilhe com o grupo desta mesa.';}

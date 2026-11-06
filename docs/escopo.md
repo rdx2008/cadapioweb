@@ -1,5 +1,7 @@
 # Escopo de produto — Plataforma de restaurantes em Laravel
 
+QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
+
 Versão 1.5 · 24 de outubro de 2026 · Operação web e integração iFood por etapas; Android adiado
 
 ## 1. Objetivo e decisões de partida

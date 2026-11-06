@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/dining', [DiningRoomController::class, 'index'])->name('dining.index');
     Route::post('/dining/tabs/{id}/guest-link', [DiningCallController::class, 'issue'])->whereNumber('id')->middleware('throttle:20,1,dining-guest-issue:')->name('dining.guest-issue');
     Route::get('/dining/tabs/{id}/guest-link', [DiningCallController::class, 'share'])->whereNumber('id')->name('dining.guest-link');
+    Route::get('/dining/tabs/{id}/guest-link/print', [DiningCallController::class, 'printLink'])->whereNumber('id')->name('dining.guest-print');
     Route::post('/dining/tabs/{id}/guest-link/rotate', [DiningCallController::class, 'rotate'])->whereNumber('id')->middleware('throttle:6,1,dining-guest-rotate:')->name('dining.guest-rotate');
     Route::post('/dining/calls/{id}/attend', [DiningCallController::class, 'attend'])->whereNumber('id')->middleware('throttle:30,1,dining-attend:')->name('dining.call-attend');
     Route::get('/dining/live', [DiningRoomController::class, 'live'])->middleware('throttle:60,1,dining-live:')->name('dining.live');

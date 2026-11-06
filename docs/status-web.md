@@ -1,5 +1,7 @@
 # Estado e prioridades da versão web
 
+QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
+
 Atualizado em 05/11/2026 após solicitações de atendimento e conta pelo link da comanda, branch `feat/platform-foundation`.
 
 ## Solicitações do cliente na mesa — 05/11/2026

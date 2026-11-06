@@ -31,6 +31,28 @@ class DiningCallsTest extends TestCase
         return compact('tenant', 'store', 'owner', 'table', 'tab', 'url', 'token');
     }
 
+    public function test_qr_print_uses_current_link_without_mutation_and_rejects_old_revision(): void
+    {
+        $f = $this->fixture();
+        $tab = DB::table('dining_tabs')->find($f['tab']->id);
+        $path = route('dining.guest-print', ['id' => $tab->id, 'revision' => $tab->guest_token_hash]);
+        $share = $this->get(route('dining.guest-link', $tab->id))->assertOk();
+        $this->assertStringStartsWith('data:image/svg+xml;base64,', $share->viewData('qr'));
+        $this->get($path)->assertOk()->assertViewHas('qr', $share->viewData('qr'))->assertDontSee('NOME PRIVADO')->assertHeader('Referrer-Policy', 'no-referrer');
+        $this->assertSame($tab->guest_token, DB::table('dining_tabs')->find($tab->id)->guest_token);
+        $this->assertDatabaseCount('dining_calls', 0);
+        $this->assertDatabaseCount('cash_entries', 0);
+        $otherOwner = $this->owner($this->tenant('qr-other'));
+        $this->actingAs($otherOwner)->get($path)->assertNotFound();
+        $this->actingAs($f['owner']);
+        $this->post(route('dining.guest-rotate', $tab->id), ['confirmed' => 1, 'expected_hash' => $tab->guest_token_hash])->assertRedirect();
+        $this->get($path)->assertConflict();
+        DB::table('dining_tabs')->where('id', $tab->id)->update(['closed_at' => now()]);
+        $this->get($path)->assertNotFound();
+        auth()->logout();
+        $this->get($path)->assertRedirect('/login');
+    }
+
     private function requestCall(array $f, string $kind = 'service', ?string $key = null): array
     {
         $data = ['kind' => $kind, 'request_key' => $key ?? (string) Str::uuid()];
