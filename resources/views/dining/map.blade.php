@@ -1,4 +1,5 @@
 @if($store)
+@include('dining.calls')
 <div class="cash-heading"><h2>{{ $store->name }}</h2><span>{{ $tabs->count() }} ocupadas · {{ $tables->where('enabled',true)->count()-$tabs->count() }} livres</span></div>
 <div class="dining-tables">@forelse($tables as $table)
 @php($active=$tabs->get($table->id))

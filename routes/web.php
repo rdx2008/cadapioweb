@@ -11,6 +11,7 @@ use App\Http\Controllers\DeliveryAlertController;
 use App\Http\Controllers\DeliveryExceptionController;
 use App\Http\Controllers\DeliveryRecordController;
 use App\Http\Controllers\DeliveryStatementController;
+use App\Http\Controllers\DiningCallController;
 use App\Http\Controllers\DiningRoomController;
 use App\Http\Controllers\IfoodController;
 use App\Http\Controllers\KitchenController;
@@ -52,11 +53,17 @@ Route::post('/pedido/{id}/pagar', [PaymentController::class, 'pay'])->middleware
 Route::post('/pedido/{id}/consultar-pagamento', [PaymentController::class, 'check'])->middleware('throttle:8,1,pedido-id-consultar-pagamento:');
 Route::get('/pedido/{id}/status', [MenuController::class, 'status'])->middleware('throttle:60,1,pedido-id-status:');
 Route::get('/media/products/{id}', [CatalogController::class, 'photo']);
+Route::get('/mesa/{token}', [DiningCallController::class, 'guest'])->where('token', '[a-f0-9]{64}')->middleware('throttle:120,1,dining-guest:')->name('dining.guest');
+Route::post('/mesa/{token}', [DiningCallController::class, 'request'])->where('token', '[a-f0-9]{64}')->middleware('throttle:dining-guest-call')->name('dining.guest-request');
 Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])->whereIn('kind', ['logo', 'cover'])->name('stores.branding');
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1,webhooks-evolution-id:');
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
     Route::get('/dining', [DiningRoomController::class, 'index'])->name('dining.index');
+    Route::post('/dining/tabs/{id}/guest-link', [DiningCallController::class, 'issue'])->whereNumber('id')->middleware('throttle:20,1,dining-guest-issue:')->name('dining.guest-issue');
+    Route::get('/dining/tabs/{id}/guest-link', [DiningCallController::class, 'share'])->whereNumber('id')->name('dining.guest-link');
+    Route::post('/dining/tabs/{id}/guest-link/rotate', [DiningCallController::class, 'rotate'])->whereNumber('id')->middleware('throttle:6,1,dining-guest-rotate:')->name('dining.guest-rotate');
+    Route::post('/dining/calls/{id}/attend', [DiningCallController::class, 'attend'])->whereNumber('id')->middleware('throttle:30,1,dining-attend:')->name('dining.call-attend');
     Route::get('/dining/live', [DiningRoomController::class, 'live'])->middleware('throttle:60,1,dining-live:')->name('dining.live');
     Route::post('/dining/tables', [DiningRoomController::class, 'saveTable'])->middleware('throttle:20,1,dining-tables:')->name('dining.tables.create');
     Route::post('/dining/tables/{id}', [DiningRoomController::class, 'saveTable'])->whereNumber('id')->name('dining.tables.update');

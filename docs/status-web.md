@@ -1,6 +1,16 @@
 # Estado e prioridades da versão web
 
-Atualizado em 05/11/2026 após atualização automática das mesas e pedidos do salão, branch `feat/platform-foundation`.
+Atualizado em 05/11/2026 após solicitações de atendimento e conta pelo link da comanda, branch `feat/platform-foundation`.
+
+## Solicitações do cliente na mesa — 05/11/2026
+
+Na comanda aberta, proprietário, operador ou garçom usa Link do cliente para ativar/copiar o endereço exclusivo daquele atendimento. Página pública sem login permite chamar atendimento ou solicitar a conta; não mostra grupo, contatos, itens, valores ou pagamentos. Solicitações aparecem no mapa e na tela do garçom pela atualização automática existente. Equipe autorizada registra atendimento, com responsável e horário persistidos e auditoria transacional; não encerra a comanda nem registra pagamento. A página do cliente permite atualizar o estado manualmente.
+
+Um chamado pendente por tipo/comanda; tentativas de vários navegadores são agrupadas. Cada chave de requisição mantém vínculo ao chamado, evitando reabertura por repetição depois de atendido. Novo pedido após atualizar a página cria outra solicitação quando não há pendência. Limite por link/IP e limite global por IP. Link usa segredo aleatório com hash para busca e cópia criptografada; páginas sem cache e sem referência externa/indexação. Segredo não entra na auditoria.
+
+Transferência mantém o link mostrando a mesa atual. Encerramento e união invalidam o link de origem e cancelam suas pendências, preservando registros; na união, compartilhar o link da conta de destino. Nova comanda na mesma mesa recebe outro link. Proprietário/operador pode substituir o link mediante confirmação; o anterior deixa de funcionar e pendências continuam na fila. Garçom pode compartilhar e atender, mas não substituir o segredo. Empresa suspensa/deletada não recebe chamados; permissões e lojas são revalidadas no servidor.
+
+Migration `2026_11_06_015846_add_dining_customer_calls` adiciona os campos opcionais e tabelas de chamadas/requisições, sem gerar links no legado. Publicar com migrações. Reversão bloqueada após existir histórico de chamadas. Validação: 53 testes PHP relacionados aprovados, 1.134 asserções, e 5 JavaScript; Pint, Blade e rotas conferidos. Chrome local em acessos separados: garçom gerou/copiou link, cliente sem login pediu conta/atendimento, fila atualizou e equipe atendeu sem alterar financeiro. Celular em 390 px sem transbordamento; sem erros JavaScript. QR impresso, som e push continuam pendentes; nesta etapa o acesso é pelo link compartilhado. Piloto físico e concorrência PostgreSQL permanecem pendentes. iFood continua pausado.
 
 ## Atualização automática do salão — 05/11/2026
 

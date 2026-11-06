@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\CheckoutPayment;
+use App\Services\DiningCalls;
 use App\Services\DiningRoom;
 use App\Services\OnlinePayment;
 use App\Support\Audit;
@@ -75,7 +76,7 @@ class DiningRoomController extends Controller
         $audience = $this->audience($user);
         $canManageTables = $user->role === 'owner';
 
-        return compact('stores', 'store', 'tables', 'tabs', 'orders', 'history', 'waiter', 'audience', 'canManageTables');
+        return compact('stores', 'store', 'tables', 'tabs', 'orders', 'history', 'waiter', 'audience', 'canManageTables') + ['calls' => app(DiningCalls::class)->pending($user->tenant_id, $store?->id ?? 0)->get()];
     }
 
     public function saveTable(Request $request, DiningRoom $room, ?int $id = null): RedirectResponse
@@ -130,7 +131,7 @@ class DiningRoomController extends Controller
 
         $waiter = $user->role === 'staff' && $user->staff_profile === 'waiter';
 
-        return compact('tab', 'summary', 'orders', 'store', 'waiter') + ['audience' => $this->audience($user), 'operator' => DB::table('users')->find($tab->opened_by),
+        return compact('tab', 'summary', 'orders', 'store', 'waiter') + ['calls' => app(DiningCalls::class)->pending($user->tenant_id, $store->id, $ids)->get(), 'audience' => $this->audience($user), 'operator' => DB::table('users')->find($tab->opened_by),
             'settlements' => DB::table('dining_settlements')->join('users', 'users.id', '=', 'dining_settlements.user_id')->whereIn('dining_tab_id', $ids)->select('dining_settlements.*', 'users.name as operator_name')->orderBy('dining_settlements.id')->get(),
             'mergeTargets' => $tab->closed_at ? collect() : DB::table('dining_tabs')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->whereNull('closed_at')->where('id', '!=', $id)->orderBy('table_name')->get(),
             'merges' => DB::table('dining_merges')->join('users', 'users.id', '=', 'dining_merges.user_id')->where(fn ($q) => $q->whereIn('source_tab_id', $ids)->orWhereIn('target_tab_id', $ids))->select('dining_merges.*', 'users.name as operator_name')->orderBy('dining_merges.id')->get(),

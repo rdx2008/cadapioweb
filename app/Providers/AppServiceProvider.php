@@ -28,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn ($request) => Limit::perMinute(120)->by($request->user()?->id ? 'api-user:'.$request->user()->id : 'api-ip:'.$request->ip()));
         RateLimiter::for('delivery-progress', fn ($request) => Limit::perMinute(6)->by('delivery:'.$request->user()->id.':'.$request->route('id')));
         RateLimiter::for('delivery-statement-export', fn ($request) => Limit::perMinute(6)->by('delivery-statement:'.$request->user()->id));
+        RateLimiter::for('dining-guest-call', fn ($request) => [Limit::perMinute(8)->by('dining-guest:'.hash('sha256', (string) $request->route('token')).':'.$request->ip()), Limit::perMinute(120)->by('dining-guest-ip:'.$request->ip())]);
         TrustProxies::at(config('platform.trusted_proxies'));
         $resetUrl = fn ($user, string $token): string => rtrim(config('app.url'), '/').route('password.reset', ['token' => $token, 'email' => $user->getEmailForPasswordReset()], false);
         ResetPassword::createUrlUsing($resetUrl);

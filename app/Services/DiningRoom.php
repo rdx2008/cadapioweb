@@ -185,6 +185,7 @@ class DiningRoom
         $sourceIds = $this->groupIds($source);
         DB::table('orders')->whereIn('dining_tab_id', $sourceIds)->orderBy('id')->lockForUpdate()->get();
         DB::table('dining_tabs')->where('id', $source->id)->update(['active_table_id' => null, 'merged_into_tab_id' => $target->id, 'closed_at' => now(), 'closed_by' => $user->id, 'updated_at' => now()]);
+        app(DiningCalls::class)->invalidate($source, 'merged');
         DB::table('dining_tabs')->where('id', $target->id)->update(['guests' => $source->guests + $target->guests, 'updated_at' => now()]);
         DB::table('orders')->whereIn('dining_tab_id', $sourceIds)->whereIn('status', ['accepted', 'preparing', 'ready'])->update(['dining_label' => $target->table_name.' · Comanda #'.$target->id, 'updated_at' => now()]);
         DB::table('dining_merges')->insert(['tenant_id' => $source->tenant_id, 'store_id' => $source->store_id, 'source_tab_id' => $source->id, 'target_tab_id' => $target->id, 'user_id' => $user->id, 'from_name' => $source->table_name, 'to_name' => $target->table_name, 'reason' => $reason, 'source_hash' => $sourceHash, 'target_hash' => $targetHash, 'request_key' => $key, 'created_at' => now()]);
@@ -204,6 +205,7 @@ class DiningRoom
             throw ValidationException::withMessages(['tab' => 'Confira os recebimentos, marque os pedidos como servidos e registre as devoluções pendentes antes de encerrar.']);
         }
         DB::table('dining_tabs')->where('id', $tab->id)->update(['active_table_id' => null, 'closed_by' => $user->id, 'close_key' => $key, 'closed_at' => now(), 'closing_total_cents' => $summary['total'], 'updated_at' => now()]);
+        app(DiningCalls::class)->invalidate($tab, 'closed');
         Audit::record('dining.closed', ['tab_id' => $tab->id, 'total_cents' => $summary['total']], $tab->tenant_id);
     }
 }
