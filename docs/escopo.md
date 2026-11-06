@@ -758,7 +758,7 @@ Fechamento definitivo com dinheiro contado, esperado, diferença justificada, to
 
 Mapa por loja, mesas cadastradas pelo proprietário, atendimento compartilhado por mesa e acesso de operadores por loja. Abertura identificada, pessoas, tempo e consumo; histórico preservado e mesa liberada após encerramento. Pedidos lançados pelo PDV existente como consumo no local, enviados à cozinha com identificação de mesa/comanda e preço congelado. Conta agrupa pedidos e recebe integralmente o saldo atual por dinheiro/Pix manual/maquininha, em caixa aberto, com confirmação explícita, conferência de alteração de valores e proteção contra reenvio. Não cria cobrança externa. Encerramento exige saldo quitado, pedidos servidos/cancelados e devoluções de cancelados pagas registradas. Impressão parcial/final pelo navegador. Sem vínculos de mesa no legado.
 
-Continuam pendentes do salão: QR por sessão, atendimento/conta solicitados pelo cliente, comandas individuais, divisão por item, taxa de serviço e mapa em tempo real. Validação física e concorrência PostgreSQL permanecem para piloto.
+Continuam pendentes do salão: QR por sessão, atendimento/conta solicitados pelo cliente, comandas individuais, divisão por item e taxa de serviço. Validação física e concorrência PostgreSQL permanecem para piloto.
 
 ### 17.24. Transferência integral de comanda
 
@@ -775,3 +775,7 @@ Conferência de duas comandas abertas da mesma loja, com consumo, recebido, sald
 ### 17.27. Perfil de garçom
 
 Perfil configurável pelo proprietário em Equipe e acessos, limitado às lojas selecionadas. Entrada direto nas mesas, abertura de comanda, consulta de consumo e itens, lançamento com catálogo completo e revisão, serviço de pedidos prontos e impressão de produção. Tela em desktop/celular sem caixa ou controles financeiros. Sem pedidos remotos, checkout online, troco, recebimento, cancelamento, fechamento, transferência/união, configurações ou acesso a outras lojas. Servidor revalida acesso na confirmação e impede aproveitar rascunho de operador após mudança de perfil para receber valores. Não inclui QR público nem chamadas do cliente nesta etapa. Sem migração adicional.
+
+### 17.28. Atualização automática do salão
+
+Mapa de mesas com ocupação, consumo consolidado e pedidos prontos para servir, consultado a cada cinco segundos com página visível. Comanda do garçom acompanha preparo e serviço sem recarga. Preserva edição/foco, conteúdo inalterado e paginação; interrompe após envio ou acesso alterado, retoma após falhas de rede e pausa em aba oculta. Dados e ações continuam limitados ao perfil e às lojas autorizadas; feed do garçom não inclui financeiro ou contatos. Revisão financeira permanece explícita para operador/proprietário. Sem push, som ou garantia com navegador fechado. Sem migração adicional.

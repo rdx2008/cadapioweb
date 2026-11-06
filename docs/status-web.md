@@ -1,6 +1,14 @@
 # Estado e prioridades da versão web
 
-Atualizado em 05/11/2026 após organização do menu em sanfona, branch `feat/platform-foundation`.
+Atualizado em 05/11/2026 após atualização automática das mesas e pedidos do salão, branch `feat/platform-foundation`.
+
+## Atualização automática do salão — 05/11/2026
+
+Mapa de mesas consulta ocupação, consumo consolidado, histórico e quantidade de pedidos prontos para servir a cada 5 segundos com a página visível. Tela da comanda do garçom atualiza itens, preparo e disponibilidade de marcar servido, sem recarregar a página. Conta financeira do proprietário/operador mantém a revisão explícita existente; recebimento e encerramento continuam protegidos contra valores antigos. Não inicia som, push ou chamadas públicas de clientes.
+
+Atualização preserva foco, detalhes abertos e formulários com campos alterados, inclusive edição iniciada enquanto uma resposta está em trânsito. Exibe mensagem para terminar a edição; salvar a ação ou recarregar continua usando o fluxo normal. Conteúdo inalterado não é substituído. Falha de conexão mantém a última tela e tenta novamente; aba oculta pausa consultas, envio de formulário/navegação interrompe a atualização e retorno pelo histórico retoma. Revogação, troca de perfil ou expiração detectadas na consulta apagam o conteúdo atualizado e interrompem o fluxo. Não garante atualização com navegador fechado ou sem rede.
+
+Endpoints autenticados revalidam empresa, perfil e lojas permitidas. Feed da comanda é exclusivo do garçom e não inclui contatos, recebimentos, saldo ou histórico financeiro. Links de paginação continuam levando às páginas completas. Sem migração adicional. Validação: 36 testes PHP aprovados, 810 asserções, e 5 testes JavaScript dedicados; Pint, Blade e rotas conferidos. Chrome local em dois acessos: cozinha marcou pronto e garçom recebeu o botão de servir sem navegação; mapa exibiu o pedido pronto, e texto digitado em abertura de mesa permaneceu após outra alteração. Sem erros JavaScript; celular conferido. Piloto físico permanece pendente. iFood continua pausado.
 
 ## Menu em sanfona — 05/11/2026
 

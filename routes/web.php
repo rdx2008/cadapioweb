@@ -57,10 +57,12 @@ Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])-
 Route::middleware('auth')->group(function () {
     Route::get('/app', [PlatformController::class, 'home']);
     Route::get('/dining', [DiningRoomController::class, 'index'])->name('dining.index');
+    Route::get('/dining/live', [DiningRoomController::class, 'live'])->middleware('throttle:60,1,dining-live:')->name('dining.live');
     Route::post('/dining/tables', [DiningRoomController::class, 'saveTable'])->middleware('throttle:20,1,dining-tables:')->name('dining.tables.create');
     Route::post('/dining/tables/{id}', [DiningRoomController::class, 'saveTable'])->whereNumber('id')->name('dining.tables.update');
     Route::post('/dining/tables/{id}/open', [DiningRoomController::class, 'open'])->whereNumber('id')->middleware('throttle:20,1,dining-open:')->name('dining.open');
     Route::get('/dining/tabs/{id}', [DiningRoomController::class, 'show'])->whereNumber('id')->name('dining.show');
+    Route::get('/dining/tabs/{id}/live', [DiningRoomController::class, 'tabLive'])->whereNumber('id')->middleware('throttle:60,1,dining-tab-live:')->name('dining.tab-live');
     Route::get('/dining/tabs/{id}/print', [DiningRoomController::class, 'print'])->whereNumber('id')->name('dining.print');
     Route::post('/dining/tabs/{id}/pay', [DiningRoomController::class, 'pay'])->whereNumber('id')->middleware('throttle:10,1,dining-pay:')->name('dining.pay');
     Route::post('/dining/tabs/{id}/transfer', [DiningRoomController::class, 'transfer'])->whereNumber('id')->middleware('throttle:10,1,dining-transfer:')->name('dining.transfer');

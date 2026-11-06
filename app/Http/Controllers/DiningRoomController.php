@@ -7,6 +7,7 @@ use App\Services\DiningRoom;
 use App\Services\OnlinePayment;
 use App\Support\Audit;
 use App\Support\MoneyInput;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -17,8 +18,39 @@ class DiningRoomController extends Controller
 {
     public function index(Request $request, DiningRoom $room): Response
     {
+        return response()->view('dining.index', $this->mapData($request, $room))->header('Cache-Control', 'private, no-store');
+    }
+
+    private function audience(object $user): string
+    {
+        return $user->role === 'owner' ? 'owner' : $user->staff_profile;
+    }
+
+    private function liveResponse(string $view, array $data): JsonResponse
+    {
+        $html = view($view, $data)->render();
+        $stable = preg_replace('/(name="request_key" value=")[a-f0-9-]{36}/', '$1request-key', $html);
+
+        return response()->json(['html' => $html, 'signature' => hash('sha256', $stable), 'audience' => $data['audience']])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function live(Request $request, DiningRoom $room): JsonResponse
+    {
+        return $this->liveResponse('dining.map', $this->mapData($request, $room));
+    }
+
+    public function tabLive(Request $request, int $id, DiningRoom $room): JsonResponse
+    {
+        $data = $this->data($request, $id, $room);
+        abort_unless($data['waiter'], 403);
+
+        return $this->liveResponse('dining.waiter-content', $data);
+    }
+
+    private function mapData(Request $request, DiningRoom $room): array
+    {
         $user = $room->member($request->user());
-        $data = $request->validate(['store_id' => 'nullable|integer|min:1']);
+        $data = $request->validate(['store_id' => 'nullable|integer|min:1', 'page' => 'nullable|integer|min:1|max:100000']);
         $stores = $room->stores($user)->orderBy('name')->get();
         $store = ! empty($data['store_id']) ? $stores->firstWhere('id', (int) $data['store_id']) : $stores->first();
         abort_if(! empty($data['store_id']) && ! $store, 404);
@@ -36,12 +68,14 @@ class DiningRoomController extends Controller
                 }
             }
         }
-        $orders = DB::table('orders')->whereIn('dining_tab_id', array_keys($owners))->where('status', '!=', 'cancelled')->get(['dining_tab_id', 'total_cents', 'payment_status'])->groupBy(fn ($order) => $owners[$order->dining_tab_id]);
-        $history = DB::table('dining_tabs')->where('store_id', $store?->id ?? 0)->orderByDesc('id')->paginate(15);
+        $orders = DB::table('orders')->whereIn('dining_tab_id', array_keys($owners))->where('status', '!=', 'cancelled')->get(['dining_tab_id', 'total_cents', 'payment_status', 'status'])->groupBy(fn ($order) => $owners[$order->dining_tab_id]);
+        $history = DB::table('dining_tabs')->where('store_id', $store?->id ?? 0)->orderByDesc('id')->paginate(15)->withPath(route('dining.index'));
 
         $waiter = $user->role === 'staff' && $user->staff_profile === 'waiter';
+        $audience = $this->audience($user);
+        $canManageTables = $user->role === 'owner';
 
-        return response()->view('dining.index', compact('stores', 'store', 'tables', 'tabs', 'orders', 'history', 'waiter'))->header('Cache-Control', 'private, no-store');
+        return compact('stores', 'store', 'tables', 'tabs', 'orders', 'history', 'waiter', 'audience', 'canManageTables');
     }
 
     public function saveTable(Request $request, DiningRoom $room, ?int $id = null): RedirectResponse
@@ -86,17 +120,17 @@ class DiningRoomController extends Controller
 
     private function data(Request $request, int $id, DiningRoom $room): array
     {
-        $request->validate(['split_people' => 'sometimes|required|integer|min:1|max:100']);
+        $request->validate(['split_people' => 'sometimes|required|integer|min:1|max:100', 'page' => 'nullable|integer|min:1|max:100000']);
         $user = $room->member($request->user());
         $tab = $room->tab($user, $id);
         $summary = $room->summary($tab);
         $ids = $room->groupIds($tab);
-        $orders = DB::table('orders')->whereIn('dining_tab_id', $ids)->orderByDesc('id')->paginate(20);
+        $orders = DB::table('orders')->whereIn('dining_tab_id', $ids)->orderByDesc('id')->paginate(20)->withPath(route('dining.show', $id));
         $store = DB::table('stores')->find($tab->store_id);
 
         $waiter = $user->role === 'staff' && $user->staff_profile === 'waiter';
 
-        return compact('tab', 'summary', 'orders', 'store', 'waiter') + ['operator' => DB::table('users')->find($tab->opened_by),
+        return compact('tab', 'summary', 'orders', 'store', 'waiter') + ['audience' => $this->audience($user), 'operator' => DB::table('users')->find($tab->opened_by),
             'settlements' => DB::table('dining_settlements')->join('users', 'users.id', '=', 'dining_settlements.user_id')->whereIn('dining_tab_id', $ids)->select('dining_settlements.*', 'users.name as operator_name')->orderBy('dining_settlements.id')->get(),
             'mergeTargets' => $tab->closed_at ? collect() : DB::table('dining_tabs')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->whereNull('closed_at')->where('id', '!=', $id)->orderBy('table_name')->get(),
             'merges' => DB::table('dining_merges')->join('users', 'users.id', '=', 'dining_merges.user_id')->where(fn ($q) => $q->whereIn('source_tab_id', $ids)->orWhereIn('target_tab_id', $ids))->select('dining_merges.*', 'users.name as operator_name')->orderBy('dining_merges.id')->get(),

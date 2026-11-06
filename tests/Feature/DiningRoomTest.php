@@ -319,6 +319,32 @@ class DiningRoomTest extends TestCase
         $this->assertSame(500, json_decode(DB::table('cash_sessions')->find($first->id)->closing_totals, true)['cash']['sales']);
     }
 
+    public function test_live_map_refreshes_occupancy_consumption_and_ready_orders_without_writes(): void
+    {
+        $this->travelTo(now()->startOfMinute());
+        $f = $this->fixture();
+        $order = $this->orderForTab($f);
+        $url = '/dining/live?store_id='.$f['store'];
+        $first = $this->getJson($url)->assertOk()->assertJsonPath('audience', 'owner');
+        $second = $this->getJson($url)->assertOk();
+        $this->assertSame($first->json('signature'), $second->json('signature'));
+        $this->assertStringContainsString('no-store', $first->headers->get('Cache-Control'));
+        DB::table('orders')->where('id', $order->id)->update(['status' => 'ready']);
+        $ready = $this->getJson($url)->assertOk();
+        $this->assertNotSame($first->json('signature'), $ready->json('signature'));
+        $this->assertStringContainsString('pronto(s) para servir', $ready->json('html'));
+        $this->assertStringContainsString('30,00', $ready->json('html'));
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('cash_entries', 0);
+        $other = $this->store($f['tenant'], 'denied');
+        $operator = User::factory()->create(['tenant_id' => $f['tenant'], 'role' => 'staff', 'staff_profile' => 'operator']);
+        DB::table('user_store_access')->insert(['tenant_id' => $f['tenant'], 'store_id' => $other, 'user_id' => $operator->id]);
+        $this->actingAs($operator)->getJson($url)->assertNotFound();
+        $this->getJson('/dining/live?store_id='.$other)->assertOk()->assertDontSee('Mesa 1');
+        DB::table('users')->where('id', $operator->id)->update(['access_enabled' => false]);
+        $this->getJson('/dining/live?store_id='.$other)->assertForbidden();
+    }
+
     private function anotherTab(array $f, string $name = 'Mesa 2'): array
     {
         $table = $this->spareTable($f, $name);

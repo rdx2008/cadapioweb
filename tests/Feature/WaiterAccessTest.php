@@ -165,6 +165,47 @@ class WaiterAccessTest extends TestCase
         $this->get('/pos/'.$f['store'].'?tab='.$f['tab']->id)->assertForbidden();
     }
 
+    public function test_waiter_live_feed_updates_readiness_and_pagination_without_financial_data(): void
+    {
+        $f = $this->fixture();
+        $order = $this->orderForTab($f);
+        $url = '/dining/tabs/'.$f['tab']->id.'/live';
+        $first = $this->getJson($url)->assertOk()->assertJsonPath('audience', 'waiter');
+        $this->assertSame($first->json('signature'), $this->getJson($url)->json('signature'));
+        DB::table('orders')->where('id', $order->id)->update(['status' => 'ready', 'phone' => '11987654321']);
+        $ready = $this->getJson($url)->assertOk();
+        $this->assertNotSame($first->json('signature'), $ready->json('signature'));
+        $html = $ready->json('html');
+        $this->assertStringContainsString('Marcar como servido', $html);
+        foreach (['11987654321', 'Saldo a receber', 'Histórico de recebimentos', 'review_hash'] as $private) {
+            $this->assertStringNotContainsString($private, $html);
+        }
+        $copy = (array) DB::table('orders')->find($order->id);
+        unset($copy['id']);
+        for ($i = 0; $i < 21; $i++) {
+            DB::table('orders')->insert(array_replace($copy, ['public_id' => (string) Str::uuid(), 'idempotency_key' => (string) Str::uuid()]));
+        }
+        $page = $this->getJson($url.'?page=2')->assertOk()->json('html');
+        $this->assertStringContainsString('/dining/tabs/'.$f['tab']->id.'?page=', $page);
+        $this->assertStringNotContainsString('/live?page=', $page);
+        DB::table('user_store_access')->where('user_id', $f['waiter']->id)->delete();
+        $this->getJson($url)->assertNotFound();
+        $this->getJson('/dining/live?store_id='.$f['store'])->assertNotFound();
+    }
+
+    public function test_live_feed_revalidates_profile_and_hidden_map_controls(): void
+    {
+        $f = $this->fixture();
+        $map = $this->getJson('/dining/live?store_id='.$f['store'])->assertOk();
+        $this->assertStringNotContainsString('Cadastrar mesa', $map->json('html'));
+        $url = '/dining/tabs/'.$f['tab']->id.'/live';
+        DB::table('users')->where('id', $f['waiter']->id)->update(['staff_profile' => 'operator']);
+        $this->getJson($url)->assertForbidden();
+        $this->getJson('/dining/live?store_id='.$f['store'])->assertOk()->assertJsonPath('audience', 'operator');
+        DB::table('users')->where('id', $f['waiter']->id)->update(['staff_profile' => 'kitchen']);
+        $this->getJson('/dining/live?store_id='.$f['store'])->assertForbidden();
+    }
+
     public function test_owner_can_create_and_change_waiter_profile_with_store_scoping(): void
     {
         $f = $this->fixture();
