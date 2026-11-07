@@ -793,3 +793,7 @@ Ativação explícita com teste no mapa/comanda do garçom; som curto para chama
 ### 17.31. Identificação do consumo por pessoa
 
 Campo opcional ao lançar pedido de mesa pelo operador/garçom, com sugestões da comanda e revisão antes do envio. Um pedido inteiro por identificação; sem identificação é compartilhado. Resumo de consumo por pessoa na comanda e impressão, cancelamentos excluídos. Identificação acompanha cozinha e novas vias; legado não recebe nomes inferidos. União preserva pessoas de origens distintas mesmo com nomes iguais. Recebimentos continuam pela conta da mesa; não atribui parcelas a pessoas nem divide itens compartilhados. Base para evolução de comandas individuais, ainda pendentes.
+
+### 17.32. Recebimento por identificação de consumo
+
+Proprietário/operador seleciona conta inteira, pessoa ou compartilhado por comanda de origem; confere saldo derivado dos pedidos e recebe parcial/integralmente em caixa aberto. Parcelas abatem apenas pedidos da seleção; pagamentos anteriores são respeitados. Seleção vinculada à revisão e idempotência; origem e identificação congeladas no histórico/conta impressa. Garçom não recebe; fechar mesa exige quitar todo saldo e concluir serviço. Não representa quem pagou, divisão de item compartilhado ou comanda individual independente. Migração preserva parcelas anteriores sem atribuição fictícia.

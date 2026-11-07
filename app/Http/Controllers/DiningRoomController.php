@@ -121,7 +121,7 @@ class DiningRoomController extends Controller
 
     private function data(Request $request, int $id, DiningRoom $room): array
     {
-        $request->validate(['split_people' => 'sometimes|required|integer|min:1|max:100', 'page' => 'nullable|integer|min:1|max:100000']);
+        $request->validate(['person' => 'nullable|string|regex:/^[a-f0-9]{64}$/', 'split_people' => 'sometimes|required|integer|min:1|max:100', 'page' => 'nullable|integer|min:1|max:100000']);
         $user = $room->member($request->user());
         $tab = $room->tab($user, $id);
         $summary = $room->summary($tab);
@@ -131,7 +131,7 @@ class DiningRoomController extends Controller
 
         $waiter = $user->role === 'staff' && $user->staff_profile === 'waiter';
 
-        return compact('tab', 'summary', 'orders', 'store', 'waiter') + ['calls' => app(DiningCalls::class)->pending($user->tenant_id, $store->id, $ids)->get(), 'audience' => $this->audience($user), 'operator' => DB::table('users')->find($tab->opened_by),
+        return compact('tab', 'summary', 'orders', 'store', 'waiter') + ['paymentSelection' => $waiter ? null : $room->paymentSelection($summary, $request->input('person'))] + ['calls' => app(DiningCalls::class)->pending($user->tenant_id, $store->id, $ids)->get(), 'audience' => $this->audience($user), 'operator' => DB::table('users')->find($tab->opened_by),
             'settlements' => DB::table('dining_settlements')->join('users', 'users.id', '=', 'dining_settlements.user_id')->whereIn('dining_tab_id', $ids)->select('dining_settlements.*', 'users.name as operator_name')->orderBy('dining_settlements.id')->get(),
             'mergeTargets' => $tab->closed_at ? collect() : DB::table('dining_tabs')->where('tenant_id', $tab->tenant_id)->where('store_id', $tab->store_id)->whereNull('closed_at')->where('id', '!=', $id)->orderBy('table_name')->get(),
             'merges' => DB::table('dining_merges')->join('users', 'users.id', '=', 'dining_merges.user_id')->where(fn ($q) => $q->whereIn('source_tab_id', $ids)->orWhereIn('target_tab_id', $ids))->select('dining_merges.*', 'users.name as operator_name')->orderBy('dining_merges.id')->get(),
@@ -163,11 +163,11 @@ class DiningRoomController extends Controller
     {
         $request->validate(['amount' => 'sometimes|required|string']);
         MoneyInput::normalize($request, ['amount' => 'amount_cents']);
-        $data = $request->validate(['amount_cents' => 'sometimes|required|integer|min:1|max:100000000', 'payment_method' => 'required|in:cash,pix,card', 'review_hash' => 'required|string|size:64', 'request_key' => 'required|uuid', 'confirmed' => 'accepted']);
+        $data = $request->validate(['person' => 'nullable|string|regex:/^[a-f0-9]{64}$/', 'amount_cents' => 'sometimes|required|integer|min:1|max:100000000', 'payment_method' => 'required|in:cash,pix,card', 'review_hash' => 'required|string|size:64', 'request_key' => 'required|uuid', 'confirmed' => 'accepted']);
         DB::transaction(function () use ($request, $id, $room, $data): void {
             $user = $room->member($request->user(), true, true);
             $tab = $room->tab($user, $id, true);
-            $room->pay($tab, $user, $data['payment_method'], $data['review_hash'], $data['request_key'], isset($data['amount_cents']) ? (int) $data['amount_cents'] : null);
+            $room->pay($tab, $user, $data['payment_method'], $data['review_hash'], $data['request_key'], isset($data['amount_cents']) ? (int) $data['amount_cents'] : null, $data['person'] ?? null);
         }, 3);
 
         return redirect()->route('dining.show', $id)->with('success', 'Recebimento registrado no caixa.');

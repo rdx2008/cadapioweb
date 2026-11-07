@@ -2,7 +2,15 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 07/11/2026 após identificação de consumo por pessoa, branch `feat/platform-foundation`.
+Atualizado em 07/11/2026 após recebimento de consumo selecionado, branch `feat/platform-foundation`.
+
+## Recebimento do consumo selecionado — 07/11/2026
+
+Proprietário/operador escolhe Conta inteira ou uma identificação em Receber a conta, confere o saldo e pode receber parcial ou integralmente, uma forma presencial por vez, com caixa aberto. Seleção inclui origem da comanda para distinguir nomes iguais em mesas unidas; compartilhados têm seleção própria. A divisão por valor considera o saldo selecionado. Não atribui quem entregou o dinheiro nem divide um item compartilhado entre pessoas.
+
+Saldo deriva dos recebimentos reais dos pedidos, inclusive parcelas anteriores da conta inteira. Receber uma identificação abate somente seus pedidos por ordem de lançamento, sem tocar nos demais. Revisão vincula saldo, mesa, grupo e seleção; mudanças exigem nova conferência. Reenvio não duplica e alterar seleção com a mesma chave é recusado. Identificação e origem ficam congeladas no histórico de recebimentos e na conta impressa. Sem antecipar preparo, serviço ou fechamento; garçom continua sem receber e saldo de toda a mesa impede encerramento.
+
+Migração 2026_11_07_193431_add_person_selection_to_dining_settlements adiciona metadados opcionais; histórico anterior preservado sem atribuição fictícia. Reversão bloqueada após uso de seleção por pessoa. Publicar com migrações. Sem dependência adicional. Validação: 51 testes PHP, 1.090 asserções, Pint e Blade aprovados. Cobertura de parcelas selecionadas, reenvio, seleção alterada, saldo antigo, limite por pessoa, união de homônimos, recebimentos anteriores, caixa fechado e rollback de auditoria. iFood permanece pausado.
 
 ## Identificação do consumo por pessoa — 07/11/2026
 

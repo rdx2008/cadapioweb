@@ -73,11 +73,30 @@ class DiningRoom
         $pending = $valid->where('payment_status', '!=', 'paid');
         $refunds = DB::table('cash_entries')->whereIn('order_id', $orders->where('status', 'cancelled')->pluck('id'))->where('kind', 'sale')->whereNotIn('order_id', DB::table('cash_entries')->where('kind', 'refund')->select('order_id'))->distinct()->count('order_id');
 
-        $people = $valid->groupBy(fn ($order) => $order->dining_tab_id.':'.($order->dining_person === null ? 'shared' : 'person:'.mb_strtolower($order->dining_person)))->map(fn ($rows) => ['name' => $rows->first()->dining_person, 'tab_id' => $rows->first()->dining_tab_id, 'total' => (int) $rows->sum('total_cents'), 'orders' => $rows->count()])->values();
+        $people = $valid->groupBy(fn ($order) => $this->personKey($order))->map(fn ($rows, $key) => ['key' => $key, 'name' => $rows->first()->dining_person, 'tab_id' => $rows->first()->dining_tab_id, 'total' => (int) $rows->sum('total_cents'), 'pending' => (int) $rows->sum('balance_cents'), 'orders' => $rows->count()])->values();
 
         return ['orders' => $orders, 'people' => $people, 'total' => (int) $valid->sum('total_cents'), 'paid' => (int) $valid->sum('received_cents'),
             'pending' => (int) $pending->sum('balance_cents'), 'pending_orders' => $pending, 'unfinished' => $valid->where('status', '!=', 'completed')->count(), 'refunds_pending' => $refunds,
             'review_hash' => hash('sha256', json_encode([$tab->current_table_id, $ids, $pending->map(fn ($o) => [$o->id, $o->total_cents, $o->payment_status, $o->received_cents])->values()->all()], JSON_THROW_ON_ERROR))];
+    }
+
+    private function personKey(object $order): string
+    {
+        return hash('sha256', json_encode([$order->dining_tab_id, $order->dining_person === null ? null : mb_strtolower($order->dining_person)], JSON_THROW_ON_ERROR));
+    }
+
+    public function paymentSelection(array $summary, ?string $person = null): array
+    {
+        if ($person === null) {
+            return ['pending_orders' => $summary['pending_orders'], 'pending' => $summary['pending'], 'review_hash' => $summary['review_hash'], 'label' => null];
+        }
+        $selected = $summary['people']->firstWhere('key', $person);
+        if (! $selected) {
+            throw ValidationException::withMessages(['payment' => 'Esta identificação não está disponível nesta comanda. Atualize a conta.']);
+        }
+
+        return ['pending_orders' => $summary['pending_orders']->filter(fn ($order) => $this->personKey($order) === $person), 'pending' => $selected['pending'],
+            'review_hash' => hash('sha256', $summary['review_hash'].':'.$person), 'label' => ($selected['name'] ?? 'Compartilhado / sem identificação').' · Comanda #'.$selected['tab_id']];
     }
 
     public function open(object $table, object $user, string $guest, int $guests, string $key): int
@@ -124,11 +143,11 @@ class DiningRoom
         Audit::record('dining.transferred', ['tab_id' => $tab->id, 'from_table_id' => $from, 'to_table_id' => $to, 'reason' => $reason], $tab->tenant_id);
     }
 
-    public function pay(object $tab, object $user, string $method, string $hash, string $key, ?int $amount = null): void
+    public function pay(object $tab, object $user, string $method, string $hash, string $key, ?int $amount = null, ?string $person = null): void
     {
         $existing = DB::table('dining_settlements')->where('request_key', $key)->first();
         if ($existing) {
-            abort_unless($existing->dining_tab_id === $tab->id && $existing->user_id === $user->id && $existing->payment_method === $method && ($amount === null || $existing->amount_cents === $amount) && hash_equals($existing->review_hash, $hash), 409);
+            abort_unless($existing->dining_tab_id === $tab->id && $existing->user_id === $user->id && $existing->payment_method === $method && $existing->person_key === $person && ($amount === null || $existing->amount_cents === $amount) && hash_equals($existing->review_hash, $hash), 409);
 
             return;
         }
@@ -136,19 +155,20 @@ class DiningRoom
         DB::table('stores')->where('id', $tab->store_id)->lockForUpdate()->firstOrFail();
         DB::table('orders')->whereIn('dining_tab_id', $this->groupIds($tab))->orderBy('id')->lockForUpdate()->get();
         $summary = $this->summary($tab);
-        if (! hash_equals($summary['review_hash'], $hash)) {
+        $selection = $this->paymentSelection($summary, $person);
+        if (! hash_equals($selection['review_hash'], $hash)) {
             throw ValidationException::withMessages(['payment' => 'O consumo ou recebimento mudou. Atualize a comanda e confira o saldo antes de receber.']);
         }
-        abort_if($summary['pending_orders']->isEmpty(), 409, 'Não há pedidos pendentes de recebimento.');
-        $amount ??= $summary['pending'];
-        if ($amount < 1 || $amount > $summary['pending']) {
-            throw ValidationException::withMessages(['amount' => 'Informe um valor maior que zero e até o saldo restante da comanda.']);
+        abort_if($selection['pending_orders']->isEmpty(), 409, 'Não há pedidos pendentes de recebimento nesta seleção.');
+        $amount ??= $selection['pending'];
+        if ($amount < 1 || $amount > $selection['pending']) {
+            throw ValidationException::withMessages(['amount' => 'Informe um valor maior que zero e até o saldo restante da seleção.']);
         }
         $store = DB::table('stores')->find($tab->store_id);
         abort_unless(in_array($method, ['cash', 'pix', 'card'], true) && $store->{'accepts_'.$method}, 422, 'Escolha uma forma de pagamento habilitada na loja.');
         $remaining = $amount;
         $orderIds = [];
-        foreach ($summary['pending_orders'] as $order) {
+        foreach ($selection['pending_orders'] as $order) {
             if ($remaining === 0) {
                 break;
             }
@@ -162,7 +182,7 @@ class DiningRoom
             $remaining -= $portion;
         }
         DB::table('dining_settlements')->insert(['dining_tab_id' => $tab->id, 'user_id' => $user->id, 'request_key' => $key, 'review_hash' => $hash,
-            'payment_method' => $method, 'amount_cents' => $amount, 'order_ids' => json_encode($orderIds, JSON_THROW_ON_ERROR), 'created_at' => now()]);
+            'payment_method' => $method, 'amount_cents' => $amount, 'person_key' => $person, 'person_label' => $selection['label'], 'order_ids' => json_encode($orderIds, JSON_THROW_ON_ERROR), 'created_at' => now()]);
         Audit::record('dining.paid', ['tab_id' => $tab->id, 'amount_cents' => $amount, 'payment_method' => $method], $tab->tenant_id);
     }
 

@@ -61,6 +61,102 @@ class DiningRoomTest extends TestCase
         return ['request_key' => (string) Str::uuid(), 'review_hash' => $summary['review_hash'], 'payment_method' => $method, 'confirmed' => '1'];
     }
 
+    public function test_person_payment_only_reduces_selected_orders_and_records_history(): void
+    {
+        $f = $this->fixture();
+        $ana = $this->orderForTab($f);
+        $joao = $this->orderForTab($f);
+        $shared = $this->orderForTab($f);
+        DB::table('orders')->where('id', $ana->id)->update(['dining_person' => 'Ana']);
+        DB::table('orders')->where('id', $joao->id)->update(['dining_person' => 'Joao']);
+        $room = app(DiningRoom::class);
+        $summary = $room->summary($f['tab']);
+        $person = $summary['people']->firstWhere('name', 'Ana')['key'];
+        $selection = $room->paymentSelection($summary, $person);
+        $this->get('/dining/tabs/'.$f['tab']->id.'?person='.$person)->assertOk()->assertViewHas('paymentSelection', fn ($data) => $data['pending'] === 3000)->assertSee('Recebendo:');
+        $data = ['person' => $person, 'request_key' => (string) Str::uuid(), 'review_hash' => $selection['review_hash'], 'amount_cents' => 1500, 'payment_method' => 'cash', 'confirmed' => 1];
+        $path = '/dining/tabs/'.$f['tab']->id.'/pay';
+        $this->post($path, $data)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post($path, $data)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('cash_entries', 1);
+        $this->assertDatabaseHas('cash_entries', ['order_id' => $ana->id, 'amount_cents' => 1500]);
+        $this->assertDatabaseHas('orders', ['id' => $joao->id, 'payment_status' => 'pending']);
+        $this->assertDatabaseHas('orders', ['id' => $shared->id, 'payment_status' => 'pending']);
+        $this->assertDatabaseHas('dining_settlements', ['person_key' => $person, 'person_label' => 'Ana · Comanda #'.$f['tab']->id]);
+        $this->post($path, array_replace($data, ['person' => null]))->assertConflict();
+        $this->post($path, array_replace($data, ['request_key' => (string) Str::uuid()]))->assertSessionHasErrors('payment');
+        $selection = $room->paymentSelection($room->summary($f['tab']), $person);
+        $this->assertSame(1500, $selection['pending']);
+        $data = array_replace($data, ['request_key' => (string) Str::uuid(), 'review_hash' => $selection['review_hash'], 'payment_method' => 'pix']);
+        $this->post($path, $data)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('orders', ['id' => $ana->id, 'payment_status' => 'paid', 'payment_method' => 'mixed']);
+        $this->assertSame(6000, $room->summary($f['tab'])['pending']);
+        $this->get('/dining/tabs/'.$f['tab']->id.'/print')->assertOk()->assertSee('Consumo selecionado:');
+        $this->assertDatabaseHas('dining_tabs', ['id' => $f['tab']->id, 'closed_at' => null]);
+    }
+
+    public function test_person_payment_rejects_wrong_selection_hash_and_amount_above_its_balance(): void
+    {
+        $f = $this->fixture();
+        $first = $this->orderForTab($f);
+        $this->orderForTab($f);
+        DB::table('orders')->where('id', $first->id)->update(['dining_person' => 'Ana']);
+        $room = app(DiningRoom::class);
+        $summary = $room->summary($f['tab']);
+        $person = $summary['people']->firstWhere('name', 'Ana')['key'];
+        $data = $this->payment($f) + ['person' => $person, 'amount_cents' => 3500];
+        $path = '/dining/tabs/'.$f['tab']->id.'/pay';
+        $this->post($path, $data)->assertSessionHasErrors('payment');
+        $data['review_hash'] = $room->paymentSelection($summary, $person)['review_hash'];
+        $this->post($path, $data)->assertSessionHasErrors('amount');
+        $this->post($path, array_replace($data, ['person' => str_repeat('a', 64)]))->assertSessionHasErrors('payment');
+        $this->assertDatabaseCount('cash_entries', 0);
+        $this->assertDatabaseCount('dining_settlements', 0);
+    }
+
+    public function test_person_payment_preserves_prior_receipts_and_merged_people_with_same_name(): void
+    {
+        $source = $this->fixture();
+        $target = $this->anotherTab($source);
+        $first = $this->orderForTab($source);
+        $second = $this->orderForTab($target);
+        $shared = $this->orderForTab($target);
+        DB::table('orders')->whereIn('id', [$first->id, $second->id])->update(['dining_person' => 'Ana']);
+        $this->post('/dining/tabs/'.$source['tab']->id.'/pay', $this->payment($source) + ['amount_cents' => 1500])->assertSessionHasNoErrors();
+        $this->post('/dining/tabs/'.$source['tab']->id.'/merge', $this->mergePayload($source, $target))->assertRedirect()->assertSessionHasNoErrors();
+        $room = app(DiningRoom::class);
+        $summary = $room->summary($target['tab']);
+        $person = $summary['people']->firstWhere('tab_id', $source['tab']->id)['key'];
+        $selection = $room->paymentSelection($summary, $person);
+        $this->assertSame(1500, $selection['pending']);
+        $this->post('/dining/tabs/'.$target['tab']->id.'/pay', ['person' => $person, 'review_hash' => $selection['review_hash'], 'request_key' => (string) Str::uuid(), 'payment_method' => 'card', 'confirmed' => 1])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('orders', ['id' => $first->id, 'payment_status' => 'paid']);
+        $this->assertDatabaseHas('orders', ['id' => $second->id, 'payment_status' => 'pending']);
+        $this->assertDatabaseHas('orders', ['id' => $shared->id, 'payment_status' => 'pending']);
+        $this->assertSame(6000, $room->summary($target['tab'])['pending']);
+        $this->assertDatabaseCount('cash_entries', 2);
+    }
+
+    public function test_person_payment_requires_cash_and_rolls_back_when_audit_fails(): void
+    {
+        $f = $this->fixture(false);
+        $order = $this->orderForTab($f);
+        DB::table('orders')->where('id', $order->id)->update(['dining_person' => 'Ana']);
+        $room = app(DiningRoom::class);
+        $summary = $room->summary($f['tab']);
+        $person = $summary['people']->first()['key'];
+        $data = $this->payment($f) + ['person' => $person];
+        $data['review_hash'] = $room->paymentSelection($summary, $person)['review_hash'];
+        $path = '/dining/tabs/'.$f['tab']->id.'/pay';
+        $this->post($path, $data)->assertSessionHasErrors('cash');
+        app(CashRegister::class)->open(DB::table('stores')->find($f['store']), $f['owner']->id, 0, (string) Str::uuid());
+        DB::statement("CREATE TRIGGER fail_person_audit BEFORE INSERT ON audit_events WHEN NEW.action = 'dining.paid' BEGIN SELECT RAISE(FAIL, 'audit unavailable'); END");
+        $this->post($path, $data)->assertStatus(500);
+        $this->assertDatabaseCount('cash_entries', 0);
+        $this->assertDatabaseCount('dining_settlements', 0);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'payment_status' => 'pending']);
+    }
+
     public function test_table_orders_reach_kitchen_with_table_label_and_can_be_served_paid_and_closed(): void
     {
         $f = $this->fixture();
