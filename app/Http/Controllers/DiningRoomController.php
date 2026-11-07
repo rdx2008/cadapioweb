@@ -32,7 +32,7 @@ class DiningRoomController extends Controller
         $html = view($view, $data)->render();
         $stable = preg_replace('/(name="request_key" value=")[a-f0-9-]{36}/', '$1request-key', $html);
 
-        return response()->json(['html' => $html, 'signature' => hash('sha256', $stable), 'audience' => $data['audience']])->header('Cache-Control', 'private, no-store');
+        return response()->json(['html' => $html, 'signature' => hash('sha256', $stable), 'audience' => $data['audience'], 'callIds' => $data['calls']->pluck('id')->values()])->header('Cache-Control', 'private, no-store');
     }
 
     public function live(Request $request, DiningRoom $room): JsonResponse

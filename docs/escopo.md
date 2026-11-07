@@ -760,7 +760,7 @@ Fechamento definitivo com dinheiro contado, esperado, diferença justificada, to
 
 Mapa por loja, mesas cadastradas pelo proprietário, atendimento compartilhado por mesa e acesso de operadores por loja. Abertura identificada, pessoas, tempo e consumo; histórico preservado e mesa liberada após encerramento. Pedidos lançados pelo PDV existente como consumo no local, enviados à cozinha com identificação de mesa/comanda e preço congelado. Conta agrupa pedidos e recebe integralmente o saldo atual por dinheiro/Pix manual/maquininha, em caixa aberto, com confirmação explícita, conferência de alteração de valores e proteção contra reenvio. Não cria cobrança externa. Encerramento exige saldo quitado, pedidos servidos/cancelados e devoluções de cancelados pagas registradas. Impressão parcial/final pelo navegador. Sem vínculos de mesa no legado.
 
-Continuam pendentes do salão: QR por sessão, comandas individuais, divisão por item e taxa de serviço. Solicitações de atendimento/conta já estão disponíveis por link do atendimento. Validação física e concorrência PostgreSQL permanecem para piloto.
+Continuam pendentes do salão: comandas individuais, divisão por item e taxa de serviço. QR por sessão e som de chamados implementados. Solicitações de atendimento/conta já estão disponíveis por link do atendimento. Validação física e concorrência PostgreSQL permanecem para piloto.
 
 ### 17.24. Transferência integral de comanda
 
@@ -784,4 +784,8 @@ Mapa de mesas com ocupação, consumo consolidado e pedidos prontos para servir,
 
 ### 17.29. Atendimento e conta pelo link da comanda
 
-Link exclusivo ativado pela equipe em cada comanda aberta; cliente sem login chama atendimento ou solicita a conta, sem acesso a contatos ou dados financeiros. Fila atualizada no salão, resolução por proprietário/operador/garçom autorizado, com autoria e auditoria. Repetições agrupadas por tipo e chaves de requisição preservadas para evitar reabertura por reenvio. Nenhum pagamento ou encerramento automático. Transferência acompanha mesa atual; encerramento/união invalidam origem, nova comanda tem outro link, substituição restrita ao proprietário/operador. Suspensão da empresa e revogação de acesso são respeitadas. Migração preserva histórico de chamadas. QR, som e push ainda pendentes; acesso do cliente por link compartilhado nesta etapa.
+Link exclusivo ativado pela equipe em cada comanda aberta; cliente sem login chama atendimento ou solicita a conta, sem acesso a contatos ou dados financeiros. Fila atualizada no salão, resolução por proprietário/operador/garçom autorizado, com autoria e auditoria. Repetições agrupadas por tipo e chaves de requisição preservadas para evitar reabertura por reenvio. Nenhum pagamento ou encerramento automático. Transferência acompanha mesa atual; encerramento/união invalidam origem, nova comanda tem outro link, substituição restrita ao proprietário/operador. Suspensão da empresa e revogação de acesso são respeitadas. Migração preserva histórico de chamadas. QR por comanda com cartão de impressão e som opcional para novos chamados implementados nas etapas seguintes. Push permanece pendente.
+
+### 17.30. Alertas sonoros de solicitações das mesas
+
+Ativação explícita com teste no mapa/comanda do garçom; som curto para chamados novos autorizados, sem repetir a cada consulta. Desligado ao abrir outra tela, sem tocar para pendências iniciais. Preserva formulários; interrompe ao perder acesso/navegar. Exige página visível, permissão do navegador e volume do aparelho. Sem push ou funcionamento garantido em segundo plano. Cada aba ativada pode emitir o próprio alerta. Sem novas migrações/dependências.

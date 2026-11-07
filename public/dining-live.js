@@ -1,5 +1,6 @@
 document.querySelectorAll('[data-dining-live]').forEach(feed=>{
     const message=document.querySelector('[data-dining-connection]');
+    const sound=window.createDiningSound?.(JSON.parse(feed.dataset.callIds||'[]'));
     let signature='',running=false,stopped=false,timer=null,controller=null;
     const editing=()=>feed.contains(document.activeElement)||Boolean(feed.querySelector('details[open]'))||[...feed.querySelectorAll('input,select,textarea')].some(field=>{
         if(field.type==='hidden'||field.type==='submit')return false;
@@ -9,7 +10,7 @@ document.querySelectorAll('[data-dining-live]').forEach(feed=>{
     });
     const schedule=()=>{if(!stopped)timer=setTimeout(refresh,5000);};
     const stop=()=>{
-        stopped=true;clearTimeout(timer);feed.replaceChildren();
+        stopped=true;clearTimeout(timer);sound?.stop(true);feed.replaceChildren();
         message.textContent='Seu acesso foi alterado ou expirou. Entre novamente para continuar.';
     };
     const refresh=async()=>{
@@ -26,6 +27,7 @@ document.querySelectorAll('[data-dining-live]').forEach(feed=>{
             const data=await response.json();
             if(typeof data.html!=='string'||typeof data.signature!=='string'||typeof data.audience!=='string')throw new Error('invalid');
             if(data.audience!==feed.dataset.audience){stop();return;}
+            sound?.observe(data.callIds);
             if(editing()){message.textContent='Há novidades. Termine a edição para atualizar os pedidos.';return;}
             if(signature!==data.signature){feed.innerHTML=data.html;signature=data.signature;}
             message.textContent='Atualizado às '+new Date().toLocaleTimeString('pt-BR')+'. Novas consultas a cada 5 segundos.';
@@ -33,8 +35,8 @@ document.querySelectorAll('[data-dining-live]').forEach(feed=>{
             if(!stopped)message.textContent='Sem atualização no momento. Vamos tentar novamente. Você pode atualizar a página.';
         }finally{clearTimeout(timeout);running=false;controller=null;schedule();}
     };
-    feed.addEventListener('submit',()=>{stopped=true;clearTimeout(timer);controller?.abort();});
-    window.addEventListener('pagehide',()=>{stopped=true;clearTimeout(timer);controller?.abort();});
+    feed.addEventListener('submit',()=>{stopped=true;clearTimeout(timer);sound?.stop();controller?.abort();});
+    window.addEventListener('pagehide',()=>{stopped=true;clearTimeout(timer);sound?.stop();controller?.abort();});
     window.addEventListener('pageshow',event=>{if(event.persisted){stopped=false;refresh();}});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
     schedule();

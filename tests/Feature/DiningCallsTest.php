@@ -110,13 +110,15 @@ class DiningCallsTest extends TestCase
         $this->actingAs($waiter)->getJson('/dining/live?store_id='.$f['store'])->assertNotFound();
         $this->post('/dining/calls/'.$id.'/attend')->assertNotFound();
         DB::table('user_store_access')->insert(['tenant_id' => $f['tenant'], 'store_id' => $f['store'], 'user_id' => $waiter->id]);
-        $this->getJson('/dining/live?store_id='.$f['store'])->assertOk()->assertSee('Solicitou a conta');
-        $this->getJson('/dining/tabs/'.$f['tab']->id.'/live')->assertOk()->assertSee('Solicitou a conta')->assertDontSee($f['token']);
+        $this->getJson('/dining/live?store_id='.$f['store'])->assertOk()->assertSee('Solicitou a conta')->assertJsonPath('callIds', [$id]);
+        $this->get('/dining?store_id='.$f['store'])->assertOk()->assertSee('data-dining-sound', false)->assertSee('aria-pressed="false"', false);
+        $this->getJson('/dining/tabs/'.$f['tab']->id.'/live')->assertOk()->assertSee('Solicitou a conta')->assertDontSee($f['token'])->assertJsonPath('callIds', [$id]);
         $this->post('/dining/tabs/'.$f['tab']->id.'/guest-link')->assertRedirect();
         $this->get('/dining/tabs/'.$f['tab']->id.'/guest-link')->assertOk()->assertDontSee('Gerar novo link');
         $this->post('/dining/tabs/'.$f['tab']->id.'/guest-link/rotate', ['confirmed' => 1, 'expected_hash' => hash('sha256', $f['token'])])->assertForbidden();
         $this->post('/dining/calls/'.$id.'/attend')->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('dining_calls', ['id' => $id, 'handled_by' => $waiter->id]);
+        $this->getJson('/dining/live?store_id='.$f['store'])->assertOk()->assertJsonPath('callIds', []);
         $this->actingAs($f['owner'])->post('/dining/calls/'.$id.'/attend')->assertConflict();
         $this->assertDatabaseCount('cash_entries', 0);
     }

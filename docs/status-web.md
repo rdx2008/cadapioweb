@@ -2,7 +2,17 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 05/11/2026 após solicitações de atendimento e conta pelo link da comanda, branch `feat/platform-foundation`.
+Atualizado em 07/11/2026 após alertas sonoros das mesas, branch `feat/platform-foundation`.
+
+## Alertas sonoros das mesas — 07/11/2026
+
+Mapa e comanda do garçom oferecem Ativar som das mesas, desligado por padrão em cada tela. Clique ativa Web Audio e emite teste; novos chamados pendentes de atendimento/conta autorizados pelo feed produzem dois toques curtos, uma vez por ID observado. Pendências já presentes ao abrir a tela não geram alerta automático. Sem serviço externo, dependência ou migração adicional. Preferência não persiste entre telas/lojas; cada aba ativada pode tocar.
+
+Metadados de chamados usam o mesmo escopo de empresa/loja/comanda e validação de perfil do feed. Som funciona mesmo durante edição sem substituir formulários; respostas inválidas/falhas não geram alertas. Revogação, troca de perfil, envio de formulário e navegação interrompem o áudio. Navegador que pausar o contexto exige nova ativação. Aba oculta não consulta; não há garantia de som com aparelho silenciado, navegador suspenso/fechado ou sem rede. Validação física no aparelho da operação permanece necessária.
+
+Validação: 37 testes PHP (829 asserções), 11 JavaScript, Pint e compilação Blade aprovados. Chrome local com Web Audio real: ativação, novo chamado e desligamento conferidos.
+
+Usuário informou em 07/11/2026 que o polling iFood permaneceu três dias sem queda; relato operacional, sem nova auditoria do servidor nesta etapa. Conector permanece em pausa para evolução do escopo.
 
 ## Solicitações do cliente na mesa — 05/11/2026
 
@@ -12,7 +22,7 @@ Um chamado pendente por tipo/comanda; tentativas de vários navegadores são agr
 
 Transferência mantém o link mostrando a mesa atual. Encerramento e união invalidam o link de origem e cancelam suas pendências, preservando registros; na união, compartilhar o link da conta de destino. Nova comanda na mesma mesa recebe outro link. Proprietário/operador pode substituir o link mediante confirmação; o anterior deixa de funcionar e pendências continuam na fila. Garçom pode compartilhar e atender, mas não substituir o segredo. Empresa suspensa/deletada não recebe chamados; permissões e lojas são revalidadas no servidor.
 
-Migration `2026_11_06_015846_add_dining_customer_calls` adiciona os campos opcionais e tabelas de chamadas/requisições, sem gerar links no legado. Publicar com migrações. Reversão bloqueada após existir histórico de chamadas. Validação: 53 testes PHP relacionados aprovados, 1.134 asserções, e 5 JavaScript; Pint, Blade e rotas conferidos. Chrome local em acessos separados: garçom gerou/copiou link, cliente sem login pediu conta/atendimento, fila atualizou e equipe atendeu sem alterar financeiro. Celular em 390 px sem transbordamento; sem erros JavaScript. QR impresso, som e push continuam pendentes; nesta etapa o acesso é pelo link compartilhado. Piloto físico e concorrência PostgreSQL permanecem pendentes. iFood continua pausado.
+Migration `2026_11_06_015846_add_dining_customer_calls` adiciona os campos opcionais e tabelas de chamadas/requisições, sem gerar links no legado. Publicar com migrações. Reversão bloqueada após existir histórico de chamadas. Validação: 53 testes PHP relacionados aprovados, 1.134 asserções, e 5 JavaScript; Pint, Blade e rotas conferidos. Chrome local em acessos separados: garçom gerou/copiou link, cliente sem login pediu conta/atendimento, fila atualizou e equipe atendeu sem alterar financeiro. Celular em 390 px sem transbordamento; sem erros JavaScript. QR impresso e som foram implementados nas etapas seguintes; push permanece pendente. Piloto físico e concorrência PostgreSQL permanecem pendentes. iFood continua pausado.
 
 ## Atualização automática do salão — 05/11/2026
 

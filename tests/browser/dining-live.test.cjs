@@ -2,11 +2,11 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),vm=requir
 const script=fs.readFileSync(path.join(__dirname,'../../public/dining-live.js'),'utf8');
 function environment(){
     let next=0,calls=0,replacements=0,opened=false,fields=[],focused=false,reply={ok:true,status:200,redirected:false,json:async()=>({html:'ready',signature:'one',audience:'waiter'})};
-    const timers=new Map(),events={},windows={},feedEvents={},message={textContent:''};
+    const timers=new Map(),events={},windows={},feedEvents={},message={textContent:''},observed=[],stops=[];
     const feed={dataset:{url:'/dining/tabs/1/live',audience:'waiter'},contains:()=>focused,querySelector:()=>opened?{}:null,querySelectorAll:()=>fields,addEventListener:(name,fn)=>feedEvents[name]=fn,replaceChildren:()=>{feed.html='';replacements++;},set innerHTML(value){this.html=value;replacements++;}};
     const document={hidden:false,activeElement:{},querySelectorAll:()=>[feed],querySelector:()=>message,addEventListener:(name,fn)=>events[name]=fn};
-    vm.runInNewContext(script,{document,window:{addEventListener:(name,fn)=>windows[name]=fn},fetch:async()=>{calls++;return typeof reply==='function'?reply():reply;},AbortController,Date,setTimeout:(fn,delay)=>{timers.set(++next,{fn,delay});return next;},clearTimeout:id=>timers.delete(id)});
-    return {feed,message,document,events,windows,feedEvents,setReply:value=>reply=value,setOpen:value=>opened=value,setFields:value=>fields=value,setFocus:value=>focused=value,calls:()=>calls,replacements:()=>replacements,timers,
+    vm.runInNewContext(script,{document,window:{addEventListener:(name,fn)=>windows[name]=fn,createDiningSound:()=>({observe:ids=>observed.push(ids),stop:permanent=>stops.push(permanent)})},fetch:async()=>{calls++;return typeof reply==='function'?reply():reply;},AbortController,Date,setTimeout:(fn,delay)=>{timers.set(++next,{fn,delay});return next;},clearTimeout:id=>timers.delete(id)});
+    return {feed,message,document,events,windows,feedEvents,observed,stops,setReply:value=>reply=value,setOpen:value=>opened=value,setFields:value=>fields=value,setFocus:value=>focused=value,calls:()=>calls,replacements:()=>replacements,timers,
         tick(){const entry=[...timers].find(([,timer])=>timer.delay===5000);assert.ok(entry,'refresh scheduled');timers.delete(entry[0]);return entry[1].fn();}};
 }
 test('polls every five seconds while visible and keeps identical content untouched',async()=>{
@@ -31,4 +31,13 @@ test('changed profile stops polling and connection failures retain existing scre
 test('pagehide and form submission stop refresh and persisted navigation resumes',async()=>{
     const r=environment();r.windows.pagehide();assert.equal(r.timers.size,0);r.windows.pageshow({persisted:true});await new Promise(resolve=>setImmediate(resolve));assert.equal(r.calls(),1);
     r.feedEvents.submit();assert.equal(r.timers.size,0);
+});
+
+test('sound observes authorized calls even during editing and stops on permission change',async()=>{
+    const r=environment();r.setOpen(true);
+    r.setReply({ok:true,status:200,json:async()=>({html:'calls',signature:'new',audience:'waiter',callIds:[7]})});
+    await r.tick();assert.deepEqual(r.observed,[[7]]);assert.equal(r.replacements(),0);
+    r.setReply({ok:false,status:500});await r.tick();assert.equal(r.observed.length,1);
+    r.setReply({ok:true,status:200,json:async()=>({html:'private',signature:'new',audience:'operator',callIds:[8]})});
+    await r.tick();assert.equal(r.observed.length,1);assert.deepEqual(r.stops,[true]);
 });
