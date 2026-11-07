@@ -1,0 +1,62 @@
+/* Administration workspace: Lezato-inspired presentation, using the existing application components. */
+:root { --bg:#fafafa; --ink:#25252d; --muted:#737380; --accent:#ff6745; --line:#eeeef2; }
+.sidebar { width:264px; background:white; color:var(--ink); border-right:1px solid var(--line); padding:30px 20px 22px; }
+.brand { color:#292930; font-size:30px; }
+.brand > span:last-child { color:var(--accent); }
+.workspace-card { background:#fafafa; border-color:var(--line); border-radius:16px; padding:15px 12px; }
+.workspace-card small,.account small { color:#737380; }
+.workspace-avatar { background:#fff0e9; color:#dd492c; border-radius:12px; }
+.workspace { color:#737380; letter-spacing:1.6px; margin-top:27px; }
+.sidebar nav { gap:8px; }
+.sidebar nav a { color:#656570; border-radius:30px; padding:13px 16px; font-weight:550; }
+.sidebar nav a:hover,.sidebar nav a.is-active { background:#fff0eb; color:#ce4024; }
+.sidebar nav a.is-active:before { display:none; }
+.sidebar nav a.is-active > .icon { background:var(--accent); color:white; border-radius:10px; padding:6px; width:34px; height:34px; margin:-6px; margin-right:1px; }
+.sidebar-bottom { border-color:var(--line); }
+.account-avatar { background:#fff0e9; color:#b83c23; }
+.topbar { height:86px; background:white; padding:0 34px; }
+.content { padding:30px 34px; }
+.topbar .button,.logout-button { border-radius:24px; }
+.breadcrumb strong { color:#373743; }
+.dashboard-eyebrow { display:block; font-size:10px; font-weight:750; letter-spacing:2px; color:#ac442d; margin-bottom:9px; }
+.page-heading h1 { font-size:28px; letter-spacing:-.9px; }
+.date-label { border-radius:24px; padding:11px 16px; }
+.tenant-welcome { display:flex; align-items:center; justify-content:space-between; gap:25px; background:#fff0e8; border:1px solid #ffe5d7; border-radius:26px; padding:28px 34px; margin-bottom:22px; overflow:hidden; }
+.welcome-label { color:#9a422e; font-size:12px; font-weight:600; }
+.tenant-welcome h2 { font-size:32px; line-height:1.18; letter-spacing:-1px; margin:10px 0; }
+.tenant-welcome p { color:#785d55; margin:0 0 20px; max-width:410px; }
+.tenant-welcome .button { display:inline-flex; align-items:center; gap:12px; border-radius:24px; padding:12px 18px; }
+.tenant-welcome .button .icon { margin:0; }
+.welcome-art { position:relative; width:280px; height:200px; flex-shrink:0; display:grid; place-items:center; }
+.art-orbit { position:absolute; width:198px; height:198px; border:1px dashed #e7ae97; border-radius:50%; transform:rotate(-20deg); }
+.art-plate { width:152px; height:152px; border:13px solid white; background:#ffdbbe; border-radius:50%; display:grid; place-items:center; box-shadow:0 16px 24px #ad583c17; transform:rotate(-12deg); color:#b94728; }
+.art-plate .icon { width:75px; height:75px; stroke-width:1.2; }
+.art-chip { position:absolute; display:flex; align-items:center; gap:8px; background:white; padding:11px 16px; border-radius:14px; box-shadow:0 8px 24px #8c4b3012; font-size:12px; color:#6b493a; }
+.chip-one { left:0; top:15px; transform:rotate(-6deg); }.chip-two { right:0; bottom:16px; transform:rotate(5deg); }
+.tenant-shortcuts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-bottom:24px; }
+.tenant-shortcuts a { display:flex; align-items:center; gap:13px; background:white; border:1px solid var(--line); border-radius:18px; padding:16px; }
+.tenant-shortcuts a:hover { border-color:#f3b6a3; }
+.tenant-shortcuts a > .icon:first-child { color:#b8472c; background:#fff1eb; padding:9px; width:40px; height:40px; border-radius:12px; }
+.tenant-shortcuts a > .icon:last-child { width:16px; margin-left:auto; color:#8b8b94; }
+.tenant-shortcuts span { font-size:13px; font-weight:650; }.tenant-shortcuts small { display:block; font-size:10px; color:var(--muted); font-weight:400; margin-top:3px; }
+.card,.stat { border-radius:22px; border:1px solid var(--line); box-shadow:0 5px 12px #20203004; }
+.metric { flex-direction:row-reverse; justify-content:space-between; align-items:center; padding:22px 18px; }
+.metric-icon,.metric-icon.chef,.metric-icon.money { background:#f4f0ff; color:#6950d9; width:52px; height:52px; border:5px solid #e9e1ff; }
+.metric .value { font-size:28px; color:#25252d; }.metric small { color:#777784; font-size:10px; }.metric-label { font-size:12px; }
+.dashboard-columns { grid-template-columns:minmax(0,1fr) 290px; gap:22px; }
+.order-panel { padding:24px; }.section-head h2 { font-size:20px; }
+.board-toolbar input,.board-toolbar select,input,select,textarea { border-radius:12px; border-color:#e3e3e9; }
+button,.button { border-radius:12px; }.order-tabs { gap:20px; }.order-tabs a.is-active { color:#bd3c22; }
+.share-card { background:#f7f5ff; border-color:#eae5fa; }.share-card h2 { color:#554391; }
+.copy-field { flex-wrap:wrap; }.copy-field input { flex-basis:100%; }.copy-field button { width:100%; background:white; }
+.store-control h3 { color:#575766; }.subtle-link { color:#bd3c22; }
+@media(min-width:1101px) and (max-width:1350px) { .sidebar { width:230px; padding-left:14px; padding-right:14px; }.content { padding:26px; }.metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.dashboard-columns { grid-template-columns:minmax(0,1fr) 260px; } }
+@media(max-width:1100px) { .dashboard-columns { grid-template-columns:1fr; }.welcome-art { width:220px; }.tenant-shortcuts { gap:10px; }.tenant-shortcuts a { padding:12px; gap:9px; } }
+@media(max-width:720px) { .sidebar { width:100%; height:auto; padding:20px 16px 12px; }.brand { font-size:27px; }.sidebar nav a { font-size:11px; padding:11px 13px; }.sidebar nav a.is-active > .icon { width:24px; height:24px; padding:4px; margin:-4px 0; }.topbar { min-height:65px; height:auto; padding:12px 16px; }.content { padding:24px 16px; }.page-heading h1 { font-size:25px; }.tenant-welcome { padding:24px; border-radius:22px; }.tenant-welcome h2 { font-size:28px; }.tenant-welcome p { font-size:12px; }.welcome-art { display:none; }.tenant-shortcuts { grid-template-columns:1fr; gap:8px; margin-bottom:18px; }.tenant-shortcuts a { padding:11px 15px; }.tenant-shortcuts small { font-size:11px; }.metric { padding:17px 13px; gap:7px; }.metric-icon,.metric-icon.chef,.metric-icon.money { width:34px; height:34px; border-width:3px; }.metric .value { font-size:22px; }.metric-label { font-size:10px; }.metric small { font-size:9px; }.card { padding:18px; }.section-head h2 { font-size:17px; } }
+@media(max-width:360px) { .metric { flex-direction:column; align-items:flex-start; }.tenant-welcome { padding:20px; } }
+
+/* Keep scrolling available without a visible scrollbar in the workspace navigation. */
+.sidebar { scrollbar-width:none; }
+.sidebar::-webkit-scrollbar { width:0; height:0; background:transparent; }
+.admin-columns { grid-template-columns:minmax(0,1fr) 310px; }
+@media(max-width:1100px) { .admin-columns { grid-template-columns:1fr; } }

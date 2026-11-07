@@ -1,0 +1,5 @@
+@if($product->product_type==='combo')
+@foreach($combos[$product->id]['groups'] as $comboGroup)<fieldset class="option-group" data-combo-group="{{ $comboGroup->id }}" data-min="{{ $comboGroup->minimum }}" data-max="{{ $comboGroup->maximum }}"><legend>{{ $comboGroup->name }} <small>Escolha {{ $comboGroup->minimum }}–{{ $comboGroup->maximum }}</small></legend>@foreach($combos[$product->id]['options']->get($comboGroup->id,collect()) as $component)
+@php($componentLabel=$component->quantity.' × '.$component->component_name.($component->variant_name?' · '.$component->variant_name:''))
+<label class="option-choice"><input type="checkbox" data-combo-option data-combo-group-id="{{ $comboGroup->id }}" data-combo-name="{{ $componentLabel }}" data-combo-price="{{ $component->quantity*$component->surcharge_cents }}" value="{{ $component->id }}"><span>{{ $componentLabel }} · {{ $component->surcharge_cents?' + R$ '.number_format($component->quantity*$component->surcharge_cents/100,2,',','.').' por combo':'Incluído' }}</span></label>@endforeach</fieldset>@endforeach
+@endif

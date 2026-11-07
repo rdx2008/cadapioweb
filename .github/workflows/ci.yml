@@ -1,0 +1,107 @@
+name: Application CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: testing
+          POSTGRES_USER: testing
+          POSTGRES_PASSWORD: testing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, intl, pdo_sqlite, pdo_pgsql, zip
+          coverage: none
+      - run: composer install --prefer-dist --no-interaction --no-progress
+      - run: cp .env.example .env && php artisan key:generate
+      - run: php artisan test --compact
+      - name: Test web interactions without browser dependencies
+        run: node --test tests/browser/*.test.cjs
+      - name: Test with PostgreSQL
+        run: php artisan test --compact
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: testing
+          DB_USERNAME: testing
+          DB_PASSWORD: testing
+      - run: php artisan view:cache && php artisan route:cache
+      - run: composer audit
+  image:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: https://example.test
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_PASSWORD: ci-configuration-only
+      REDIS_PASSWORD: ci-configuration-only
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --env-file .env.coolify.example config --quiet
+      - name: Validate generated Coolify values and shared credentials
+        run: |
+          env -u APP_URL -u APP_KEY -u DB_PASSWORD -u REDIS_PASSWORD \
+            SERVICE_URL_WEB_8080=https://example.test \
+            SERVICE_REALBASE64_APPKEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+            SERVICE_PASSWORD_POSTGRES=generated-postgres-test-only \
+            SERVICE_PASSWORD_REDIS=generated-redis-test-only \
+            docker compose --env-file .env.coolify.example config --format json > /tmp/cadapioweb-compose.json
+          python3 - <<'PY'
+          import base64, json
+          with open('/tmp/cadapioweb-compose.json') as source:
+              services = json.load(source)['services']
+          web = services['web']['environment']
+          assert web['APP_URL'] == 'https://example.test'
+          assert web['APP_KEY'].startswith('base64:')
+          assert len(base64.b64decode(web['APP_KEY'][7:], validate=True)) == 32
+          for name in ['web', 'worker', 'scheduler']:
+              environment = services[name]['environment']
+              assert environment['APP_KEY'] == web['APP_KEY']
+              assert environment['DB_PASSWORD'] == services['postgres']['environment']['POSTGRES_PASSWORD'] == 'generated-postgres-test-only'
+              assert environment['REDIS_PASSWORD'] == services['redis']['environment']['REDIS_PASSWORD'] == 'generated-redis-test-only'
+          PY
+      - run: docker build -t cadapioweb:ci .
+      - name: Start fresh stack and verify migrations before serving requests
+        run: |
+          cat > /tmp/cadapioweb-smoke.yaml <<'YAML'
+          services:
+            web:
+              ports:
+                - "127.0.0.1:18080:8080"
+              environment:
+                APP_URL: http://localhost:18080
+                SESSION_SECURE_COOKIE: "false"
+          YAML
+          docker compose --env-file .env.coolify.example -f compose.yaml -f /tmp/cadapioweb-smoke.yaml up --build -d --wait --wait-timeout 180
+          curl --fail --retry 10 --retry-all-errors --retry-delay 2 http://127.0.0.1:18080/login -o /tmp/cadapioweb-login.html
+          grep -q 'name="email"' /tmp/cadapioweb-login.html
+          docker compose --env-file .env.coolify.example exec -T web php artisan migrate:status
+          docker compose --env-file .env.coolify.example exec -T worker php artisan migrate:status
+          docker compose --env-file .env.coolify.example exec -T scheduler php artisan migrate:status
+          docker compose --env-file .env.coolify.example -f compose.yaml -f /tmp/cadapioweb-smoke.yaml restart web worker scheduler
+          curl --fail --retry 20 --retry-all-errors --retry-delay 2 http://127.0.0.1:18080/login -o /tmp/cadapioweb-login.html
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose --env-file .env.coolify.example logs --no-color --tail 100 web worker scheduler
+      - name: Clean up test stack
+        if: always()
+        run: |
+          if [ -f /tmp/cadapioweb-smoke.yaml ]; then
+            docker compose --env-file .env.coolify.example -f compose.yaml -f /tmp/cadapioweb-smoke.yaml down --volumes --remove-orphans
+          else
+            docker compose --env-file .env.coolify.example down --volumes --remove-orphans
+          fi

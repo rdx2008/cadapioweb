@@ -1,0 +1,1 @@
+<a href="{{ $href }}" data-nav-link>@include('partials.icon',['name'=>$icon])<span>{{ $label }}</span>@if($label==='Pedidos'&&isset($summary))<span class="nav-count" data-summary="pending">{{ $summary['pending'] }}</span>@endif</a>

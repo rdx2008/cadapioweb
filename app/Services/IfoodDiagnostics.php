@@ -1,0 +1,152 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Validation\ValidationException;
+
+class IfoodDiagnostics
+{
+    private const BODY_LIMIT = 65536;
+
+    public function __construct(private IfoodClient $client) {}
+
+    public function collect(object $app, string $merchantId): array
+    {
+        return $this->collectRequests($app, [
+            fn ($capture) => $this->client->merchantProbe($app, $merchantId, false, $capture),
+            fn ($capture) => $this->client->merchantProbe($app, $merchantId, true, $capture),
+        ], ['merchant_id' => strtolower($merchantId)]);
+    }
+
+    public function collectCancellationReasons(object $app, string $orderId): array
+    {
+        $report = $this->collectRequests($app, [fn ($capture) => $this->client->cancellationReasonsProbe($app, $orderId, $capture)], ['order_id' => strtolower($orderId)]);
+        $saved = Cache::get($this->cancellationKey($app, $orderId));
+        $report['cancellation_attempt'] = is_string($saved) ? json_decode(Crypt::decryptString($saved), true, flags: JSON_THROW_ON_ERROR) : null;
+        $report['notes'][] = 'cancellation_attempt is the last captured POST response within 24 hours, for this app revision and order. Downloading does not resend it. Null means no captured attempt is available.';
+
+        return $report;
+    }
+
+    public function captureCancellation(object $app, string $orderId, array $payload, Response $response, string $token): void
+    {
+        $secrets = [$token, Crypt::decryptString($app->client_secret)];
+        $body = $response->body();
+        $clean = $this->redact($body, $secrets);
+        $request = ['method' => 'POST', 'url' => 'https://merchant-api.ifood.com.br/order/v1.0/orders/'.$orderId.'/requestCancellation',
+            'headers' => ['Authorization' => ['[REDACTED]'], 'Accept' => ['application/json'], 'Content-Type' => ['application/json']],
+            'body' => $this->redact(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), $secrets)];
+        $record = ['at_utc' => now()->utc()->toIso8601String(), 'request' => $request, 'curl' => $this->curl($request),
+            'response' => ['status' => $response->status(), 'headers' => $this->headers($response->headers(), $secrets),
+                'body' => mb_convert_encoding(mb_strcut($clean, 0, self::BODY_LIMIT, 'UTF-8'), 'UTF-8', 'UTF-8'),
+                'body_bytes_original' => strlen($body), 'body_truncated' => strlen($clean) > self::BODY_LIMIT]];
+        try {
+            Cache::put($this->cancellationKey($app, $orderId), Crypt::encryptString(json_encode($record, JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)), now()->addDay());
+        } catch (\Throwable) {
+            // Diagnostic storage must never change the result of an already sent command.
+        }
+    }
+
+    private function cancellationKey(object $app, string $orderId): string
+    {
+        return 'ifood:cancellation-diagnostic:'.$app->id.':'.$app->revision.':'.strtolower($orderId);
+    }
+
+    private function collectRequests(object $app, array $probes, array $identity): array
+    {
+        $secrets = [Crypt::decryptString($app->client_secret)];
+        $records = [];
+        foreach ($probes as $probe) {
+            $record = ['at_utc' => now()->utc()->toIso8601String(), 'request' => ['method' => 'GET', 'url' => null, 'headers' => []], 'response' => null];
+            try {
+                $response = $probe(function (Request $request) use (&$record, &$secrets): void {
+                    $authorization = $request->header('Authorization')[0] ?? '';
+                    if (str_starts_with($authorization, 'Bearer ')) {
+                        $secrets[] = substr($authorization, 7);
+                    }
+                    $record['request'] = ['method' => $request->method(), 'url' => $request->url(), 'headers' => $this->headers($request->headers(), $secrets)];
+                    $record['curl'] = $this->curl($record['request']);
+                });
+                $body = $response->body();
+                $clean = $this->redact($body, $secrets);
+                $record['response'] = [
+                    'status' => $response->status(),
+                    'headers' => $this->headers($response->headers(), $secrets),
+                    'body' => mb_convert_encoding(mb_strcut($clean, 0, self::BODY_LIMIT, 'UTF-8'), 'UTF-8', 'UTF-8'),
+                    'body_bytes_original' => strlen($body),
+                    'body_truncated' => strlen($clean) > self::BODY_LIMIT,
+                ];
+                $stats = $response->handlerStats();
+                $record['transport'] = array_intersect_key($stats, array_flip(['primary_ip', 'primary_port', 'http_version', 'total_time', 'ssl_verify_result']));
+            } catch (ConnectionException) {
+                $record['error'] = 'Falha de transporte: nenhuma resposta HTTP recebida. O servidor pode ter atingido o timeout de conexão/leitura.';
+            } catch (ValidationException $exception) {
+                $record['error'] = $this->redact($exception->errors()['ifood'][0] ?? 'Falha ao autenticar o aplicativo.', $secrets);
+            }
+            $records[] = $record;
+        }
+
+        return [
+            'schema_version' => 1, 'generated_at_utc' => now()->utc()->toIso8601String(),
+            'environment' => 'test', 'client_id' => $app->client_id,
+            'notes' => [
+                'Independent GET diagnostic requests, using the same HTTP settings as the app. No redirects or automatic HTTP retries in this diagnostic.',
+                'Authorization, cookies and known credentials are redacted. Set IFOOD_ACCESS_TOKEN privately to replay the cURL. No token is included in this file.',
+                'Bodies are bounded at 65536 bytes. Check body_truncated. An HTTP 403 alone does not identify whether the refusal came from authorization or an edge block.',
+                'No polling, acknowledgment, store binding or order action is executed.',
+            ],
+            'requests' => $records,
+        ] + $identity;
+    }
+
+    private function headers(array $headers, array $secrets): array
+    {
+        $result = [];
+        foreach ($headers as $name => $values) {
+            $sensitive = preg_match('/authorization|cookie|token|secret|api[-_]?key/i', $name);
+            $result[$name] = $sensitive ? ['[REDACTED]'] : array_map(fn ($value) => $this->redact((string) $value, $secrets), (array) $values);
+        }
+
+        return $result;
+    }
+
+    private function redact(string $value, array $secrets): string
+    {
+        $secrets = array_values(array_unique(array_filter($secrets, fn ($secret) => is_string($secret) && $secret !== '')));
+        usort($secrets, fn ($a, $b) => strlen($b) <=> strlen($a));
+        $value = str_replace($secrets, '[REDACTED]', $value);
+        $value = preg_replace('/Bearer\s+[A-Za-z0-9._~+\/=-]+/i', 'Bearer [REDACTED]', $value);
+
+        return preg_replace('/("(?:access_?token|refresh_?token|client_?secret|password)"\s*:\s*")[^"]*(")/i', '$1[REDACTED]$2', $value);
+    }
+
+    private function curl(array $request): string
+    {
+        $parts = ['curl --request '.$request['method'].' --connect-timeout 5 --max-time 10 --url '.$this->quote($request['url'])];
+        foreach ($request['headers'] as $name => $values) {
+            if (strtolower($name) === 'authorization') {
+                $parts[] = '--header "Authorization: Bearer ${IFOOD_ACCESS_TOKEN}"';
+            } elseif ($values !== ['[REDACTED]']) {
+                foreach ($values as $value) {
+                    $parts[] = '--header '.$this->quote($name.': '.$value);
+                }
+            }
+        }
+
+        if (isset($request['body'])) {
+            $parts[] = '--data-raw '.$this->quote($request['body']);
+        }
+
+        return implode(" \\\n  ", $parts);
+    }
+
+    private function quote(string $value): string
+    {
+        return "'".str_replace("'", "'\"'\"'", $value)."'";
+    }
+}
