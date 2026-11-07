@@ -1,6 +1,6 @@
 <div class="card"><div class="grid">@foreach(['accepted'=>'Aguardando preparo','preparing'=>'Em preparo','ready'=>'Prontos para conferência'] as $value=>$label)<a href="{{ route('kitchen.index',array_filter(['stage'=>$value,'store_id'=>$filters['store_id']??null])) }}" @if($stage===$value) aria-current="page" @endif>{{ $label }} <strong>{{ $counts[$value]??0 }}</strong></a>@endforeach</div></div>
 <div class="grid staff-order-grid">@forelse($orders as $order)<article class="card">
-<p class="muted">{{ $stores->firstWhere('id',$order->store_id)?->name }}</p><h2>Pedido #{{ $order->id }}</h2><p>{{ App\Support\OrderMode::label($order->mode,$order->dining_label) }}</p>
+<p class="muted">{{ $stores->firstWhere('id',$order->store_id)?->name }}</p><h2>Pedido #{{ $order->id }}</h2><p>{{ App\Support\OrderMode::label($order->mode,$order->dining_label) }}</p>@if($order->dining_person)<p>Consumo: {{ $order->dining_person }}</p>@endif
 @include('partials.production-timer')
 @if($scheduleLabel=app(App\Services\OrderScheduling::class)->label($order))<p class="badge">Agendado: {{ $scheduleLabel }}<br>Preparo a partir de {{ Illuminate\Support\Carbon::parse($order->prepare_at,'UTC')->timezone($order->scheduled_timezone)->format('d/m H:i') }}</p>@endif
 @foreach($items->get($order->id,collect()) as $item)<p><strong>{{ $item->quantity }} × {{ $item->name }}</strong>@foreach(json_decode($item->options??'[]',true) as $option)<br><small>{{ $option['group']??'' }}: {{ $option['name']??'' }}</small>@endforeach</p>@endforeach

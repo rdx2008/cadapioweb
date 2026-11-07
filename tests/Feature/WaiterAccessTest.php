@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\CashRegister;
 use App\Services\DiningRoom;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\BuildsPlatform;
@@ -31,10 +32,11 @@ class WaiterAccessTest extends TestCase
         return compact('tenant', 'store', 'owner', 'waiter', 'table', 'tab', 'product');
     }
 
-    private function draft(array $f): array
+    private function draft(array $f, array $extra = []): array
     {
         $key = (string) Str::uuid();
         $payload = ['idempotency_key' => $key, 'dining_tab_id' => $f['tab']->id, 'mode' => 'dine_in', 'payment_method' => 'cash', 'received' => 'no', 'cart_lines' => [['product_id' => $f['product'], 'quantity' => 1]]];
+        $payload = array_replace($payload, $extra);
         $this->post('/pos/'.$f['store'].'/review', $payload)->assertRedirect()->assertSessionHasNoErrors();
         $preview = $this->get('/pos/'.$f['store'].'/review/'.$key)->assertOk()->assertDontSee('Forma:')->assertDontSee('Caixa</a>', false);
 
@@ -49,6 +51,67 @@ class WaiterAccessTest extends TestCase
         $this->post($url, ['review_hash' => $draft['hash']])->assertRedirect()->assertSessionHasNoErrors();
 
         return DB::table('orders')->where('idempotency_key', $draft['key'])->firstOrFail();
+    }
+
+    public function test_waiter_identifies_consumption_without_creating_individual_receipts(): void
+    {
+        $f = $this->fixture();
+        foreach (['  Ana   Silva  ', 'ana silva', null] as $name) {
+            $draft = $this->draft($f, ['dining_person' => $name]);
+            $this->post('/pos/'.$f['store'].'/review/'.$draft['key'].'/confirm', ['review_hash' => $draft['hash']])->assertRedirect()->assertSessionHasNoErrors();
+            $this->post('/pos/'.$f['store'].'/review/'.$draft['key'].'/confirm', ['review_hash' => $draft['hash']])->assertRedirect();
+        }
+        $orders = DB::table('orders')->orderBy('id')->get();
+        $this->assertSame('Ana Silva', $orders[0]->dining_person);
+        $this->assertSame('Grupo da Ana', $orders[0]->customer_name);
+        $this->assertNull($orders[2]->dining_person);
+        $summary = app(DiningRoom::class)->summary($f['tab']);
+        $this->assertSame(9000, $summary['total']);
+        $this->assertSame(6000, $summary['people'][0]['total']);
+        $this->assertSame(2, $summary['people'][0]['orders']);
+        $this->assertSame(3000, $summary['people'][1]['total']);
+        $this->get('/dining/tabs/'.$f['tab']->id)->assertOk()->assertSee('Consumo por pessoa')->assertSee('Ana Silva')->assertDontSee('Saldo:');
+        $this->assertDatabaseCount('orders', 3);
+        $this->assertDatabaseCount('cash_entries', 0);
+        DB::table('orders')->where('id', $orders[0]->id)->update(['status' => 'cancelled']);
+        $summary = app(DiningRoom::class)->summary($f['tab']);
+        $this->assertSame(6000, $summary['total']);
+        $this->assertSame(3000, $summary['people'][0]['total']);
+        $this->actingAs($f['owner'])->get('/dining/tabs/'.$f['tab']->id.'/print')->assertOk()->assertSee('Consumo por pessoa');
+        $this->actingAs($f['waiter'])->post('/orders/'.$orders[1]->id.'/print-jobs', ['kind' => 'production', 'paper' => '80', 'request_key' => (string) Str::uuid()])->assertRedirect();
+        $snapshot = json_decode(Crypt::decryptString(DB::table('order_prints')->value('payload')), true);
+        $this->assertSame('ana silva', $snapshot['dining_person']);
+    }
+
+    public function test_person_labels_validate_and_cannot_be_attached_to_remote_orders(): void
+    {
+        $f = $this->fixture();
+        $payload = ['idempotency_key' => (string) Str::uuid(), 'dining_tab_id' => $f['tab']->id, 'mode' => 'dine_in', 'payment_method' => 'cash', 'received' => 'no', 'cart_lines' => [['product_id' => $f['product'], 'quantity' => 1]], 'dining_person' => str_repeat('a', 81)];
+        $this->post('/pos/'.$f['store'].'/review', $payload)->assertSessionHasErrors('dining_person');
+        $payload['dining_person'] = 'Ana';
+        $payload['mode'] = 'pickup';
+        unset($payload['dining_tab_id']);
+        $this->actingAs($f['owner'])->post('/pos/'.$f['store'].'/review', $payload)->assertStatus(422);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_people_with_same_name_in_merged_accounts_remain_distinct(): void
+    {
+        $f = $this->fixture();
+        $this->actingAs($f['owner'])->post('/dining/tables', ['store_id' => $f['store'], 'name' => 'Mesa 2', 'seats' => 4, 'enabled' => 1])->assertRedirect();
+        $table = DB::table('dining_tables')->where('name', 'Mesa 2')->firstOrFail();
+        $this->post('/dining/tables/'.$table->id.'/open', ['guests' => 1, 'request_key' => (string) Str::uuid()])->assertRedirect();
+        $source = DB::table('dining_tabs')->where('active_table_id', $table->id)->firstOrFail();
+        foreach ([$f['tab']->id, $source->id] as $id) {
+            $order = $this->order($f['tenant'], $f['store']);
+            DB::table('orders')->where('id', $order)->update(['mode' => 'dine_in', 'dining_tab_id' => $id, 'dining_person' => 'Ana']);
+        }
+        DB::table('dining_tabs')->where('id', $source->id)->update(['active_table_id' => null, 'closed_at' => now(), 'merged_into_tab_id' => $f['tab']->id]);
+        $summary = app(DiningRoom::class)->summary($f['tab']);
+        $this->assertCount(2, $summary['people']);
+        $this->assertSame(7000, $summary['total']);
+        $this->assertSame([$f['tab']->id, $source->id], $summary['people']->pluck('tab_id')->all());
+        $this->assertDatabaseCount('cash_entries', 0);
     }
 
     public function test_waiter_opens_table_launches_order_without_cash_and_serves_ready_items(): void

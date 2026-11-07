@@ -2,7 +2,15 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 07/11/2026 após alertas sonoros das mesas, branch `feat/platform-foundation`.
+Atualizado em 07/11/2026 após identificação de consumo por pessoa, branch `feat/platform-foundation`.
+
+## Identificação do consumo por pessoa — 07/11/2026
+
+PDV e tela do garçom, ao lançar em comanda aberta, oferecem Consumo de quem? Opcional, até 80 caracteres, espaços normalizados e sugestões das identificações já usadas na mesma comanda. Cada pedido inteiro pertence a uma identificação; vazio significa compartilhado. Revisão mostra a escolha antes do envio; edição de rascunho preserva o campo. Cliente/grupo original permanece separado. Não permite identificação de consumo em pedidos sem comanda.
+
+Comanda do responsável, garçom e impressão da conta mostram resumo do consumo por identificação, sem cancelados, independente da paginação. Nomes iguais ignorando maiúsculas são agrupados apenas dentro da comanda de origem; uniões preservam origens distintas. Transferência/união preservam a identificação dos pedidos. Cozinha, detalhes e novas vias de produção exibem a identificação; vias antigas permanecem imutáveis.
+
+Esta etapa identifica consumo, sem criar saldo ou recebimento por pessoa, dividir itens compartilhados ou alterar pagamentos/BI. Cada registro de recebimento continua na conta da mesa. Comandas individuais e divisão por itens continuam pendentes. Migração 2026_11_07_134029_add_dining_person_to_orders adiciona coluna opcional; legado permanece sem identificação. Reversão bloqueada enquanto houver identificações para evitar perda do histórico. Publicar com migrações. Validação: 53 testes PHP, 1.046 asserções, Pint e Blade aprovados; cobre garçom, PDV, comanda, caixa e impressão. iFood permanece pausado.
 
 ## Alertas sonoros das mesas — 07/11/2026
 

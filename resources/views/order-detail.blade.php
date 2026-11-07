@@ -3,7 +3,8 @@
 <div class="heading">
 <div class="eyebrow">Operação da loja</div>
 <h1>Pedido #{{ $order->id }}</h1>
-@if($order->source==='pos')<p class="badge">Venda no PDV · {{ App\Support\OrderMode::label($order->mode,$order->dining_label) }}</p>@endif
+@if($order->source==='pos')<p class="badge">Venda no PDV · {{ App\Support\OrderMode::label($order->mode,$order->dining_label) }}</p>@if($order->dining_person)<p>Consumo: {{ $order->dining_person }}</p>@endif
+@endif
 @include('partials.payment-details',['payment'=>$order])
 @if($scheduleLabel=app(App\Services\OrderScheduling::class)->label($order))<p class="badge">Agendado: {{ $scheduleLabel }}<br>Preparo a partir de {{ Illuminate\Support\Carbon::parse($order->prepare_at,'UTC')->timezone($order->scheduled_timezone)->format('d/m H:i') }}</p>@endif
 <a href="/dashboard#pedidos">← Voltar aos pedidos</a>

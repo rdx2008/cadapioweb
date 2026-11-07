@@ -60,6 +60,7 @@ class OrderPrinting
             $store = DB::table('stores')->where('id', $order->store_id)->firstOrFail();
             $snapshot = ['store_name' => $store->name, 'order_id' => $order->id, 'mode' => $order->mode, 'status' => $order->status, 'notice' => $this->notice($order), 'timezone' => $store->timezone, 'ordered_at' => Carbon::parse($order->created_at, 'UTC')->timezone($store->timezone)->format('d/m/Y H:i'), 'scheduled' => app(OrderScheduling::class)->label($order), 'prepare_at' => $order->prepare_at ? Carbon::parse($order->prepare_at, 'UTC')->timezone($store->timezone)->format('d/m/Y H:i') : null, 'items' => []];
             $snapshot['dining_label'] = $order->dining_label;
+            $snapshot['dining_person'] = $order->dining_person;
             foreach (DB::table('order_items')->where('order_id', $orderId)->orderBy('id')->get() as $item) {
                 $line = ['name' => $item->name, 'quantity' => $item->quantity, 'options' => []];
                 $options = json_decode($item->options ?? '[]', true);

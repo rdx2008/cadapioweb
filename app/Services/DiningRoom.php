@@ -73,7 +73,9 @@ class DiningRoom
         $pending = $valid->where('payment_status', '!=', 'paid');
         $refunds = DB::table('cash_entries')->whereIn('order_id', $orders->where('status', 'cancelled')->pluck('id'))->where('kind', 'sale')->whereNotIn('order_id', DB::table('cash_entries')->where('kind', 'refund')->select('order_id'))->distinct()->count('order_id');
 
-        return ['orders' => $orders, 'total' => (int) $valid->sum('total_cents'), 'paid' => (int) $valid->sum('received_cents'),
+        $people = $valid->groupBy(fn ($order) => $order->dining_tab_id.':'.($order->dining_person === null ? 'shared' : 'person:'.mb_strtolower($order->dining_person)))->map(fn ($rows) => ['name' => $rows->first()->dining_person, 'tab_id' => $rows->first()->dining_tab_id, 'total' => (int) $rows->sum('total_cents'), 'orders' => $rows->count()])->values();
+
+        return ['orders' => $orders, 'people' => $people, 'total' => (int) $valid->sum('total_cents'), 'paid' => (int) $valid->sum('received_cents'),
             'pending' => (int) $pending->sum('balance_cents'), 'pending_orders' => $pending, 'unfinished' => $valid->where('status', '!=', 'completed')->count(), 'refunds_pending' => $refunds,
             'review_hash' => hash('sha256', json_encode([$tab->current_table_id, $ids, $pending->map(fn ($o) => [$o->id, $o->total_cents, $o->payment_status, $o->received_cents])->values()->all()], JSON_THROW_ON_ERROR))];
     }

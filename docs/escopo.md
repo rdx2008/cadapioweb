@@ -789,3 +789,7 @@ Link exclusivo ativado pela equipe em cada comanda aberta; cliente sem login cha
 ### 17.30. Alertas sonoros de solicitações das mesas
 
 Ativação explícita com teste no mapa/comanda do garçom; som curto para chamados novos autorizados, sem repetir a cada consulta. Desligado ao abrir outra tela, sem tocar para pendências iniciais. Preserva formulários; interrompe ao perder acesso/navegar. Exige página visível, permissão do navegador e volume do aparelho. Sem push ou funcionamento garantido em segundo plano. Cada aba ativada pode emitir o próprio alerta. Sem novas migrações/dependências.
+
+### 17.31. Identificação do consumo por pessoa
+
+Campo opcional ao lançar pedido de mesa pelo operador/garçom, com sugestões da comanda e revisão antes do envio. Um pedido inteiro por identificação; sem identificação é compartilhado. Resumo de consumo por pessoa na comanda e impressão, cancelamentos excluídos. Identificação acompanha cozinha e novas vias; legado não recebe nomes inferidos. União preserva pessoas de origens distintas mesmo com nomes iguais. Recebimentos continuam pela conta da mesa; não atribui parcelas a pessoas nem divide itens compartilhados. Base para evolução de comandas individuais, ainda pendentes.
