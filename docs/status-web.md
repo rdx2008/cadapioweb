@@ -2,7 +2,15 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 07/11/2026 após recebimento de consumo selecionado, branch `feat/platform-foundation`.
+Atualizado em 07/11/2026 após estoque manual de insumos, branch `feat/platform-foundation`.
+
+## Estoque manual de insumos — 07/11/2026
+
+Proprietário acessa Gestão > Estoque e insumos, seleciona loja e cadastra nome, unidade (un/kg/g/l/ml) e mínimo. Saldo inicial zero; quantidade inicial exige entrada com motivo. Nome/mínimo/situação editáveis, unidade imutável; inativação preserva saldo/histórico. Nomes normalizados únicos por loja; limite inicial de 2.000 cadastros por loja, lista paginada. Itens ativos no mínimo ou abaixo recebem sinalização de reposição.
+
+Entradas/saídas manuais com quantidade positiva, unidade explícita, motivo, confirmação e chave idempotente. Quantidades armazenadas em milésimos inteiros, até três casas; entrada admite vírgula ou ponto decimal sem milhares, limite de saldo 999999,999. Não permite saldo negativo. Ajustes por contagem exigem registrar diferença; movimentos não são editados/apagados. Histórico por loja/insumo preserva nome/unidade do momento, quantidade, saldo após, motivo, data e responsável. Auditoria e alteração de saldo na mesma transação; bloqueios revalidam permissão/empresa e serializam movimentos. Reenvios iguais não duplicam; reutilizar chave com outros dados é recusado.
+
+Acesso inicial exclusivo do proprietário ativo. Sem conversão de unidades, custo, compras, ficha técnica, baixa automática por venda ou reposição por cancelamento nesta etapa. Nenhum movimento financeiro criado. Migração 2026_11_07_194542_create_inventory_tables cria cadastro e razão sem inferir saldos do catálogo; reversão bloqueada após cadastro para preservar dados. Publicar com migrações. Sem dependência adicional. Validação: 19 testes PHP (368 asserções), Pint e Blade aprovados. Chrome local: cadastro e entrada inicial conferidos; desktop e celular de 390 px sem transbordamento da página, com rolagem dentro do histórico e sem erros JavaScript. Concorrência PostgreSQL e contagem física ficam para piloto. iFood permanece pausado.
 
 ## Recebimento do consumo selecionado — 07/11/2026
 

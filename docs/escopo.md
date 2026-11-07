@@ -797,3 +797,7 @@ Campo opcional ao lançar pedido de mesa pelo operador/garçom, com sugestões d
 ### 17.32. Recebimento por identificação de consumo
 
 Proprietário/operador seleciona conta inteira, pessoa ou compartilhado por comanda de origem; confere saldo derivado dos pedidos e recebe parcial/integralmente em caixa aberto. Parcelas abatem apenas pedidos da seleção; pagamentos anteriores são respeitados. Seleção vinculada à revisão e idempotência; origem e identificação congeladas no histórico/conta impressa. Garçom não recebe; fechar mesa exige quitar todo saldo e concluir serviço. Não representa quem pagou, divisão de item compartilhado ou comanda individual independente. Migração preserva parcelas anteriores sem atribuição fictícia.
+
+### 17.33. Estoque manual de insumos
+
+Proprietário cadastra insumos por loja, unidade fixa e mínimo, edita/inativa sem apagar histórico. Entradas/saídas com motivo, confirmação, responsável e idempotência. Quantidades exatas em milésimos; sem negativos, conversão ou unidade alterável. Reposição sinalizada no mínimo/abaixo, histórico paginado e filtrado por insumo. Saldo/histórico/auditoria atômicos, isolamento por empresa e loja, snapshots de nome/unidade. Saldo inicial por movimento explícito. Base para fichas técnicas; não baixa vendas nem repõe cancelamentos automaticamente, não integra custos/compras/financeiro nesta etapa. Migração preserva catálogo e não inventa saldos existentes.

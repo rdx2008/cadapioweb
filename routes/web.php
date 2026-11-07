@@ -14,6 +14,7 @@ use App\Http\Controllers\DeliveryStatementController;
 use App\Http\Controllers\DiningCallController;
 use App\Http\Controllers\DiningRoomController;
 use App\Http\Controllers\IfoodController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OrderBoardController;
@@ -58,6 +59,10 @@ Route::post('/mesa/{token}', [DiningCallController::class, 'request'])->where('t
 Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])->whereIn('kind', ['logo', 'cover'])->name('stores.branding');
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1,webhooks-evolution-id:');
 Route::middleware('auth')->group(function () {
+    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::post('/inventory/items', [InventoryController::class, 'save'])->middleware('throttle:30,1,inventory-save:')->name('inventory.create');
+    Route::post('/inventory/items/{id}', [InventoryController::class, 'save'])->whereNumber('id')->name('inventory.update');
+    Route::post('/inventory/items/{id}/movements', [InventoryController::class, 'move'])->whereNumber('id')->middleware('throttle:30,1,inventory-move:')->name('inventory.move');
     Route::get('/app', [PlatformController::class, 'home']);
     Route::get('/dining', [DiningRoomController::class, 'index'])->name('dining.index');
     Route::post('/dining/tabs/{id}/guest-link', [DiningCallController::class, 'issue'])->whereNumber('id')->middleware('throttle:20,1,dining-guest-issue:')->name('dining.guest-issue');
