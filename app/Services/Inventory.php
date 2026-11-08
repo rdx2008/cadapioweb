@@ -38,11 +38,11 @@ class Inventory
         return number_format(intdiv($quantity, 1000), 0, ',', '.').','.str_pad((string) ($quantity % 1000), 3, '0', STR_PAD_LEFT);
     }
 
-    public function move(object $item, object $user, string $kind, int $quantity, string $reason, string $key): void
+    public function move(object $item, object $user, string $kind, int $quantity, string $reason, string $key, ?int $orderId = null): void
     {
         $existing = DB::table('inventory_movements')->where('request_key', $key)->first();
         if ($existing) {
-            abort_unless($existing->item_id === $item->id && $existing->user_id === $user->id && $existing->kind === $kind && $existing->quantity === $quantity && $existing->reason === $reason, 409, 'Esta solicitação já foi usada com outros dados.');
+            abort_unless($existing->item_id === $item->id && $existing->user_id === $user->id && $existing->kind === $kind && $existing->quantity === $quantity && $existing->reason === $reason && $existing->order_id === $orderId, 409, 'Esta solicitação já foi usada com outros dados.');
 
             return;
         }
@@ -54,7 +54,7 @@ class Inventory
         }
         DB::table('inventory_items')->where('id', $item->id)->update(['balance' => $balance, 'updated_at' => now()]);
         $id = DB::table('inventory_movements')->insertGetId(['tenant_id' => $item->tenant_id, 'store_id' => $item->store_id, 'item_id' => $item->id, 'user_id' => $user->id,
-            'item_name' => $item->name, 'unit' => $item->unit, 'kind' => $kind, 'quantity' => $quantity, 'balance_after' => $balance, 'reason' => $reason, 'request_key' => $key, 'created_at' => now()]);
+            'item_name' => $item->name, 'unit' => $item->unit, 'kind' => $kind, 'quantity' => $quantity, 'balance_after' => $balance, 'reason' => $reason, 'request_key' => $key, 'order_id' => $orderId, 'created_at' => now()]);
         Audit::record('inventory.moved', ['movement_id' => $id, 'item_id' => $item->id, 'kind' => $kind, 'quantity' => $quantity, 'balance_after' => $balance], $item->tenant_id);
     }
 }

@@ -176,6 +176,7 @@ class MenuController extends Controller
                 $public = (string) Str::uuid();
                 $id = DB::table('orders')->insertGetId([
                     'public_id' => $public, 'tenant_id' => $store->tenant_id, 'store_id' => $store->id, 'idempotency_key' => $data['draft_id'],
+                    'inventory_plan' => isset($quote['inventory_plan']) ? json_encode($quote['inventory_plan'], JSON_THROW_ON_ERROR) : null,
                     'scheduled_at' => $quote['scheduled_at'], 'prepare_at' => $quote['prepare_at'], 'scheduled_timezone' => $quote['scheduled_timezone'],
                     'payment_method' => $quote['payment_method'], 'change_for_cents' => $quote['change_for_cents'],
                     'customer_name' => $draft['data']['customer_name'], 'phone' => $draft['data']['phone'], 'mode' => $draft['data']['mode'],

@@ -63,6 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/products/{id}/recipe', [ProductRecipeController::class, 'edit'])->whereNumber('id')->name('recipes.edit');
     Route::post('/products/{id}/recipe', [ProductRecipeController::class, 'save'])->whereNumber('id')->middleware('throttle:30,1,recipe-save:')->name('recipes.save');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::post('/inventory/settings', [InventoryController::class, 'settings'])->name('inventory.settings');
     Route::post('/inventory/items', [InventoryController::class, 'save'])->middleware('throttle:30,1,inventory-save:')->name('inventory.create');
     Route::post('/inventory/items/{id}', [InventoryController::class, 'save'])->whereNumber('id')->name('inventory.update');
     Route::post('/inventory/items/{id}/movements', [InventoryController::class, 'move'])->whereNumber('id')->middleware('throttle:30,1,inventory-move:')->name('inventory.move');

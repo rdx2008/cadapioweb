@@ -2,7 +2,17 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 08/11/2026 após fichas técnicas versionadas, branch `feat/platform-foundation`.
+Atualizado em 08/11/2026 após baixa automática no preparo, branch `feat/platform-foundation`.
+
+## Baixa automática ao iniciar preparo — 08/11/2026
+
+Proprietário ativa por loja em Gestão > Estoque e insumos; desligada por padrão. Novos pedidos do cardápio e PDV congelam um plano privado de consumo e referências das versões de fichas no checkout. Mudar ficha/configuração durante a revisão exige revisar novamente. Pedidos já registrados conservam o plano mesmo ao desligar a opção; legado e pedidos criados com baixa desligada continuam manuais, sem inferência por nome.
+
+Plano considera quantidade vendida, tamanho substituindo base (fallback na base quando tamanho não tem ficha ativa), adicionais/bordas selecionados, partes iguais de 1 a 4 sabores e quantidade/tamanho dos componentes concretos de combos, além de extras/embalagem do combo. Base do combo é opcional; componentes precisam de ficha. Componentes meramente descritivos e composições obrigatórias vazias/ausentes impedem novos pedidos quando ativo. Insumos precisam pertencer à loja e estar ativos. Demanda usa doze avos de milésimo para somar frações sem float, arredondando para cima uma vez por insumo no total do pedido; limite de demanda 999999,999.
+
+Ao iniciar preparo pela cozinha/operação/proprietário, verifica saldo/unidade/situação de todos os insumos sob bloqueio e registra saídas vinculadas ao pedido, com responsável e auditoria. Flag de consumo e unicidade pedido/insumo impedem duplicidade. Saldo insuficiente ou falha de auditoria mantêm estoque e status intactos. Ordem de bloqueios alinha ator/empresa/pedido/insumos. Confirmação online e horário agendado continuam exigidos antes do preparo. Nenhuma reserva no checkout; a loja deve tratar falta após receber pedido. Cancelamento antes do preparo não consome; depois do preparo não repõe ingredientes automaticamente. Retorno físico exige entrada manual justificada. Sem CMV/custos/compras nesta etapa. iFood não integra este fluxo e permanece pausado.
+
+Migração 2026_11_08_150049_add_order_inventory_consumption adiciona opção, plano/carimbo e vínculo dos movimentos; reversão bloqueada após planos registrados. Publicar com migrações, conferir fichas/saldos e ativar explicitamente por loja. Sem dependências adicionais. Validação: 82 testes PHP (912 asserções), Pint e Blade aprovados. Chrome local: ativar, vender no PDV, iniciar preparo na cozinha e conferir saída/saldo/histórico; celular sem transbordamento e sem erros JavaScript. Concorrência real PostgreSQL permanece para piloto. Regressão também corrigiu configuração da loja que tentava renderizar accepts_mixed; resumo de pagamento dividido não é meio configurável.
 
 ## Fichas técnicas versionadas — 08/11/2026
 
@@ -12,7 +22,7 @@ Convenção de composições: tamanho é ficha completa substituindo a base; adi
 
 Cada salvamento cria revisão com snapshots de produto, composição, nome/unidade/quantidade dos insumos, motivo e responsável. Limpar linhas preserva versões anteriores; histórico paginado e privado. Tamanhos/sabores retirados do catálogo mantêm consulta das composições antigas, sem permitir edição sobre alvo indisponível. Revisão e contexto do catálogo protegem formulários antigos; chave idempotente impede salvar duas versões por reenvio. Auditoria, ficha e revisão na mesma transação. Insumo inativo precisa ser removido/substituído para nova versão; histórico não muda.
 
-Migração 2026_11_08_144222_create_product_recipe_tables cria fichas/versões sem inferir composições no legado; reversão bloqueada após salvar fichas. Sem dependência adicional. Publicar com migrações. Validação: 24 testes PHP (286 asserções), Pint e Blade aprovados. Chrome local: adicionar/remover linha, salvar e ler versão; desktop/celular 390 px sem transbordamento e sem erros JavaScript. Baixa automática e concorrência PostgreSQL permanecem para etapa seguinte/piloto. iFood permanece pausado.
+Migração 2026_11_08_144222_create_product_recipe_tables cria fichas/versões sem inferir composições no legado; reversão bloqueada após salvar fichas. Sem dependência adicional. Publicar com migrações. Validação: 24 testes PHP (286 asserções), Pint e Blade aprovados. Chrome local: adicionar/remover linha, salvar e ler versão; desktop/celular 390 px sem transbordamento e sem erros JavaScript. Baixa automática entregue na etapa seguinte; concorrência PostgreSQL permanece para piloto. iFood permanece pausado.
 
 ## Estoque manual de insumos — 07/11/2026
 

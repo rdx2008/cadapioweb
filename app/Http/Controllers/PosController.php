@@ -237,6 +237,7 @@ class PosController extends Controller
             $orderId = DB::table('orders')->insertGetId([
                 'public_id' => (string) Str::uuid(), 'tenant_id' => $store->tenant_id, 'store_id' => $id,
                 'idempotency_key' => $key, 'source' => 'pos', 'created_by' => $request->user()->id,
+                'inventory_plan' => isset($quote['inventory_plan']) ? json_encode($quote['inventory_plan'], JSON_THROW_ON_ERROR) : null,
                 'dining_tab_id' => $tab?->id, 'dining_label' => $tab ? $tab->table_name.' · Comanda #'.$tab->id : null,
                 'dining_person' => $tab ? ($draft['data']['dining_person'] ?? null) : null,
                 'customer_name' => $draft['data']['customer_name'], 'phone' => $draft['data']['phone'], 'mode' => $draft['data']['mode'],

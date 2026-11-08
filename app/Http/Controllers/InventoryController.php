@@ -12,6 +12,19 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryController extends Controller
 {
+    public function settings(Request $request, Inventory $inventory): RedirectResponse
+    {
+        $data = $request->validate(['store_id' => 'required|integer|min:1', 'inventory_auto' => 'required|boolean', 'confirmed' => 'accepted']);
+        DB::transaction(function () use ($request, $inventory, $data): void {
+            $user = $inventory->member($request->user(), true);
+            DB::table('stores')->where('tenant_id', $user->tenant_id)->where('id', $data['store_id'])->lockForUpdate()->firstOrFail();
+            DB::table('stores')->where('id', $data['store_id'])->update(['inventory_auto' => $data['inventory_auto'], 'updated_at' => now()]);
+            Audit::record('inventory.automation_changed', ['store_id' => (int) $data['store_id'], 'enabled' => (bool) $data['inventory_auto']], $user->tenant_id);
+        }, 3);
+
+        return redirect()->route('inventory.index', ['store_id' => $data['store_id']])->with('success', 'Configuração salva para novos pedidos. Pedidos já registrados mantêm sua composição.');
+    }
+
     public function index(Request $request, Inventory $inventory): Response
     {
         $user = $inventory->member($request->user());

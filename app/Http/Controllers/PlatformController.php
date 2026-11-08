@@ -8,6 +8,7 @@ use App\Services\DashboardSummary;
 use App\Services\DispatchService;
 use App\Services\FareCalculator;
 use App\Services\OnlinePayment;
+use App\Services\OrderInventory;
 use App\Services\OrderProduction;
 use App\Services\OrderScheduling;
 use App\Support\Audit;
@@ -140,6 +141,8 @@ class PlatformController extends Controller
     {
         $r->validate(['status' => 'required|in:accepted,preparing,ready,completed,cancelled', 'cancellation_reason' => 'required_if:status,cancelled|nullable|string|max:500']);
         DB::transaction(function () use ($r, $id) {
+            $actor = DB::table('users')->where('id', auth()->id())->lockForUpdate()->firstOrFail();
+            abort_unless($actor->access_enabled && $actor->tenant_id === $this->tid(), 403);
             DB::table('tenants')->where('id', $this->tid())->lockForUpdate()->firstOrFail();
             $o = DB::table('orders')->where('tenant_id', $this->tid())->where('id', $id)->lockForUpdate()->firstOrFail();
             $allowed = ['pending' => ['accepted', 'cancelled'], 'accepted' => ['preparing', 'cancelled'], 'preparing' => ['ready', 'cancelled'], 'ready' => ['completed', 'cancelled']];
@@ -149,6 +152,9 @@ class PlatformController extends Controller
             abort_if($r->status === 'preparing' && ! app(OrderScheduling::class)->canPrepare($o), 409, 'Aguarde o horário previsto para iniciar o preparo deste pedido agendado.');
             abort_unless(in_array($r->status, $allowed[$o->status] ?? []), 409, 'Transição inválida.');
             abort_if(DB::table('rides')->where('order_id', $id)->whereIn('status', ['assigned', 'collected', 'returning'])->exists(), 409, 'Trate a corrida atribuída antes de alterar o pedido.');
+            if ($r->status === 'preparing') {
+                app(OrderInventory::class)->consume($o, auth()->id());
+            }
             $production = app(OrderProduction::class)->transition($o, $r->status);
             DB::table('orders')->where('id', $id)->update($production + ['status' => $r->status, 'cancellation_reason' => $r->status === 'cancelled' ? $r->cancellation_reason : null, 'updated_at' => now()]);
             if ($r->status === 'cancelled' && app(OnlinePayment::class)->isOnline($o)) {
