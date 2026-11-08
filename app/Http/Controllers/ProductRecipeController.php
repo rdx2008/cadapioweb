@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Inventory;
+use App\Services\InventoryCosts;
 use App\Services\ProductRecipes;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,7 +31,9 @@ class ProductRecipeController extends Controller
         $items = DB::table('inventory_items')->where('tenant_id', $product->tenant_id)->where('store_id', $product->store_id)->orderBy('name')->get();
         $history = DB::table('product_recipe_revisions')->join('users', 'users.id', '=', 'product_recipe_revisions.user_id')->where('recipe_id', $current?->id ?? 0)->select('product_recipe_revisions.*', 'users.name as operator_name')->orderByDesc('product_recipe_revisions.id')->paginate(10)->withQueryString();
 
-        return response()->view('inventory.recipe', compact('product', 'targets', 'target', 'current', 'items', 'history', 'editable', 'store') + ['contextHash' => $recipes->context($product, $target, $targets)])->header('Cache-Control', 'private, no-store');
+        $estimate = app(InventoryCosts::class)->estimate(json_decode($current?->lines ?? '[]', true), $user->tenant_id, $store->id);
+
+        return response()->view('inventory.recipe', compact('product', 'targets', 'target', 'current', 'items', 'history', 'editable', 'store', 'estimate') + ['contextHash' => $recipes->context($product, $target, $targets)])->header('Cache-Control', 'private, no-store');
     }
 
     public function save(Request $request, int $id, Inventory $inventory, ProductRecipes $recipes): RedirectResponse

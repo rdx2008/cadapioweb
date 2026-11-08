@@ -24,7 +24,7 @@
             default => [
                 ['/dashboard','home','Visão geral'],
                 ['Operação','orders', [['/dashboard#pedidos','orders','Pedidos'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/dining','store','Mesas e comandas'],['/deliveries','truck','Entregas']]],
-                ['Gestão','chart', [['/cash','orders','Caixa'],['/bi','chart','BI e crescimento'],['/inventory','menu','Estoque e insumos']]],
+                ['Gestão','chart', [['/cash','orders','Caixa'],['/bi','chart','BI e crescimento'],['/inventory','menu','Estoque e insumos'],['/inventory/purchases','orders','Compras'],['/inventory/costs','chart','Custos e margens']]],
                 ['Minha empresa','store', [['/catalog','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/team','users','Equipe e acessos']]],
                 ['Integrações','chat', [['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood']]],
             ],

@@ -2,7 +2,19 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 08/11/2026 após baixa automática no preparo, branch `feat/platform-foundation`.
+Atualizado em 08/11/2026 após compras e custos de insumos, branch `feat/platform-foundation`.
+
+## Compras e custos de insumos — 08/11/2026
+
+Gestão > Compras reúne fornecedores por loja, rascunhos com até 50 insumos, data/referência, quantidades e preços por unidade, frete e desconto. Fornecedores podem ser editados/inativados; compras preservam o nome registrado. Frete e desconto são rateados por valor dos produtos pelo método do maior resto, reconciliando todos os centavos. Valores inteiros, sem dependência adicional. Cada edição preserva uma versão no histórico; revisão otimista impede sobrescrever rascunho alterado. Rascunhos podem ser cancelados com motivo.
+
+Recebimento integral exige conferência explícita da versão exibida. Saldo, valor contábil, custo médio ponderado, movimentos e auditoria são gravados na mesma transação. Insumo inativo, excesso de saldo/valor ou falha em qualquer linha/auditoria desfazem tudo. Reenvio da mesma solicitação é idempotente; compras recebidas ficam imutáveis. Sem pagamento automático ao fornecedor, contas a pagar ou recebimento parcial. Devolução física requer movimento manual, sem gerar crédito financeiro.
+
+Estoque mostra custo médio e valor do saldo. Entrada manual aceita valor total opcional; valor desconhecido torna o custo do saldo pendente, sem tratá-lo como zero. Saldo legado positivo permanece sem valor até avaliação explícita de seu custo total, com motivo, confirmação, revisão do saldo/último movimento e histórico privado. Saldo zero recebe valor zero na migração, sem inventar custo unitário. Saídas registram custo proporcional em centavos (truncado; saída final consome o valor restante) e o último custo médio conhecido permanece disponível quando o saldo acaba. Reavaliação não reescreve movimentos antigos; baixa automática de preparo passa a congelar também o custo efetivo dos insumos.
+
+Gestão > Custos e margens mostra valor conhecido do estoque e pendências, estimativa da ficha base de produtos simples e simulador de composição completa. Simulação reutiliza as regras de preço e consumo para quantidade, tamanho, sabores em partes iguais, adicionais/bordas e componentes concretos de combos. Não cria pedidos, estoque ou recebimentos. Composição obrigatória sem ficha impede cálculo parcial enganoso; custos ausentes deixam margem/CMV pendentes. Ficha técnica também exibe custo isolado da composição. CMV é estimativa atual dos insumos sobre a venda; margem não inclui impostos, taxas ou despesas e não representa lucro líquido ou CMV financeiro por período.
+
+Migração `2026_11_08_152213_add_inventory_purchases_and_costs` preserva saldos e histórico e bloqueia reversão após registros de custos/compras. Publicar com migrações. Acesso exclusivo do proprietário ativo, isolamento de empresa/loja, respostas privadas. Validação: 80 testes / 983 asserções de compras, custos, estoque, fichas, preparo, PDV, pagamentos e catálogo; Pint e Blade aprovados. Chrome local com fornecedor, avaliação inicial, compra, recebimento e cálculo da margem. Celular 390 px sem transbordamento em estoque, compras e custos; sem erros JavaScript. Concorrência real PostgreSQL permanece para piloto. iFood continua pausado.
 
 ## Baixa automática ao iniciar preparo — 08/11/2026
 
