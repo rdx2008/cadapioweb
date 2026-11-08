@@ -2,7 +2,17 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 07/11/2026 após estoque manual de insumos, branch `feat/platform-foundation`.
+Atualizado em 08/11/2026 após fichas técnicas versionadas, branch `feat/platform-foundation`.
+
+## Fichas técnicas versionadas — 08/11/2026
+
+Proprietário acessa Cardápio > editar produto > Ficha técnica / insumos. Seleciona base, tamanho, adicional/borda ou sabor de pizza por tamanho, monta até 50 insumos ativos da mesma loja e informa quantidades por unidade vendida, motivo e confirmação. Campos dinâmicos para adicionar/remover linhas, unidade indicada em cada insumo e quantidades exatas em milésimos. Sem repetição de insumos, quantidades zero/negativas ou mistura entre lojas.
+
+Convenção de composições: tamanho é ficha completa substituindo a base; adicional/borda é consumo extra por unidade escolhida; pizza base/tamanho representa massa/embalagem e sabor representa cobertura de pizza inteira naquele tamanho; combo base somente extras/embalagem, componentes têm fichas nos próprios produtos. O mecanismo de baixa/partilha/conversão ainda não está ativado. Não altera saldo, vendas, preços, disponibilidade ou financeiro.
+
+Cada salvamento cria revisão com snapshots de produto, composição, nome/unidade/quantidade dos insumos, motivo e responsável. Limpar linhas preserva versões anteriores; histórico paginado e privado. Tamanhos/sabores retirados do catálogo mantêm consulta das composições antigas, sem permitir edição sobre alvo indisponível. Revisão e contexto do catálogo protegem formulários antigos; chave idempotente impede salvar duas versões por reenvio. Auditoria, ficha e revisão na mesma transação. Insumo inativo precisa ser removido/substituído para nova versão; histórico não muda.
+
+Migração 2026_11_08_144222_create_product_recipe_tables cria fichas/versões sem inferir composições no legado; reversão bloqueada após salvar fichas. Sem dependência adicional. Publicar com migrações. Validação: 24 testes PHP (286 asserções), Pint e Blade aprovados. Chrome local: adicionar/remover linha, salvar e ler versão; desktop/celular 390 px sem transbordamento e sem erros JavaScript. Baixa automática e concorrência PostgreSQL permanecem para etapa seguinte/piloto. iFood permanece pausado.
 
 ## Estoque manual de insumos — 07/11/2026
 

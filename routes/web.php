@@ -23,6 +23,7 @@ use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\ProductRecipeController;
 use App\Http\Controllers\StaffOperationController;
 use App\Http\Controllers\StoreAddressController;
 use App\Http\Controllers\TeamController;
@@ -59,6 +60,8 @@ Route::post('/mesa/{token}', [DiningCallController::class, 'request'])->where('t
 Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])->whereIn('kind', ['logo', 'cover'])->name('stores.branding');
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1,webhooks-evolution-id:');
 Route::middleware('auth')->group(function () {
+    Route::get('/products/{id}/recipe', [ProductRecipeController::class, 'edit'])->whereNumber('id')->name('recipes.edit');
+    Route::post('/products/{id}/recipe', [ProductRecipeController::class, 'save'])->whereNumber('id')->middleware('throttle:30,1,recipe-save:')->name('recipes.save');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::post('/inventory/items', [InventoryController::class, 'save'])->middleware('throttle:30,1,inventory-save:')->name('inventory.create');
     Route::post('/inventory/items/{id}', [InventoryController::class, 'save'])->whereNumber('id')->name('inventory.update');

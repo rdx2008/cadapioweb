@@ -1,0 +1,22 @@
+@extends('layout')
+@section('page-label','Ficha técnica')
+@push('styles')<link rel="stylesheet" href="/inventory.css?v=2">@endpush
+@section('content')
+@php($quantity=fn($v)=>App\Services\Inventory::format($v))
+@php($savedLines=json_decode($current?->lines??'[]',true))
+@php($editingLines=old('lines',array_map(fn($line)=>['item_id'=>$line['item_id'],'quantity'=>intdiv($line['quantity'],1000).','.str_pad((string)($line['quantity']%1000),3,'0',STR_PAD_LEFT)],$savedLines)))
+<div class="inventory-page"><div class="heading"><h1>Ficha técnica · {{ $product->name }}</h1><div class="recipe-links"><a href="{{ url('/products/'.$product->id.'/edit') }}">← Voltar ao produto</a><a href="{{ route('inventory.index',['store_id'=>$product->store_id]) }}">Estoque da loja</a></div></div>
+<p class="notice">Defina os insumos para preparar uma unidade vendida. Salvar a ficha não altera saldos e ainda não ativa baixas automáticas nas vendas.</p>
+<form class="fields card" method="get" action="{{ route('recipes.edit',$product->id) }}"><label>Qual composição deseja configurar?<select name="target">@foreach($targets as $key=>$label)<option value="{{ $key }}" @selected($target===$key)>{{ $label }}</option>@endforeach</select></label><button>Abrir composição</button></form>
+<details class="card"><summary>Como organizar as composições</summary><p>A base informa os insumos de uma unidade do produto. Uma ficha de tamanho é a composição completa daquele tamanho e substitui a base; não repita quantidades nas duas esperando uma soma. Adicionais e bordas têm consumo extra por unidade escolhida.</p><p>Para pizza, a base/tamanho representa massa e embalagem. Cada sabor informa a cobertura de uma pizza inteira no tamanho escolhido, sem repetir a massa; partes de sabores serão tratadas na futura baixa automática. Para combo, configure apenas extras/embalagem na base; os componentes têm fichas nos próprios produtos.</p><p>Use a unidade cadastrada no estoque, até três casas decimais, sem milhares. Não há conversão automática de unidades nesta etapa. Linhas vazias são ignoradas. Salvar sem insumos deixa esta composição sem ficha ativa, preservando o histórico.</p></details>
+<section class="card"><h2>{{ $targets[$target] }}</h2><p>Versão atual: {{ $current?->revision??0 }} · {{ count($savedLines) }} insumo(s)</p>
+@if($items->isEmpty())<p>Cadastre os insumos desta loja no estoque antes de montar a ficha.</p>@endif
+@if($editable)
+<form class="stack-form" method="post" action="{{ route('recipes.save',$product->id) }}" data-recipe-form>@csrf<input type="hidden" name="target" value="{{ $target }}"><input type="hidden" name="revision" value="{{ old('revision',$current?->revision??0) }}"><input type="hidden" name="context_hash" value="{{ old('context_hash',$contextHash) }}"><input type="hidden" name="request_key" value="{{ old('request_key',(string)Illuminate\Support\Str::uuid()) }}">
+<div data-recipe-lines>@foreach($editingLines as $index=>$line)@include('inventory.recipe-line',['rowIndex'=>$index,'row'=>$line])@endforeach</div>
+<template data-recipe-template>@include('inventory.recipe-line',['rowIndex'=>'__INDEX__','row'=>[]])</template><button class="outline" type="button" data-recipe-add>+ Adicionar insumo</button><p data-recipe-status role="status"></p><label>Motivo desta versão<textarea name="reason" required maxlength="500" placeholder="Ex.: ficha inicial ou ajuste da porção">{{ old('reason') }}</textarea></label><label class="option-choice"><input type="checkbox" name="confirmed" value="1" required>Conferi os insumos, as unidades e as quantidades desta composição.</label><button>Salvar nova versão</button></form>
+@else<p class="notice">Esta composição não está mais disponível no catálogo. Seu histórico permanece abaixo para consulta.</p>@endif
+</section>
+<section class="card"><h2>Histórico desta composição</h2>@forelse($history as $version)<details><summary>Versão {{ $version->revision }} · {{ Illuminate\Support\Carbon::parse($version->created_at)->timezone($store->timezone)->format('d/m/Y H:i') }} · {{ $version->operator_name }}</summary><p>{{ $version->product_name }} · {{ $version->target_label }}</p><p>{{ $version->reason }}</p><ul>@forelse(json_decode($version->lines,true) as $line)<li>{{ $line['name'] }} · {{ $quantity($line['quantity']) }} {{ $line['unit'] }}</li>@empty<li>Sem insumos nesta versão.</li>@endforelse</ul></details>@empty<p>Nenhuma versão salva.</p>@endforelse{{ $history->links() }}</section></div>
+<script src="/product-recipe.js?v=1" defer></script>
+@endsection

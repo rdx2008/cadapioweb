@@ -5,7 +5,7 @@
 <div class="heading">
 <div class="eyebrow">Catálogo da loja</div>
 <h1>{{ $product->name }}</h1>
-<a href="/catalog">← Voltar ao catálogo</a>
+<a href="/catalog">← Voltar ao catálogo</a><a class="button outline" href="{{ route('recipes.edit',$product->id) }}">Ficha técnica / insumos</a>
 </div>
 <nav class="catalog-editor-steps" aria-label="Etapas do produto"><a href="#product-basics">Dados e foto</a>@if($product->product_type!=='combo')<a href="#variants">Tamanhos e preços</a>@else<a href="#combo">Componentes do combo</a>@endif
 @if($product->product_type==='pizza')<a href="#pizza">Sabores de pizza</a>@endif<a href="#product-addons">Adicionais e revisão</a></nav><p class="muted">Confira a apresentação, os tamanhos e os adicionais antes de divulgar. Os botões de cada seção salvam suas próprias alterações.</p><form id="product-basics" action="/products/{{ $product->id }}/edit" method="post" enctype="multipart/form-data" class="card">@csrf
