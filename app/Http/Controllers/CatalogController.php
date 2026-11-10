@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\DeliveryCoverage;
 use App\Services\OnlinePayment;
 use App\Services\PizzaPricing;
+use App\Services\TenantState;
 use App\Support\Audit;
 use App\Support\MoneyInput;
 use Illuminate\Http\JsonResponse;
@@ -350,7 +351,7 @@ class CatalogController extends Controller
         MoneyInput::normalize($request, ['delivery_fixed' => 'delivery_fixed_cents', 'delivery_base' => 'delivery_base_cents', 'delivery_per_km' => 'delivery_per_km_cents', 'delivery_minimum' => 'delivery_minimum_cents']);
         $pricedRadius = $request->input('delivery_mode') === 'radius' && $request->input('delivery_pricing') !== 'bands';
         $data = $request->validate([
-            'delivery_mode' => 'required|in:neighborhood,radius',
+            'delivery_mode' => 'required|in:neighborhood,radius,polygon',
             'delivery_pricing' => 'required_if:delivery_mode,radius|nullable|in:fixed,bands,per_km',
             'delivery_max_km' => [Rule::requiredIf($pricedRadius), 'nullable', 'numeric', 'min:0.1', 'max:100'],
             'delivery_fixed_cents' => [Rule::requiredIf($pricedRadius && $request->input('delivery_pricing') === 'fixed'), 'nullable', 'integer', 'min:0', 'max:100000'],
@@ -365,7 +366,14 @@ class CatalogController extends Controller
         $data = array_filter($data, fn ($value) => $value !== null);
         $data['delivery_by_radius'] = $data['delivery_mode'] === 'radius';
         DB::transaction(function () use ($store, $data): void {
+            $actor = DB::table('users')->where('id', auth()->id())->lockForUpdate()->firstOrFail();
+            abort_unless($actor->role === 'owner' && $actor->access_enabled && $actor->tenant_id === $store->tenant_id, 403);
+            DB::table('tenants')->where('id', $store->tenant_id)->lockForUpdate()->firstOrFail();
+            abort_unless(app(TenantState::class)->active($store->tenant_id), 403);
             DB::table('stores')->where('id', $store->id)->lockForUpdate()->firstOrFail();
+            if ($data['delivery_mode'] === 'polygon' && ! DB::table('delivery_areas')->where('store_id', $store->id)->where('enabled', true)->whereNull('deleted_at')->exists()) {
+                throw ValidationException::withMessages(['delivery_mode' => 'Desenhe e salve pelo menos uma área ativa no mapa antes de usar esta opção.']);
+            }
             DB::table('stores')->where('id', $store->id)->update($data + ['updated_at' => now()]);
             Audit::record('store.delivery_settings', ['store_id' => $store->id], $store->tenant_id);
         });

@@ -2,7 +2,21 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 08/11/2026 após compras e custos de insumos, branch `feat/platform-foundation`.
+Atualizado em 09/11/2026 após áreas de entrega desenhadas no mapa, branch `feat/platform-foundation`.
+
+## Áreas de entrega desenhadas no mapa — 09/11/2026
+
+Proprietário acessa Minha empresa > Lojas > configurar > Entrega e frete > Desenhar áreas no mapa > Abrir mapa. Tela própria preserva o layout do painel e oferece mapa com localização da loja, navegação/zoom, desenho por pontos, fechamento do contorno, ajuste por arraste, desfazer último ponto, cor, nome, frete e pausa. Lista permite editar/remover; remoção é lógica e preserva auditoria. Suporte a toque e desenho pelo teclado (setas movem, espaço marca no centro e Enter fecha). Alterações não salvas geram aviso ao sair ou trocar de edição.
+
+Salvar um desenho não altera o modo de entrega automaticamente. Após configurar ao menos uma área ativa, o proprietário escolhe Ativar entrega por áreas. Bairros e raio/faixas/cálculo por km permanecem disponíveis e preservados. O modo desenhado usa exclusivamente áreas ativas não removidas; sem áreas ativas a entrega fica indisponível, sem fallback acidental. Sobreposições usam o menor frete ativo, com desempate estável pelo ID. Endereços na borda são incluídos.
+
+Geometria é validada no servidor: 3–64 vértices, coordenadas finitas, contorno simples sem auto-interseção/retorno sobre uma aresta, área mínima aproximada de 25 m² e pontos a até 100 km da loja; até 50 áreas não removidas por loja. Linhas e inclusão são calculadas na mesma projeção Web Mercator usada no mapa. Checkout usa coordenadas assinadas da consulta do endereço, revalida cobertura/tarifa e exige reconferência quando o preço muda. Coordenadas/frete enviados diretamente pelo cliente não autorizam entrega. Pedidos anteriores mantêm nome de região e frete congelados.
+
+Teste por CEP/número usa ViaCEP e o geocodificador já configurado na plataforma e compara com áreas salvas, mesmo antes de ativar o modo. CEP genérico sem rua requer um CEP específico neste teste. Não grava pedidos nem altera área, modo ou saldo; endereço não entra na auditoria. Frontend elimina o resultado ao mudar endereço e ignora resposta atrasada.
+
+Mapa nativo em JavaScript/SVG, sem dependência nova. Tiles OpenStreetMap somente da visualização atual, cache normal do navegador, atribuição visível e referer de origem. Provedor configurável por `DELIVERY_MAP_TILES_URL`; sem download em lote/offline ou proxy anônimo, conforme [política de tiles OSM](https://operations.osmfoundation.org/policies/tiles/). Isso não substitui o geocodificador existente por Nominatim. Nos testes automatizados de navegador, tiles/retorno visual de endereço foram simulados localmente para evitar tráfego automatizado no provedor; consultas do servidor verificadas com HTTP fake.
+
+Migração `2026_11_09_211445_create_delivery_areas_table` não altera regiões/saldos existentes e bloqueia reversão após áreas cadastradas. Publicar com migrações; configuração inicial permanece inalterada. Escritas usam proprietário/empresa/loja atuais, bloqueios, revisão otimista e auditoria atômica; criação idempotente. Validação: 49 testes de regressão (áreas, fretes, PDV, checkout, pagamentos e catálogo), mais reconferência dos testes de áreas após cobrir pontos colineares válidos e borda inclinada. Chrome local: desenho de cinco pontos, ajuste, salvamento, ativação, edição de frete, acesso pelas configurações, teste de endereço, limpeza de resultado antigo, teclado e cancelamento; celular 390 px sem transbordamento e sem erros JavaScript. Financeiro da loja segue como próximo bloco; iFood permanece pausado.
 
 ## Compras e custos de insumos — 08/11/2026
 

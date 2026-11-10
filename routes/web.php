@@ -8,6 +8,7 @@ use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CourierController;
 use App\Http\Controllers\DeliveryAlertController;
+use App\Http\Controllers\DeliveryAreaController;
 use App\Http\Controllers\DeliveryExceptionController;
 use App\Http\Controllers\DeliveryRecordController;
 use App\Http\Controllers\DeliveryStatementController;
@@ -63,6 +64,10 @@ Route::post('/mesa/{token}', [DiningCallController::class, 'request'])->where('t
 Route::get('/media/stores/{id}/{kind}', [CatalogController::class, 'branding'])->whereIn('kind', ['logo', 'cover'])->name('stores.branding');
 Route::post('/webhooks/evolution/{id}', [WhatsappController::class, 'webhook'])->middleware('throttle:120,1,webhooks-evolution-id:');
 Route::middleware('auth')->group(function () {
+    Route::get('/stores/{id}/delivery-areas', [DeliveryAreaController::class, 'index'])->whereNumber('id')->name('delivery-areas.index');
+    Route::post('/stores/{id}/delivery-areas', [DeliveryAreaController::class, 'save'])->whereNumber('id')->middleware('throttle:30,1,delivery-area-save:')->name('delivery-areas.save');
+    Route::post('/stores/{id}/delivery-areas/test', [DeliveryAreaController::class, 'test'])->whereNumber('id')->middleware('throttle:10,1,delivery-area-test:')->name('delivery-areas.test');
+    Route::post('/stores/{id}/delivery-areas/{areaId}/remove', [DeliveryAreaController::class, 'remove'])->whereNumber(['id', 'areaId'])->name('delivery-areas.remove');
     Route::get('/inventory/suppliers', [InventorySupplierController::class, 'index'])->name('suppliers.index');
     Route::post('/inventory/suppliers', [InventorySupplierController::class, 'save'])->middleware('throttle:30,1,supplier-save:')->name('suppliers.create');
     Route::post('/inventory/suppliers/{id}', [InventorySupplierController::class, 'save'])->whereNumber('id')->name('suppliers.update');

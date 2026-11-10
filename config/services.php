@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'delivery_map' => ['tiles' => env('DELIVERY_MAP_TILES_URL', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png')],
     'geoapify' => [
         'key' => env('GEOAPIFY_API_KEY'),
         'daily_limit' => (int) env('GEOCODING_DAILY_LIMIT', 2800),

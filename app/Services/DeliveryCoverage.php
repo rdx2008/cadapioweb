@@ -110,6 +110,9 @@ class DeliveryCoverage
 
     private function zone(object $store, array $place): ?object
     {
+        if ($this->mode($store) === 'polygon') {
+            return $this->polygonZone($store, $place);
+        }
         if ($this->mode($store) === 'neighborhood') {
             if (empty($place['neighborhood']) || empty($place['city']) || empty($place['state_code'])) {
                 return null;
@@ -139,6 +142,20 @@ class DeliveryCoverage
 
         return DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)
             ->where('radius_meters', '>=', $meters)->orderBy('radius_meters')->orderBy('id')->first();
+    }
+
+    public function polygonZone(object $store, array $place): ?object
+    {
+        if (! isset($place['latitude'], $place['longitude']) || ! is_numeric($place['latitude']) || ! is_numeric($place['longitude'])) {
+            return null;
+        }
+        foreach (DB::table('delivery_areas')->where('store_id', $store->id)->where('enabled', true)->whereNull('deleted_at')->orderBy('fee_cents')->orderBy('id')->get() as $area) {
+            if (app(DeliveryPolygon::class)->contains(json_decode($area->polygon, true), (float) $place['latitude'], (float) $place['longitude'])) {
+                return (object) ['name' => $area->name, 'fee_cents' => (int) $area->fee_cents];
+            }
+        }
+
+        return null;
     }
 
     private function normalize(string $address): string

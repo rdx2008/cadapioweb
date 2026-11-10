@@ -41,9 +41,9 @@ class MenuController extends Controller
         $zones = DB::table('delivery_zones')->where('store_id', $store->id)->where('enabled', true)->orderBy('name')->get();
 
         $deliveryMode = app(DeliveryCoverage::class)->mode($store);
-        $hasDelivery = $deliveryMode === 'radius'
+        $hasDelivery = $deliveryMode === 'polygon' ? DB::table('delivery_areas')->where('store_id', $store->id)->where('enabled', true)->whereNull('deleted_at')->exists() : ($deliveryMode === 'radius'
             ? ($store->delivery_pricing !== 'bands' || $zones->contains(fn ($zone) => $zone->radius_meters !== null))
-            : $zones->contains(fn ($zone) => $zone->radius_meters === null && $zone->city && $zone->state_code);
+            : $zones->contains(fn ($zone) => $zone->radius_meters === null && $zone->city && $zone->state_code));
 
         return view('menu', $catalog + ['store' => $store, 'zones' => $zones, 'hasDelivery' => $hasDelivery, 'isOpen' => $availability->isOpen($store)]);
     }
