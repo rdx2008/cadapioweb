@@ -1,0 +1,4 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QR Code · {{ $tab->table_name }}</title><link rel="stylesheet" href="/dining-qr.css?v=1"></head>
+<body><nav><button type="button" data-dining-print>Imprimir cartão</button><p>Use este cartão somente neste atendimento. Ao encerrar a comanda ou substituir o link, imprima um novo cartão.</p></nav>
+<main class="qr-card"><p>{{ $store->name }}</p><h1>{{ $tab->table_name }}</h1><p>Comanda #{{ $tab->id }}</p><img src="{{ $qr }}" width="400" height="400" alt="QR Code para chamar atendimento nesta comanda"><h2>Precisou? É só chamar.</h2><p>Aponte a câmera do celular para chamar atendimento ou solicitar a conta.</p><small>Válido somente neste atendimento.</small></main><script src="/dining-guest.js?v=2" defer></script></body></html>

@@ -1,0 +1,18 @@
+@extends('layout')
+@section('page-label','Gerenciar empresa')
+@section('content')
+<div class="heading"><div class="eyebrow">Administração de empresas</div><h1>{{ $company->name }}</h1><a href="/admin#empresas">← Voltar às empresas</a></div>
+<div class="actions"><span class="badge">{{ $company->deleted_at?'Excluída':($company->status==='active'?'Ativa':'Suspensa') }}</span><a class="button secondary" href="{{ url('/admin/bi').'?'.http_build_query(['tenant_id'=>$company->id]) }}">Ver BI desta empresa</a></div>
+<div class="stats">@foreach(['stores'=>'Lojas','orders'=>'Pedidos no histórico','users'=>'Usuários vinculados'] as $key=>$label)<div class="card"><span class="muted">{{ $label }}</span><h2>{{ $counts[$key] }}</h2></div>@endforeach</div>
+@if(!$company->deleted_at)
+<section class="card"><h2>Dados da empresa</h2><form action="{{ route('tenants.update',$company->id) }}" method="post" class="fields">@csrf<label>Nome da empresa<input name="name" value="{{ old('name',$company->name) }}" maxlength="100" required></label><label>Identificador<input name="slug" value="{{ old('slug',$company->slug) }}" maxlength="80" required><small>Identificador interno. Não altera os links das lojas.</small></label>
+@if($owner)<label>Nome do proprietário<input name="owner_name" value="{{ old('owner_name',$owner->name) }}" maxlength="120" required></label><label>E-mail de acesso<input type="email" name="email" value="{{ old('email',$owner->email) }}" maxlength="190" required></label>@endif
+<div class="actions"><button>Salvar empresa</button></div></form></section>
+<section class="card"><h2>{{ $company->status==='active'?'Suspender empresa':'Reativar empresa' }}</h2><p>A suspensão bloqueia o acesso dos usuários, novos pedidos no cardápio e novas ofertas de entrega. O histórico é preservado; entregas já aceitas podem ser finalizadas pelo motoboy.</p>
+@if($company->suspension_reason)<p><strong>Motivo registrado:</strong> {{ $company->suspension_reason }}</p>@endif
+<form action="{{ route('tenants.status',$company->id) }}" method="post" class="fields">@csrf<input type="hidden" name="status" value="{{ $company->status==='active'?'suspended':'active' }}">@if($company->status==='active')<label class="full">Motivo da suspensão<textarea name="reason" required maxlength="500"></textarea></label>@endif<div><button class="secondary">{{ $company->status==='active'?'Suspender empresa':'Reativar empresa' }}</button></div></form></section>
+<section class="card"><h2>Excluir empresa</h2><p>A empresa será retirada da operação e poderá ser restaurada pelo superadmin. Pedidos, pagamentos e auditoria permanecem no histórico e no BI. Finalize ou cancele os pedidos e encerre as entregas em andamento antes de excluir.</p><details><summary>Excluir esta empresa</summary><form action="{{ route('tenants.delete',$company->id) }}" method="post" class="fields">@csrf<label>Digite {{ $company->slug }} para confirmar<input name="confirm_slug" required autocomplete="off"></label><label>Sua senha de superadmin<input name="current_password" type="password" required autocomplete="current-password"></label><div><button class="secondary">Confirmar exclusão da empresa</button></div></form></details></section>
+@else
+<section class="card"><h2>Empresa excluída da operação</h2><p>Excluída em {{ Illuminate\Support\Carbon::parse($company->deleted_at)->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }}. O histórico foi preservado. Ao restaurar, a empresa permanece suspensa até você reativá-la.</p><form action="{{ route('tenants.restore',$company->id) }}" method="post">@csrf<button>Restaurar empresa</button></form></section>
+@endif
+@endsection

@@ -1,0 +1,2 @@
+<div class="actions"><button type="button" class="outline" data-dining-sound aria-pressed="false">Ativar som das mesas</button><span data-dining-sound-status role="status">Som desligado. Ao ativar, você ouvirá um teste.</span></div>
+<p><small>O som avisa novos chamados de atendimento e conta nesta tela. Mantenha a página visível e o volume do aparelho ligado. Não funciona com o navegador fechado.</small></p>
