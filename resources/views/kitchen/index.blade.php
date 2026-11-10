@@ -1,10 +1,9 @@
-@extends('layout')
+@extends('operations.layout')
 @section('page-label','Cozinha')
 @section('content')
-<div class="heading"><h1>Fila da cozinha</h1><p class="muted">Pedidos aceitos, preparo e prontos para conferência. A fila prioriza o horário previsto de preparo e, nos pedidos imediatos, o aceite mais antigo.</p></div>
-<form method="get" action="{{ route('kitchen.index') }}" class="card fields">
-<label>Loja<select name="store_id"><option value="">Todas as lojas autorizadas</option>@foreach($stores as $store)<option value="{{ $store->id }}" @selected(($filters['store_id']??'')==$store->id)>{{ $store->name }}</option>@endforeach</select></label>
-<label>Etapa<select name="stage">@foreach(['accepted'=>'Aguardando preparo','preparing'=>'Em preparo','ready'=>'Prontos para conferência'] as $value=>$label)<option value="{{ $value }}" @selected($stage===$value)>{{ $label }}</option>@endforeach</select></label><button>Atualizar fila</button></form>
-<p data-staff-connection role="status">Atualização automática com a página ativa.</p>
-<div data-staff-feed data-url="{{ route('kitchen.live',request()->only(['store_id','stage','page'])) }}">@include('kitchen.orders')</div>
+<div class="ops-page-title"><div><h1>Cozinha em tempo real</h1><p>Cada pedido no lugar certo. Avance com um toque.</p></div><div class="ops-title-actions"><button class="secondary" type="button" data-ops-sound>Ativar som</button><a class="ops-button" href="{{ route('kitchen.index',array_filter(['store_id'=>$filters['store_id']??null,'view'=>$kanban?'list':'kanban'])) }}">{{ $kanban?'Ver em lista':'Ver kanban' }}</a></div></div>
+<form method="get" action="{{ route('kitchen.index') }}" class="ops-filters">
+<label>Loja<select name="store_id"><option value="">Todas as lojas autorizadas</option>@foreach($stores as $unit)<option value="{{ $unit->id }}" @selected(($filters['store_id']??'')==$unit->id)>{{ $unit->name }}</option>@endforeach</select></label>
+<input type="hidden" name="view" value="{{ $kanban?'kanban':'list' }}">@if(!$kanban)<label>Etapa<select name="stage">@foreach(['accepted'=>'Aguardando preparo','preparing'=>'Em preparo','ready'=>'Prontos para conferência'] as $value=>$label)<option value="{{ $value }}" @selected($stage===$value)>{{ $label }}</option>@endforeach</select></label>@endif<label>Modalidade<select name="mode"><option value="">Todas as modalidades</option>@foreach(['delivery'=>'Entrega','pickup'=>'Retirada','dine_in'=>'Salão'] as $key=>$label)<option value="{{ $key }}" @selected(($filters['mode']??'')===$key)>{{ $label }}</option>@endforeach</select></label><button>Atualizar fila</button></form>
+<div data-ops-root><p data-ops-message role="status">Atualização automática com a página ativa.</p><div data-ops-feed data-url="{{ route('kitchen.live',request()->query()) }}">@if($kanban)@include('operations.kitchen-board')@else @include('kitchen.orders')@endif</div></div>
 @endsection

@@ -17,13 +17,13 @@
                 ['Integrações','chat', [['/admin#evolution','chat','WhatsApp central'],['/admin/ifood','store','Integração iFood']]],
             ],
             'staff' => auth()->user()->staff_profile==='waiter'?[['/dining','store','Mesas e comandas']]:(auth()->user()->staff_profile==='operator' ? [
-                ['Operação','orders', [['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/dining','store','Mesas e comandas']]],
+                ['Operação','orders', [['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/expedition','truck','Entregas'],['/dining','store','Mesas e comandas']]],
                 ['/cash','orders','Caixa'],
             ] : [['/operation','orders','Minha operação'],['/kitchen','menu','Cozinha']]),
             'courier' => [['/courier','home','Meu painel'],['/courier#ofertas','truck','Ofertas de corrida'],['/courier#corridas','orders','Minhas corridas']],
             default => [
                 ['/dashboard','home','Visão geral'],
-                ['Operação','orders', [['/dashboard#pedidos','orders','Pedidos'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/dining','store','Mesas e comandas'],['/deliveries','truck','Entregas']]],
+                ['Operação','orders', [['/dashboard#pedidos','orders','Pedidos'],['/kitchen','menu','Cozinha'],['/pos','store','PDV'],['/dining','store','Mesas e comandas'],['/expedition','truck','Entregas']]],
                 ['Gestão','chart', [['/cash','orders','Caixa'],['/bi','chart','BI e crescimento'],['/inventory','menu','Estoque e insumos'],['/inventory/purchases','orders','Compras'],['/inventory/costs','chart','Custos e margens']]],
                 ['Minha empresa','store', [['/catalog','menu','Cardápio'],['/dashboard#lojas','store','Lojas'],['/team','users','Equipe e acessos']]],
                 ['Integrações','chat', [['/dashboard#whatsapp','chat','WhatsApp'],['/integrations/ifood','store','Integração iFood']]],

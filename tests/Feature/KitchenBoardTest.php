@@ -48,7 +48,7 @@ class KitchenBoardTest extends TestCase
         $id = $this->order($other, $foreign);
         DB::table('orders')->where('id', $id)->update(['status' => 'accepted']);
         $this->actingAs($this->owner($tenant));
-        $this->get('/kitchen')->assertOk()->assertSee('Item accepted')->assertDontSee('Item preparing')->assertDontSee('Secret Customer')->assertDontSee('11999999999')->assertDontSee('99999')->assertDontSee('456789');
+        $this->get('/kitchen')->assertOk()->assertSee('Item accepted')->assertSee('Item preparing')->assertSee('Item ready')->assertDontSee('Secret Customer')->assertDontSee('11999999999')->assertDontSee('99999')->assertDontSee('456789');
         $response = $this->get('/kitchen/live?stage=preparing')->assertOk()->assertHeader('Cache-Control', 'no-store, private');
         $html = $response->json('html');
         $this->assertStringContainsString('Item preparing', $html);

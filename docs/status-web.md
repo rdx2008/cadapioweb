@@ -2,7 +2,17 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 09/11/2026 após áreas de entrega desenhadas no mapa, branch `feat/platform-foundation`.
+Atualizado em 10/11/2026 após cozinha, PDV e expedição operacionais, branch `feat/platform-foundation`.
+
+## Cozinha, PDV e expedição — 10/11/2026
+
+Três telas em largura total com navegação própria PDV / Cozinha / Entregas, nome da loja, tela cheia e retorno ao painel. Cozinha abre em kanban com aguardando preparo, em produção e prontos, contadores, modalidade, canal, itens/opções e cronômetros existentes. Botões ou arraste avançam uma etapa, confirmada pelo servidor; pagamento online, horário de preparo, estoque e concorrência continuam protegidos. Agendamentos futuros ficam separados; cada coluna tem paginação própria. Visualização em lista preservada. Perfil cozinha mantém acesso restrito, sem endereço, telefone, preços ou nome completo do cliente.
+
+PDV mantém catálogo, personalização, carrinho, endereço, motoboy e revisão de pagamento; nome e forma de cobrança ficam na venda. Resumo lateral mostra produção e prontos de todos os canais locais da loja, quatro por etapa com contagem total e acesso aos demais. Atualização a cada cinco segundos com página ativa substitui somente o resumo; não reconstrói nem perde carrinho ou campos. Links abrem em outra aba para acompanhar o pedido sem sair da venda. Atendimento do garçom preservado.
+
+Operação > Entregas abre expedição por loja: aguardando motoboy/coleta, em rota/retorno e entregues no dia local da loja. Inclui busca, ocorrências abertas, valores pendentes/troco, motoboys freelancers e mapa com posições recentes/precisas. Histórico e acertos permanecem na tela anterior. Seleção de motoboy solicita oferta e exige revisão atual do pedido; disponibilidade/check-in, localização, corrida ocupada, acesso e pagamento são revalidados no servidor. Solicitação não equivale a aceite/coleta e não conclui o pedido. Posições do mapa expiram, sem reapresentar coordenadas antigas como atuais. Sem dependência ou migração nova; não altera iFood.
+
+Escopo de empresa/loja e permissões rechecados em consultas e ações. Feed pausa durante conferência de despacho, seleção ou arraste e não faz movimentação otimista de status. Sem criar recebimentos, baixas, corridas ou comprovantes fictícios pela apresentação. Verificação: testes de cozinha e novo espaço operacional, regressão de produção/estoque/PDV/equipe/entregas/salão, compilação Blade e sintaxe JavaScript; Chrome local confirmou avanço aguardando → produção → pronto, preservação de venda aberta, checkout e celular 390 px. Tiles do mapa simulados localmente no navegador. Financeiro da loja segue como próximo bloco; iFood permanece pausado.
 
 ## Áreas de entrega desenhadas no mapa — 09/11/2026
 

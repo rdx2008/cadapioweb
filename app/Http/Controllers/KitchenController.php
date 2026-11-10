@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\OperationsBoard;
 use App\Services\TenantState;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Illuminate\View\View;
 
 class KitchenController extends Controller
 {
@@ -32,33 +33,39 @@ class KitchenController extends Controller
     private function data(Request $request): array
     {
         $user = $this->member($request);
-        $filters = $request->validate(['store_id' => 'nullable|integer', 'stage' => 'nullable|in:accepted,preparing,ready', 'page' => 'nullable|integer|min:1|max:100000']);
+        $filters = $request->validate(['store_id' => 'nullable|integer', 'stage' => 'nullable|in:accepted,preparing,ready', 'view' => 'nullable|in:kanban,list', 'mode' => 'nullable|in:delivery,pickup,dine_in', 'accepted_page' => 'nullable|integer|min:1|max:100000', 'preparing_page' => 'nullable|integer|min:1|max:100000', 'ready_page' => 'nullable|integer|min:1|max:100000', 'scheduled_page' => 'nullable|integer|min:1|max:100000', 'page' => 'nullable|integer|min:1|max:100000']);
         $stores = $this->stores($user)->orderBy('name')->get(['id', 'name']);
         if (! empty($filters['store_id'])) {
             abort_unless($stores->contains('id', (int) $filters['store_id']), 404);
         }
         $query = DB::table('orders')->where('tenant_id', $user->tenant_id)->whereIn('store_id', $stores->pluck('id'))->when(! empty($filters['store_id']), fn ($q) => $q->where('store_id', $filters['store_id']));
+        $query->when(! empty($filters['mode']), fn ($q) => $q->where('mode', $filters['mode']));
         $counts = (clone $query)->whereIn('status', ['accepted', 'preparing', 'ready'])->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status');
         $stage = $filters['stage'] ?? 'accepted';
         $orders = $query->where('status', $stage)->orderByRaw('COALESCE(prepare_at, accepted_at, created_at) ASC')->orderBy('id')->paginate(30)->withQueryString();
         $items = DB::table('order_items')->whereIn('order_id', $orders->pluck('id'))->select('id', 'order_id', 'quantity', 'name', 'options')->orderBy('id')->get()->groupBy('order_id');
 
-        return compact('user', 'filters', 'stores', 'counts', 'stage', 'orders', 'items');
+        $kanban = ($filters['view'] ?? (isset($filters['stage']) ? 'list' : 'kanban')) === 'kanban';
+        $store = isset($filters['store_id']) ? $stores->firstWhere('id', (int) $filters['store_id']) : ($stores->count() === 1 ? $stores->first() : null);
+        $board = $kanban ? app(OperationsBoard::class)->production($user, isset($filters['store_id']) ? (int) $filters['store_id'] : null, $filters) : null;
+
+        return compact('user', 'filters', 'stores', 'counts', 'stage', 'orders', 'items', 'kanban', 'board', 'store');
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
-        return view('kitchen.index', $this->data($request));
+        return response()->view('kitchen.index', $this->data($request))->header('Cache-Control', 'private, no-store');
     }
 
     public function live(Request $request): JsonResponse
     {
-        $html = view('kitchen.orders', $this->data($request))->render();
+        $data = $this->data($request);
+        $html = view($data['kanban'] ? 'operations.kitchen-board' : 'kitchen.orders', $data)->render();
 
         return response()->json(['html' => $html, 'signature' => hash('sha256', $html)])->header('Cache-Control', 'no-store');
     }
 
-    public function status(Request $request, int $id): RedirectResponse
+    public function status(Request $request, int $id): RedirectResponse|JsonResponse
     {
         $request->validate(['status' => 'required|in:preparing,ready']);
 
@@ -66,7 +73,9 @@ class KitchenController extends Controller
             $user = $this->member($request, true);
             DB::table('orders')->where('tenant_id', $user->tenant_id)->whereIn('store_id', $this->stores($user)->select('id'))->where('id', $id)->firstOrFail();
 
-            return app(PlatformController::class)->orderStatus($request, $id);
+            $response = app(PlatformController::class)->orderStatus($request, $id);
+
+            return $request->expectsJson() ? response()->json(['message' => 'Pedido atualizado na cozinha.']) : $response;
         });
     }
 }

@@ -21,6 +21,7 @@ use App\Http\Controllers\InventoryPurchaseController;
 use App\Http\Controllers\InventorySupplierController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\OperationsBoardController;
 use App\Http\Controllers\OrderBoardController;
 use App\Http\Controllers\OrderPrintController;
 use App\Http\Controllers\PasswordRecoveryController;
@@ -119,6 +120,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/cash/{id}/refunds', [CashRegisterController::class, 'refund'])->whereNumber('id')->middleware('throttle:10,1,cash-refunds:')->name('cash.refund');
     Route::post('/cash/{id}/close', [CashRegisterController::class, 'close'])->whereNumber('id')->middleware('throttle:10,1,cash-close:')->name('cash.close');
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
+    Route::get('/pos/{id}/operations', [OperationsBoardController::class, 'summary'])->whereNumber('id')->middleware('throttle:60,1,pos-operations:')->name('pos.operations');
+    Route::get('/expedition', [OperationsBoardController::class, 'index'])->name('expedition.index');
+    Route::get('/expedition/live', [OperationsBoardController::class, 'live'])->middleware('throttle:60,1,expedition-live:')->name('expedition.live');
+    Route::post('/expedition/orders/{id}/dispatch', [OperationsBoardController::class, 'dispatch'])->whereNumber('id')->middleware('throttle:20,1,expedition-dispatch:')->name('expedition.dispatch');
     Route::get('/pos/orders/{orderId}', [PosController::class, 'result'])->whereNumber('orderId')->name('pos.result');
     Route::post('/pos/orders/{orderId}/dispatch', [PosController::class, 'dispatch'])->whereNumber('orderId')->middleware('throttle:10,1,pos-orders-orderId-dispatch:')->name('pos.dispatch');
     Route::get('/pos/{id}', [PosController::class, 'sale'])->whereNumber('id')->name('pos.sale');
