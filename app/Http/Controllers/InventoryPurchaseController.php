@@ -65,7 +65,9 @@ class InventoryPurchaseController extends Controller
         $lines = DB::table('inventory_purchase_lines')->where('purchase_id', $id)->orderBy('id')->get();
         $events = DB::table('inventory_purchase_events')->join('users', 'users.id', '=', 'inventory_purchase_events.user_id')->where('purchase_id', $id)->select('inventory_purchase_events.*', 'users.name as operator_name')->orderByDesc('inventory_purchase_events.id')->paginate(10)->withQueryString();
 
-        return response()->view('inventory.purchase-show', compact('purchase', 'store', 'lines', 'events') + ['reviewHash' => $service->reviewHash($purchase, $lines)])->header('Cache-Control', 'private, no-store');
+        $financialAccount = DB::table('financial_accounts')->where('tenant_id', $user->tenant_id)->where('purchase_id', $id)->first();
+
+        return response()->view('inventory.purchase-show', compact('purchase', 'store', 'lines', 'events', 'financialAccount') + ['reviewHash' => $service->reviewHash($purchase, $lines)])->header('Cache-Control', 'private, no-store');
     }
 
     public function receive(Request $request, int $id, Inventory $inventory, InventoryPurchases $purchases): RedirectResponse

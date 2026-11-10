@@ -2,7 +2,23 @@
 
 QR Code por comanda (06/11/2026): Link do cliente permite visualizar e imprimir cartão de atendimento. Gerado localmente com endroid/qr-code 6.0.9 (PHP 8.4), sem serviço externo. Cartão vale apenas durante a comanda; encerramento, união ou troca de link invalidam o anterior. Impressão protegida pelas permissões da loja e revisão do link. Validado com 10 testes/220 asserções e compilação Blade.
 
-Atualizado em 10/11/2026 após cozinha, PDV e expedição operacionais, branch `feat/platform-foundation`.
+Atualizado em 10/11/2026 após financeiro da loja, branch `feat/platform-foundation`.
+
+## Financeiro da loja — 10/11/2026
+
+Gestão > Financeiro reúne contas a pagar e receber por loja, categoria, pessoa/empresa, descrição, vencimento e observações. Cadastro manual não movimenta caixa ou estoque. Saldos de todas as contas abertas da loja e pagamentos vencidos ficam separados da lista por vencimento/período. Filtros por tipo, situação e categoria atuam na lista; movimentações do período usam datas efetivas de baixas/estornos e todas as contas da loja. Paginação de contas, movimentos, baixas e eventos.
+
+Baixa parcial ou integral exige conferência explícita de valor, data, forma e origem do dinheiro. Não aceita valor acima do saldo, zero ou data futura. Valores em centavos, sem cálculo monetário em ponto flutuante. Cada ação tem chave de idempotência e revisão; formulário antigo não sobrescreve edição/baixa/estorno posterior. Escritas usam proprietário ativo, empresa/loja atuais, bloqueios e auditoria na mesma transação. Operadores, cozinha, garçons, outras empresas e acessos suspensos não administram o financeiro.
+
+Gaveta do caixa aceita somente dinheiro, no turno atualmente aberto e na data local de hoje. Pagamento gera uma saída/sangria; recebimento gera uma entrada/suprimento, com referência à conta e vínculo ao movimento. Saldo físico insuficiente, fechamento ou troca de turno bloqueiam toda a transação. Pix, cartão, transferência e dinheiro fora da gaveta ficam em Fora do caixa físico, sem lançamento duplicado no turno. Não altera vendas/recebimentos de PDV anteriores nem confirma pagamentos online.
+
+Estorno integral de uma baixa preserva lançamento, responsável, motivo e data originais e reabre seu valor no saldo. O relatório registra o efeito inverso na data do estorno, inclusive quando em outro período. Movimento de gaveta é invertido no turno aberto atual, sem reescrever fechamento antigo; exige conferência do dinheiro. Não executa transferência, estorno bancário ou devolução em provedor. Conta só pode ser cancelada sem baixas válidas, com motivo e histórico preservado. Valor, tipo e contraparte ficam congelados após qualquer baixa, mesmo estornada, ou quando a conta vem de compra; vencimento, categoria, descrição e observações podem ser reorganizados enquanto aberta.
+
+Compra recebida oferece Gerar conta a pagar, após confirmação de que o compromisso ainda deve ser registrado. Total e fornecedor vêm do snapshot da compra; uma conta por compra, sem criar dívida automática para histórico já pago. Compra em rascunho/cancelada, versão antiga ou duplicação são recusadas. Receber insumos continua independente do pagamento; estoque/custos não são movimentados pela baixa financeira. Link recíproco entre compra e conta.
+
+Relatório de entradas/saídas líquidas destas contas, sem somar vendas do PDV e movimentações de caixa novamente. Não representa saldo bancário, lucro/DRE ou conciliação automática. Sem novas dependências/modelos; migração `2026_11_10_153851_create_financial_accounts` cria contas, baixas e eventos, preserva dados existentes e bloqueia reversão com contas cadastradas. Publicação exige rodar as migrações habituais. Próximas evoluções financeiras: recorrência/parcelamento, conciliação bancária/provedores e relatórios consolidados; CRM/RFV segue como próximo bloco de reaproveitamento. iFood permanece pausado.
+
+Validação: 33 testes distintos e 452 asserções entre financeiro, compras, caixa e checkout do PDV, incluindo idempotência, centavos, saldo insuficiente/rollback, estorno em turno posterior, datas/períodos, proteção de dados históricos e isolamento de acesso. Chrome local: cadastro, baixa parcial por Pix fora da gaveta, saldo remanescente, estorno, relatório e celular de 390 px sem transbordamento e sem erros JavaScript. Compilação Blade e Pint conferidos. Implementação local, sem publicação no servidor.
 
 ## Cozinha, PDV e expedição — 10/11/2026
 

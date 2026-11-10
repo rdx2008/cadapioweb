@@ -31,6 +31,7 @@ use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductRecipeController;
 use App\Http\Controllers\StaffOperationController;
 use App\Http\Controllers\StoreAddressController;
+use App\Http\Controllers\StoreFinanceController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TenantAdminController;
 use App\Http\Controllers\WhatsappController;
@@ -171,6 +172,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/finance', [StoreFinanceController::class, 'index'])->name('finance.index');
+        Route::get('/finance/{id}', [StoreFinanceController::class, 'show'])->whereNumber('id')->name('finance.show');
+        Route::post('/finance', [StoreFinanceController::class, 'save'])->name('finance.create');
+        Route::post('/finance/{id}', [StoreFinanceController::class, 'save'])->whereNumber('id')->name('finance.save');
+        Route::post('/finance/{id}/settle', [StoreFinanceController::class, 'settle'])->whereNumber('id')->name('finance.settle');
+        Route::post('/finance/{id}/settlements/{settlementId}/reverse', [StoreFinanceController::class, 'reverse'])->whereNumber(['id', 'settlementId'])->name('finance.reverse');
+        Route::post('/finance/{id}/cancel', [StoreFinanceController::class, 'cancel'])->whereNumber('id')->name('finance.cancel');
+        Route::post('/inventory/purchases/{id}/finance', [StoreFinanceController::class, 'purchase'])->whereNumber('id')->name('finance.purchase');
         Route::post('/deliveries/{id}/exceptions/{action}', [DeliveryExceptionController::class, 'act'])->whereNumber('id')->whereIn('action', ['release', 'receive', 'retry'])->name('deliveries.exceptions');
         Route::post('/delivery-attempts/{attemptId}/settle', [DeliveryExceptionController::class, 'settle'])->whereNumber('attemptId')->name('delivery-attempts.settle');
         Route::get('/delivery-alerts/live', [DeliveryAlertController::class, 'live'])->middleware('throttle:60,1,delivery-alerts-live:')->name('delivery-alerts.live');
