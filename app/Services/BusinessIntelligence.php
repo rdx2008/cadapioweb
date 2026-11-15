@@ -28,7 +28,7 @@ class BusinessIntelligence
         return $result;
     }
 
-    private function customerExpression(): string
+    public function customerExpression(): string
     {
         $digits = 'orders.phone';
         foreach ([' ', '+', '(', ')', '-', '.', "\t", "\r", "\n", "\u{00A0}"] as $character) {

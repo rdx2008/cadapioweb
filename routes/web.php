@@ -7,6 +7,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CourierController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DeliveryAlertController;
 use App\Http\Controllers\DeliveryAreaController;
 use App\Http\Controllers\DeliveryExceptionController;
@@ -172,6 +173,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('/customers/{storeId}', [CustomerController::class, 'show'])->whereNumber('storeId')->name('customers.show');
         Route::get('/finance', [StoreFinanceController::class, 'index'])->name('finance.index');
         Route::get('/finance/{id}', [StoreFinanceController::class, 'show'])->whereNumber('id')->name('finance.show');
         Route::post('/finance', [StoreFinanceController::class, 'save'])->name('finance.create');
