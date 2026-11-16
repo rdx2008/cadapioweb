@@ -74,6 +74,8 @@ class CustomerController extends Controller
         $history = $orders->select('id', 'source', 'pos_channel', 'total_cents', 'created_at')
             ->orderByDesc('created_at')->orderByDesc('id')->paginate(20)->appends(['customer' => $token]);
 
-        return response()->view('customers.show', compact('store', 'latest', 'totals', 'history'))->header('Cache-Control', 'private, no-store');
+        $referralsEnabled = DB::table('store_referrals')->where('store_id', $store->id)->where('enabled', true)->exists();
+
+        return response()->view('customers.show', compact('store', 'latest', 'totals', 'history', 'referralsEnabled'))->header('Cache-Control', 'private, no-store');
     }
 }

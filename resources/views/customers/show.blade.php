@@ -9,6 +9,13 @@
     <div class="heading">
         <h1>{{ $latest->customer_name ?: 'Cliente' }}</h1>
         <p>{{ $latest->phone }} · {{ $store->name }}</p>
+        @if($referralsEnabled)
+            <form method="post" action="{{ route('referrals.invite', $latest->id) }}">
+                @csrf
+                <button>Criar ou consultar link de indicação</button>
+            </form>
+        @endif
+        <a href="{{ route('referrals.index', ['store_id' => $store->id]) }}">Configurar indicações</a>
     </div>
     <div class="grid">
         <section class="card"><small>Compras</small><h2>{{ $totals->visits }}</h2></section>

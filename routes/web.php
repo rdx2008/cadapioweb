@@ -30,6 +30,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductRecipeController;
+use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\StaffOperationController;
 use App\Http\Controllers\StoreAddressController;
 use App\Http\Controllers\StoreFinanceController;
@@ -173,6 +174,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/referrals', [ReferralController::class, 'index'])->name('referrals.index');
+        Route::post('/referrals/stores/{storeId}', [ReferralController::class, 'configure'])->whereNumber('storeId')->name('referrals.configure');
+        Route::post('/referrals/orders/{orderId}', [ReferralController::class, 'invite'])->whereNumber('orderId')->name('referrals.invite');
+        Route::post('/referrals/{id}/deliver', [ReferralController::class, 'deliver'])->whereNumber('id')->name('referrals.deliver');
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{storeId}', [CustomerController::class, 'show'])->whereNumber('storeId')->name('customers.show');
         Route::get('/finance', [StoreFinanceController::class, 'index'])->name('finance.index');

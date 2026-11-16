@@ -8,6 +8,7 @@ use App\Services\DeliveryCoverage;
 use App\Services\MenuCatalog;
 use App\Services\OnlinePayment;
 use App\Services\PostcodeLookup;
+use App\Services\Referrals;
 use App\Services\StoreAvailability;
 use App\Services\TenantState;
 use App\Support\MoneyInput;
@@ -45,7 +46,13 @@ class MenuController extends Controller
             ? ($store->delivery_pricing !== 'bands' || $zones->contains(fn ($zone) => $zone->radius_meters !== null))
             : $zones->contains(fn ($zone) => $zone->radius_meters === null && $zone->city && $zone->state_code));
 
-        return view('menu', $catalog + ['store' => $store, 'zones' => $zones, 'hasDelivery' => $hasDelivery, 'isOpen' => $availability->isOpen($store)]);
+        $referralsEnabled = DB::table('store_referrals')->where('store_id', $store->id)->where('enabled', true)->exists();
+        $referralCode = $request->query('indicacao');
+        if (! is_string($referralCode) || ! preg_match('/^[a-z0-9]{24}$/D', $referralCode)) {
+            $referralCode = '';
+        }
+
+        return view('menu', $catalog + ['store' => $store, 'zones' => $zones, 'hasDelivery' => $hasDelivery, 'isOpen' => $availability->isOpen($store), 'referralsEnabled' => $referralsEnabled, 'referralCode' => $referralCode]);
     }
 
     public function review(Request $request, string $slug, CheckoutQuote $calculator): RedirectResponse
@@ -86,6 +93,7 @@ class MenuController extends Controller
             'choices' => 'nullable|array|max:50', 'choices.*' => 'array|max:20', 'choices.*.*' => 'array|max:99', 'choices.*.*.*' => 'integer|min:1',
             'variants' => 'nullable|array|max:500', 'variants.*' => 'nullable|integer|min:1',
             'idempotency_key' => 'required|uuid',
+            'referral_code' => 'nullable|string|alpha_num:ascii|size:24',
         ]);
         $existing = DB::table('orders')->where('store_id', $store->id)->where('idempotency_key', $data['idempotency_key'])->first();
         if ($existing) {
@@ -189,6 +197,7 @@ class MenuController extends Controller
                     DB::table('order_items')->insert($item + ['order_id' => $id]);
                 }
                 app(OnlinePayment::class)->reserve(DB::table('orders')->where('id', $id)->firstOrFail());
+                app(Referrals::class)->record($current, $id, isset($draft['data']['referral_code']) ? strtolower($draft['data']['referral_code']) : null);
 
                 return $public;
             }, 3);

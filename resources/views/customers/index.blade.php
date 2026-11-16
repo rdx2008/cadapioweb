@@ -8,6 +8,9 @@
     <div class="heading">
         <h1>Clientes e recorrência</h1>
         <p>Veja quem voltou a comprar, quando foi o último pedido e quanto cada cliente gastou na loja.</p>
+        @if($store)
+            <a href="{{ route('referrals.index', ['store_id' => $store->id]) }}">Indicações e recompensas →</a>
+        @endif
     </div>
     @if($store)
         <div class="grid">
