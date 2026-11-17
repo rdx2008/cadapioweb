@@ -1,4 +1,4 @@
-@php($locked=$account&&($account->purchase_id||($account->has_settlements??false)))
+@php($locked=$account&&($account->purchase_id||$account->installment_group||($account->has_settlements??false)))
 @php($accountValue=fn($name,$fallback=null)=>($locked&&in_array($name,['direction','counterparty','amount']))?$fallback:(old('form_context')==='account'?old($name,$fallback):$fallback))
 <input type="hidden" name="form_context" value="account">
 @if($locked)<input type="hidden" name="direction" value="{{ $account->direction }}">@endif

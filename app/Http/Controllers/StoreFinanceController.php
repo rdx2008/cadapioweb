@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -57,8 +58,32 @@ class StoreFinanceController extends Controller
         $events = DB::table('financial_events')->join('users', 'users.id', '=', 'financial_events.user_id')->where('account_id', $id)->select('financial_events.*', 'users.name as operator_name')->orderByDesc('financial_events.id')->paginate(15, ['*'], 'event_page')->withQueryString();
         $cashSession = $cash->current($store->id);
         $today = Carbon::now($store->timezone)->toDateString();
+        $installments = $account->installment_group ? DB::table('financial_accounts')->where('tenant_id', $user->tenant_id)->where('store_id', $store->id)->where('installment_group', $account->installment_group)->orderBy('installment_number')->get() : collect();
 
-        return response()->view('finance.show', compact('account', 'store', 'settlements', 'events', 'cashSession', 'today'))->header('Cache-Control', 'private, no-store');
+        return response()->view('finance.show', compact('account', 'store', 'settlements', 'events', 'cashSession', 'today', 'installments'))->header('Cache-Control', 'private, no-store');
+    }
+
+    public function previewInstallments(Request $request, Inventory $access, StoreFinance $finance): Response
+    {
+        $user = $access->member($request->user());
+        $data = $request->validate(['store_id' => 'required|integer|min:1', 'direction' => 'required|in:payable,receivable', 'description' => 'required|string|max:160', 'counterparty' => 'required|string|max:120', 'category' => ['required', Rule::in(array_keys(StoreFinance::CATEGORIES))], 'due_on' => 'required|date_format:Y-m-d|after_or_equal:1970-01-01|before_or_equal:2100-12-31', 'amount' => 'required|string|max:16', 'notes' => 'nullable|string|max:500', 'installments' => 'required|integer|min:2|max:36']);
+        $store = DB::table('stores')->where('tenant_id', $user->tenant_id)->where('id', $data['store_id'])->firstOrFail();
+        $rows = $finance->installmentSchedule($data);
+        $key = (string) Str::uuid();
+        $data['request_key'] = $key;
+        $request->session()->put('finance_installments', ['user_id' => $user->id, 'data' => $data]);
+
+        return response()->view('finance.installments', compact('data', 'store', 'rows', 'key'))->header('Cache-Control', 'private, no-store');
+    }
+
+    public function createInstallments(Request $request): RedirectResponse
+    {
+        $validated = $request->validate(['request_key' => 'required|uuid', 'confirmed' => 'accepted']);
+        $preview = $request->session()->get('finance_installments');
+        abort_unless($preview && $preview['user_id'] === $request->user()->id && hash_equals($preview['data']['request_key'], $validated['request_key']), 409, 'A prévia mudou ou expirou. Gere uma nova prévia.');
+        $id = $this->run($request, fn ($user, $finance) => $finance->installments($user, $preview['data']));
+
+        return redirect()->route('finance.show', $id)->with('success', 'Parcelas cadastradas. Registre cada pagamento ou recebimento quando realizado.');
     }
 
     private function common(): array

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Support\Audit;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class StoreFinance
 {
@@ -64,8 +65,8 @@ class StoreFinance
             $account = $this->account($user, $id);
             abort_unless($account->store_id === $store->id && $account->revision === (int) $data['revision'], 409, 'A conta mudou. Atualize antes de editar.');
             abort_unless($account->status === 'open', 409, 'Somente contas abertas podem ser editadas.');
-            if ($account->purchase_id || DB::table('financial_settlements')->where('account_id', $id)->exists()) {
-                abort_unless($amount === $account->amount_cents && $data['direction'] === $account->direction && trim($data['counterparty']) === $account->counterparty, 409, 'Conta de compra ou com baixas preserva valor, tipo e pessoa/empresa. Altere apenas os dados de organização.');
+            if ($account->purchase_id || $account->installment_group || DB::table('financial_settlements')->where('account_id', $id)->exists()) {
+                abort_unless($amount === $account->amount_cents && $data['direction'] === $account->direction && trim($data['counterparty']) === $account->counterparty, 409, 'Contas parceladas, de compra ou com baixas preservam valor, tipo e pessoa/empresa. Altere apenas os dados de organização.');
             }
             DB::table('financial_accounts')->where('id', $id)->update($fields + ['revision' => $account->revision + 1]);
         } else {
@@ -91,6 +92,48 @@ class StoreFinance
         $this->event($user, $id, 'purchase', $data, $hash);
 
         return $id;
+    }
+
+    public function installmentSchedule(array $data): array
+    {
+        $total = InventoryCosts::money($data['amount'], 'amount');
+        $count = (int) $data['installments'];
+        abort_unless($count >= 2 && $count <= 36 && $total >= $count, 422, 'Informe de 2 a 36 parcelas, com pelo menos um centavo por parcela.');
+        $first = Carbon::parse($data['due_on']);
+        $rows = [];
+        for ($i = 0; $i < $count; $i++) {
+            $due = $first->copy()->addMonthsNoOverflow($i)->toDateString();
+            abort_if($due > '2100-12-31', 422, 'O último vencimento deve ser até 31/12/2100.');
+            $rows[] = ['number' => $i + 1, 'due_on' => $due, 'amount_cents' => intdiv($total, $count) + ($i < $total % $count ? 1 : 0)];
+        }
+
+        return $rows;
+    }
+
+    public function installments(object $user, array $data): int
+    {
+        $store = $this->store($user, (int) $data['store_id']);
+        $hash = $this->hash($user, 'installments', $data, null);
+        if ($existing = $this->replay($user, $data, $hash)) {
+            return $existing;
+        }
+        $rows = $this->installmentSchedule($data);
+        $firstId = 0;
+        foreach ($rows as $row) {
+            $id = DB::table('financial_accounts')->insertGetId([
+                'tenant_id' => $user->tenant_id, 'store_id' => $store->id,
+                'direction' => $data['direction'], 'description' => trim($data['description']),
+                'counterparty' => trim($data['counterparty']), 'category' => $data['category'],
+                'notes' => $data['notes'] ?? null, 'due_on' => $row['due_on'], 'amount_cents' => $row['amount_cents'],
+                'installment_group' => $data['request_key'], 'installment_number' => $row['number'], 'installment_count' => count($rows),
+                'created_by' => $user->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $eventData = ['request_key' => $firstId ? (string) Str::uuid() : $data['request_key']];
+            $this->event($user, $id, 'installments', $eventData, $hash);
+            $firstId = $firstId ?: $id;
+        }
+
+        return $firstId;
     }
 
     private function revision(object $account, array $data): void
