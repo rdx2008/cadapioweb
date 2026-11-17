@@ -2,9 +2,12 @@
 
 use App\Http\Controllers\Api\V1\CourierAuthController;
 use App\Http\Controllers\Api\V1\CourierController;
+use App\Http\Controllers\KitchenPrinterController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
+    Route::post('/kitchen-printer/claim', [KitchenPrinterController::class, 'claim'])->middleware('throttle:120,1,kitchen-printer-claim:');
+    Route::post('/kitchen-printer/{id}/report', [KitchenPrinterController::class, 'report'])->whereUuid('id')->middleware('throttle:120,1,kitchen-printer-report:');
     Route::post('/courier/login', [CourierAuthController::class, 'login'])->middleware('throttle:6,1,api-courier-login:')->name('courier.login');
 
     Route::middleware(['auth:sanctum', 'access:courier'])->prefix('courier')->name('courier.')->group(function () {

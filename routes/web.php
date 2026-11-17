@@ -22,6 +22,7 @@ use App\Http\Controllers\InventoryCostController;
 use App\Http\Controllers\InventoryPurchaseController;
 use App\Http\Controllers\InventorySupplierController;
 use App\Http\Controllers\KitchenController;
+use App\Http\Controllers\KitchenPrinterController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OperationsBoardController;
 use App\Http\Controllers\OrderBoardController;
@@ -176,6 +177,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/kitchen/printer/{storeId}', [KitchenPrinterController::class, 'index'])->whereNumber('storeId')->name('kitchen.printer');
+        Route::post('/kitchen/printer/{storeId}', [KitchenPrinterController::class, 'configure'])->whereNumber('storeId')->name('kitchen.printer.configure');
         Route::get('/referrals', [ReferralController::class, 'index'])->name('referrals.index');
         Route::post('/referrals/stores/{storeId}', [ReferralController::class, 'configure'])->whereNumber('storeId')->name('referrals.configure');
         Route::post('/referrals/orders/{orderId}', [ReferralController::class, 'invite'])->whereNumber('orderId')->name('referrals.invite');

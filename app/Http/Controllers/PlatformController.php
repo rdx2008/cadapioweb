@@ -7,6 +7,7 @@ use App\Services\CashRegister;
 use App\Services\DashboardSummary;
 use App\Services\DispatchService;
 use App\Services\FareCalculator;
+use App\Services\KitchenPrintQueue;
 use App\Services\OnlinePayment;
 use App\Services\OrderInventory;
 use App\Services\OrderProduction;
@@ -158,9 +159,14 @@ class PlatformController extends Controller
             abort_if(DB::table('rides')->where('order_id', $id)->whereIn('status', ['assigned', 'collected', 'returning'])->exists(), 409, 'Trate a corrida atribuída antes de alterar o pedido.');
             if ($r->status === 'preparing') {
                 app(OrderInventory::class)->consume($o, auth()->id());
+                app(KitchenPrintQueue::class)->enqueue($o);
             }
             $production = app(OrderProduction::class)->transition($o, $r->status);
             DB::table('orders')->where('id', $id)->update($production + ['status' => $r->status, 'cancellation_reason' => $r->status === 'cancelled' ? $r->cancellation_reason : null, 'updated_at' => now()]);
+            if ($r->status === 'cancelled') {
+                DB::table('kitchen_print_jobs')->where('order_id', $id)->where('status', 'pending')
+                    ->update(['status' => 'cancelled', 'updated_at' => now()]);
+            }
             if ($r->status === 'cancelled' && app(OnlinePayment::class)->isOnline($o)) {
                 DB::table('payment_attempts')->where('order_id', $id)->update(['needs_review' => true, 'message' => 'Pedido cancelado. Confira e trate eventual pagamento/estorno diretamente no provedor.', 'updated_at' => now()]);
                 if ($o->payment_status === 'paid') {
