@@ -190,6 +190,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{storeId}', [CustomerController::class, 'show'])->whereNumber('storeId')->name('customers.show');
         Route::get('/finance', [StoreFinanceController::class, 'index'])->name('finance.index');
+        Route::get('/finance/export', [StoreFinanceController::class, 'export'])->name('finance.export');
         Route::post('/finance/installments/preview', [StoreFinanceController::class, 'previewInstallments'])->name('finance.installments.preview');
         Route::post('/finance/installments', [StoreFinanceController::class, 'createInstallments'])->name('finance.installments.create');
         Route::get('/finance/{id}', [StoreFinanceController::class, 'show'])->whereNumber('id')->name('finance.show');

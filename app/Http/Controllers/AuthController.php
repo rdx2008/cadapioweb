@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\LoginDestination;
 use App\Services\TenantState;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,7 +26,7 @@ class AuthController extends Controller
         }
         $r->session()->regenerate();
 
-        return redirect('/app');
+        return redirect(app(LoginDestination::class)->afterLogin($r));
     }
 
     public function logout(Request $r)
@@ -34,7 +35,7 @@ class AuthController extends Controller
         $r->session()->invalidate();
         $r->session()->regenerateToken();
 
-        return redirect('/login');
+        return redirect('/login')->withoutCookie(LoginDestination::COOKIE);
     }
 
     public function register(Request $r)

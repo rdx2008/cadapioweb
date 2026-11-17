@@ -13,10 +13,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StoreFinanceController extends Controller
 {
     public function index(Request $request, Inventory $access): Response
+    {
+        return response()->view('finance.index', $this->report($request, $access))->header('Cache-Control', 'private, no-store');
+    }
+
+    private function report(Request $request, Inventory $access): array
     {
         $user = $access->member($request->user());
         $filters = $request->validate(['store_id' => 'nullable|integer|min:1', 'direction' => 'nullable|in:payable,receivable', 'status' => 'nullable|in:open,settled,cancelled,overdue', 'category' => ['nullable', Rule::in(array_keys(StoreFinance::CATEGORIES))], 'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'page' => 'nullable|integer|min:1|max:100000', 'movement_page' => 'nullable|integer|min:1|max:100000']);
@@ -36,8 +42,9 @@ class StoreFinanceController extends Controller
             'receivable' => (int) (clone $open)->where('direction', 'receivable')->sum(DB::raw('amount_cents - settled_cents')),
             'overdue' => (int) (clone $open)->where('direction', 'payable')->where('due_on', '<', $today->toDateString())->sum(DB::raw('amount_cents - settled_cents')),
         ];
-        $accounts = $base->whereBetween('due_on', [$from, $to])->when(! empty($filters['direction']), fn ($q) => $q->where('direction', $filters['direction']))->when(! empty($filters['category']), fn ($q) => $q->where('category', $filters['category']))
-            ->when(! empty($filters['status']), fn ($q) => $filters['status'] === 'overdue' ? $q->where('status', 'open')->where('due_on', '<', $today->toDateString()) : $q->where('status', $filters['status']))->orderBy('due_on')->orderBy('id')->paginate(20)->withQueryString();
+        $accountsQuery = $base->whereBetween('due_on', [$from, $to])->when(! empty($filters['direction']), fn ($q) => $q->where('direction', $filters['direction']))->when(! empty($filters['category']), fn ($q) => $q->where('category', $filters['category']))
+            ->when(! empty($filters['status']), fn ($q) => $filters['status'] === 'overdue' ? $q->where('status', 'open')->where('due_on', '<', $today->toDateString()) : $q->where('status', $filters['status']))->orderBy('due_on')->orderBy('id');
+        $accounts = (clone $accountsQuery)->paginate(20)->withQueryString();
         $ledgerBase = DB::table('financial_settlements as s')->join('financial_accounts as a', 'a.id', '=', 's.account_id')->where('a.tenant_id', $user->tenant_id)->where('a.store_id', $store?->id ?? 0);
         $normal = (clone $ledgerBase)->whereBetween('s.settled_on', [$from, $to])->selectRaw('s.id, a.id AS account_id, a.description, a.direction, s.method, s.destination, s.settled_on AS movement_on, s.amount_cents AS amount_cents, 0 AS is_reversal');
         $reversed = (clone $ledgerBase)->whereNotNull('s.reversed_at')->whereBetween('s.reversed_on', [$from, $to])->selectRaw('s.id, a.id AS account_id, a.description, a.direction, s.method, s.destination, s.reversed_on AS movement_on, -s.amount_cents AS amount_cents, 1 AS is_reversal');
@@ -45,7 +52,25 @@ class StoreFinanceController extends Controller
         $realized = ['received' => (int) (clone $ledger)->where('direction', 'receivable')->sum('amount_cents'), 'paid' => (int) (clone $ledger)->where('direction', 'payable')->sum('amount_cents')];
         $movements = $ledger->orderByDesc('movement_on')->orderByDesc('id')->orderByDesc('is_reversal')->paginate(20, ['*'], 'movement_page')->withQueryString();
 
-        return response()->view('finance.index', compact('stores', 'store', 'accounts', 'balances', 'realized', 'movements', 'from', 'to', 'today'))->header('Cache-Control', 'private, no-store');
+        return compact('stores', 'store', 'accounts', 'accountsQuery', 'balances', 'realized', 'movements', 'from', 'to', 'today');
+    }
+
+    public function export(Request $request, Inventory $access): StreamedResponse
+    {
+        $data = $this->report($request, $access);
+        $accounts = $data['accountsQuery']->limit(10001)->get();
+        abort_if($accounts->count() > 10000, 422, 'A exportação permite até 10.000 contas. Reduza o período ou aplique mais filtros.');
+
+        return response()->streamDownload(function () use ($accounts, $data): void {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            $safe = fn (string $text): string => preg_match('/^[\s]*[=+@-]/u', $text) ? "'".$text : $text;
+            fputcsv($output, ['Loja', 'Conta', 'Descrição', 'Pessoa ou empresa', 'Categoria', 'Tipo', 'Vencimento', 'Situação', 'Parcela', 'Total R$', 'Baixado R$', 'Saldo ativo R$'], ';', '"', '');
+            foreach ($accounts as $account) {
+                fputcsv($output, [$safe($data['store']->name), $account->id, $safe($account->description), $safe($account->counterparty), StoreFinance::CATEGORIES[$account->category], $account->direction === 'payable' ? 'A pagar' : 'A receber', Carbon::parse($account->due_on)->format('d/m/Y'), ['open' => 'Em aberto', 'settled' => 'Quitada', 'cancelled' => 'Cancelada'][$account->status], $account->installment_group ? $account->installment_number.'/'.$account->installment_count : '', number_format($account->amount_cents / 100, 2, ',', ''), number_format($account->settled_cents / 100, 2, ',', ''), number_format(($account->status === 'cancelled' ? 0 : $account->amount_cents - $account->settled_cents) / 100, 2, ',', '')], ';', '"', '');
+            }
+            fclose($output);
+        }, 'contas-'.$data['from'].'-'.$data['to'].'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
     }
 
     public function show(Request $request, int $id, Inventory $access, CashRegister $cash): Response
