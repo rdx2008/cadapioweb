@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BusinessIntelligenceController;
 use App\Http\Controllers\CashRegisterController;
+use App\Http\Controllers\CatalogBatchController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
@@ -204,6 +205,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/bi', [BusinessIntelligenceController::class, 'index']);
         Route::get('/bi/export', [BusinessIntelligenceController::class, 'export']);
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
+        Route::get('/catalog/batch/{storeId}', [CatalogBatchController::class, 'index'])->whereNumber('storeId')->name('catalog.batch');
+        Route::post('/catalog/batch/{storeId}/review', [CatalogBatchController::class, 'review'])->whereNumber('storeId')->name('catalog.batch.review');
+        Route::post('/catalog/batch/{storeId}/publish', [CatalogBatchController::class, 'publish'])->whereNumber('storeId')->name('catalog.batch.publish');
+        Route::post('/catalog/batch/{storeId}/discard', [CatalogBatchController::class, 'discard'])->whereNumber('storeId')->name('catalog.batch.discard');
         Route::post('/stores/{id}/payments/{provider}', [PaymentController::class, 'configure'])->middleware('throttle:10,1,stores-id-payments-provider:')->name('payments.configure');
         Route::post('/orders/{id}/payment/check', [PaymentController::class, 'ownerCheck'])->middleware('throttle:10,1,orders-id-payment-check:')->name('payments.check');
         Route::post('/products/{id}/combo/settings', [ComboController::class, 'settings'])->name('products.combo.settings');
