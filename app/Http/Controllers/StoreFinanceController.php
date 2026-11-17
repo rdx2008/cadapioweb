@@ -25,10 +25,13 @@ class StoreFinanceController extends Controller
     private function report(Request $request, Inventory $access): array
     {
         $user = $access->member($request->user());
-        $filters = $request->validate(['store_id' => 'nullable|integer|min:1', 'direction' => 'nullable|in:payable,receivable', 'status' => 'nullable|in:open,settled,cancelled,overdue', 'category' => ['nullable', Rule::in(array_keys(StoreFinance::CATEGORIES))], 'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'page' => 'nullable|integer|min:1|max:100000', 'movement_page' => 'nullable|integer|min:1|max:100000']);
+        $filters = $request->validate(['store_id' => 'nullable|integer|min:1', 'recurrence_id' => 'nullable|integer|min:1', 'direction' => 'nullable|in:payable,receivable', 'status' => 'nullable|in:open,settled,cancelled,overdue', 'category' => ['nullable', Rule::in(array_keys(StoreFinance::CATEGORIES))], 'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d', 'page' => 'nullable|integer|min:1|max:100000', 'movement_page' => 'nullable|integer|min:1|max:100000']);
         $stores = DB::table('stores')->where('tenant_id', $user->tenant_id)->orderBy('name')->get();
         $store = isset($filters['store_id']) ? $stores->firstWhere('id', (int) $filters['store_id']) : $stores->first();
         abort_if(isset($filters['store_id']) && ! $store, 404);
+        if (isset($filters['recurrence_id'])) {
+            abort_unless(DB::table('financial_recurrences')->where('tenant_id', $user->tenant_id)->where('store_id', $store?->id ?? 0)->where('id', $filters['recurrence_id'])->exists(), 404);
+        }
         $today = Carbon::now($store?->timezone ?? 'America/Sao_Paulo');
         $from = $filters['from'] ?? $today->copy()->startOfMonth()->toDateString();
         $to = $filters['to'] ?? $today->copy()->endOfMonth()->toDateString();
@@ -42,7 +45,7 @@ class StoreFinanceController extends Controller
             'receivable' => (int) (clone $open)->where('direction', 'receivable')->sum(DB::raw('amount_cents - settled_cents')),
             'overdue' => (int) (clone $open)->where('direction', 'payable')->where('due_on', '<', $today->toDateString())->sum(DB::raw('amount_cents - settled_cents')),
         ];
-        $accountsQuery = $base->whereBetween('due_on', [$from, $to])->when(! empty($filters['direction']), fn ($q) => $q->where('direction', $filters['direction']))->when(! empty($filters['category']), fn ($q) => $q->where('category', $filters['category']))
+        $accountsQuery = $base->when(isset($filters['recurrence_id']), fn ($query) => $query->where('recurrence_id', $filters['recurrence_id']))->whereBetween('due_on', [$from, $to])->when(! empty($filters['direction']), fn ($q) => $q->where('direction', $filters['direction']))->when(! empty($filters['category']), fn ($q) => $q->where('category', $filters['category']))
             ->when(! empty($filters['status']), fn ($q) => $filters['status'] === 'overdue' ? $q->where('status', 'open')->where('due_on', '<', $today->toDateString()) : $q->where('status', $filters['status']))->orderBy('due_on')->orderBy('id');
         $accounts = (clone $accountsQuery)->paginate(20)->withQueryString();
         $ledgerBase = DB::table('financial_settlements as s')->join('financial_accounts as a', 'a.id', '=', 's.account_id')->where('a.tenant_id', $user->tenant_id)->where('a.store_id', $store?->id ?? 0);

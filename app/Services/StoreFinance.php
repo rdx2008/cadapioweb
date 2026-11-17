@@ -65,8 +65,8 @@ class StoreFinance
             $account = $this->account($user, $id);
             abort_unless($account->store_id === $store->id && $account->revision === (int) $data['revision'], 409, 'A conta mudou. Atualize antes de editar.');
             abort_unless($account->status === 'open', 409, 'Somente contas abertas podem ser editadas.');
-            if ($account->purchase_id || $account->installment_group || DB::table('financial_settlements')->where('account_id', $id)->exists()) {
-                abort_unless($amount === $account->amount_cents && $data['direction'] === $account->direction && trim($data['counterparty']) === $account->counterparty, 409, 'Contas parceladas, de compra ou com baixas preservam valor, tipo e pessoa/empresa. Altere apenas os dados de organização.');
+            if ($account->purchase_id || $account->installment_group || $account->recurrence_id || DB::table('financial_settlements')->where('account_id', $id)->exists()) {
+                abort_unless($amount === $account->amount_cents && $data['direction'] === $account->direction && trim($data['counterparty']) === $account->counterparty, 409, 'Contas programadas, parceladas, de compra ou com baixas preservam valor, tipo e pessoa/empresa. Altere apenas os dados de organização.');
             }
             DB::table('financial_accounts')->where('id', $id)->update($fields + ['revision' => $account->revision + 1]);
         } else {
