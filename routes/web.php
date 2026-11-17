@@ -7,6 +7,7 @@ use App\Http\Controllers\CatalogBatchController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogImportController;
 use App\Http\Controllers\ComboController;
+use App\Http\Controllers\CouponController;
 use App\Http\Controllers\CourierController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DeliveryAlertController;
@@ -177,6 +178,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/evolution', [PlatformController::class, 'evolution']);
     });
     Route::middleware('access:owner')->group(function () {
+        Route::get('/catalog/coupons/{storeId}', [CouponController::class, 'index'])->whereNumber('storeId')->name('coupons.index');
+        Route::post('/catalog/coupons/{storeId}', [CouponController::class, 'create'])->whereNumber('storeId')->name('coupons.create');
+        Route::post('/catalog/coupons/{storeId}/{id}/availability', [CouponController::class, 'availability'])->whereNumber(['storeId', 'id'])->name('coupons.availability');
         Route::get('/kitchen/printer/{storeId}', [KitchenPrinterController::class, 'index'])->whereNumber('storeId')->name('kitchen.printer');
         Route::post('/kitchen/printer/{storeId}', [KitchenPrinterController::class, 'configure'])->whereNumber('storeId')->name('kitchen.printer.configure');
         Route::get('/referrals', [ReferralController::class, 'index'])->name('referrals.index');

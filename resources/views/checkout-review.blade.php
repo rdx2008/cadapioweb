@@ -4,7 +4,7 @@
 <div class="heading">
 <div class="eyebrow">{{ $store->name }}</div>
 <h1>Confira seu pedido.</h1>
-@include('partials.payment-details',['payment'=>(object)$draft['quote']])
+@include('partials.payment-details',['payment'=>(object)$draft['quote'], 'hideCoupon' => true])
 @if(!empty($draft['data']['referral_code']))
     <p>Código de indicação informado. A loja confere a indicação após a compra.</p>
 @endif
@@ -25,6 +25,9 @@
 <span class="freight-row">@include('partials.motoboy') Frete</span>
 <strong>R$ {{ number_format($draft['quote']['fee_cents']/100,2,',','.') }}</strong>
 </div>
+@if($draft['quote']['discount_cents'] ?? 0)
+    <div class="review-line"><span>Cupom {{ $draft['quote']['coupon_code'] }}</span><strong>− R$ {{ number_format($draft['quote']['discount_cents']/100, 2, ',', '.') }}</strong></div>
+@endif
 <div class="review-line">
 <h2>Total</h2>
 <h2>R$ {{ number_format($draft['quote']['total_cents']/100,2,',','.') }}</h2>

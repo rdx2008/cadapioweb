@@ -98,7 +98,10 @@ class CheckoutQuote
             }
         }
 
-        return $schedule + app(CheckoutPayment::class)->quote($store, $draft, $subtotal + $fee) + ['inventory_plan' => app(OrderInventory::class)->snapshot($store, $stockLines), 'items' => $lines, 'subtotal_cents' => $subtotal, 'fee_cents' => $fee, 'total_cents' => $subtotal + $fee, 'delivery_zone_name' => $zoneName, 'delivery_address' => $deliveryAddress];
+        $coupon = app(Coupons::class)->quote($store, $pointOfSale ? null : ($draft['coupon_code'] ?? null), $draft['phone'] ?? null, $subtotal, $fee);
+        $total = $subtotal + $fee - $coupon['discount_cents'];
+
+        return $schedule + app(CheckoutPayment::class)->quote($store, $draft, $total) + $coupon + ['inventory_plan' => app(OrderInventory::class)->snapshot($store, $stockLines), 'items' => $lines, 'subtotal_cents' => $subtotal, 'fee_cents' => $fee, 'total_cents' => $total, 'delivery_zone_name' => $zoneName, 'delivery_address' => $deliveryAddress];
     }
 
     public function fingerprint(array $quote): string

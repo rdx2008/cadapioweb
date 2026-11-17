@@ -94,6 +94,7 @@ class MenuController extends Controller
             'variants' => 'nullable|array|max:500', 'variants.*' => 'nullable|integer|min:1',
             'idempotency_key' => 'required|uuid',
             'referral_code' => 'nullable|string|alpha_num:ascii|size:24',
+            'coupon_code' => 'nullable|string|max:24|alpha_dash:ascii',
         ]);
         $existing = DB::table('orders')->where('store_id', $store->id)->where('idempotency_key', $data['idempotency_key'])->first();
         if ($existing) {
@@ -191,6 +192,8 @@ class MenuController extends Controller
                     'address' => $quote['delivery_address'],
                     'delivery_zone_name' => $quote['delivery_zone_name'], 'subtotal_cents' => $quote['subtotal_cents'],
                     'fee_cents' => $quote['fee_cents'], 'total_cents' => $quote['total_cents'], 'created_at' => now(), 'updated_at' => now(),
+                    'coupon_id' => $quote['coupon_id'], 'coupon_code' => $quote['coupon_code'],
+                    'coupon_customer_hash' => $quote['coupon_customer_hash'], 'discount_cents' => $quote['discount_cents'],
                 ]);
                 foreach ($quote['items'] as $item) {
                     $item['options'] = json_encode($item['options'], JSON_THROW_ON_ERROR);

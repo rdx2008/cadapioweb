@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="/catalog.css?v=1">
 @if($selectedStore)
     <p><a class="button secondary" href="{{ route('catalog.batch', $selectedStore->id) }}">Editar e publicar em lote</a></p>
+    <p><a class="button secondary" href="{{ route('coupons.index', $selectedStore->id) }}">Cupons do cardápio</a></p>
 @endif
 <div class="page-heading"><div><span class="dashboard-eyebrow">SABOR EM CADA DETALHE</span><h1>Seu cardápio, do seu jeito.</h1><p>Organize produtos, fotos e escolhas para facilitar cada pedido.</p></div>@if($selectedStore)<div class="actions"><a class="button secondary" href="{{ route('catalog.import',['store_id'=>$selectedStore->id]) }}">Importar planilha</a><a class="button" href="{{ route('products.create',['store_id'=>$selectedStore->id]) }}">+ Novo produto</a></div>@endif</div>
 @if(!$selectedStore)<section class="card catalog-empty"><h2>Vamos começar pela sua loja?</h2><p>Cadastre uma loja para montar o primeiro cardápio.</p><a class="button" href="/dashboard#lojas">Cadastrar loja</a></section>@else

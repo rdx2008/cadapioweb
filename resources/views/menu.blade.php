@@ -20,6 +20,10 @@
 <section class="menu-checkout card" id="checkout"><span class="menu-kicker">QUASE NA SUA MESA</span><h2>Vamos finalizar?</h2><div class="fields"><label>Seu nome<input name="customer_name" value="{{ old('customer_name') }}" required maxlength="120" autocomplete="name"></label><label>Telefone<input name="phone" value="{{ old('phone') }}" required minlength="8" maxlength="25" autocomplete="tel"></label><label>Como você prefere?<select name="mode" data-mode><option value="pickup" @selected(old('mode')!=='delivery')>Retirar na loja · sem frete</option>@if($hasDelivery)<option value="delivery" @selected(old('mode')==='delivery')>Receber no meu endereço</option>@endif</select></label>
 
 @include('partials.delivery-address')
+<label>Cupom de desconto (opcional)
+    <input name="coupon_code" maxlength="24" autocomplete="off" value="{{ is_string(old('coupon_code')) ? old('coupon_code') : '' }}">
+    <small>O desconto é calculado na revisão do pedido.</small>
+</label>
 @if($referralsEnabled ?? false)
     <label>Código de indicação (opcional)
         <input name="referral_code" value="{{ is_string(old('referral_code', $referralCode)) ? old('referral_code', $referralCode) : '' }}" maxlength="24" autocomplete="off">

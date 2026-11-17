@@ -1,4 +1,7 @@
 @php($paymentMethod=$payment->payment_method??'cash')
+@if(($payment->discount_cents ?? 0) > 0 && !($hideCoupon ?? false))
+    <p>Cupom {{ $payment->coupon_code }} · desconto de R$ {{ number_format($payment->discount_cents/100, 2, ',', '.') }}</p>
+@endif
 <p><strong>Pagamento:</strong> {{ (App\Services\CheckoutPayment::LABELS+App\Services\OnlinePayment::LABELS)[$paymentMethod]??$paymentMethod }}
 @if(($payment->payment_status??'pending')==='paid')<br>Recebimento registrado pela loja/entrega.@endif
 @if($paymentMethod==='cash' && ($payment->payment_status??'pending')!=='paid' && ($payment->change_for_cents??null)!==null)<br>Troco para R$ {{ number_format($payment->change_for_cents/100,2,',','.') }} · devolver R$ {{ number_format(max(0,$payment->change_for_cents-$payment->total_cents)/100,2,',','.') }}@endif

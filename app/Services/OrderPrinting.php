@@ -76,7 +76,7 @@ class OrderPrinting
             }
             if ($data['kind'] === 'conference') {
                 $snapshot['customer'] = ['name' => $order->customer_name, 'phone' => $order->phone, 'address' => $order->mode === 'delivery' ? $order->address : null];
-                $snapshot['payment'] = ['method' => $order->payment_method, 'status' => $order->payment_status, 'change_for_cents' => $order->change_for_cents, 'subtotal_cents' => $order->subtotal_cents, 'fee_cents' => $order->fee_cents, 'total_cents' => $order->total_cents];
+                $snapshot['payment'] = ['method' => $order->payment_method, 'status' => $order->payment_status, 'change_for_cents' => $order->change_for_cents, 'subtotal_cents' => $order->subtotal_cents, 'fee_cents' => $order->fee_cents, 'total_cents' => $order->total_cents, 'discount_cents' => $order->discount_cents ?? 0];
             }
             $reference = (string) Str::uuid();
             $copy = (int) DB::table('order_prints')->where('order_id', $orderId)->where('kind', $data['kind'])->max('copy_number') + 1;
