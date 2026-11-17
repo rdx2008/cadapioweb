@@ -27,5 +27,16 @@
 <section data-delivery-code-panel @if(!$deliveryCode) hidden @endif><h2>Código de entrega</h2><p>Informe ao motoboy somente quando receber seu pedido.</p><strong data-delivery-code style="font-size:2rem;letter-spacing:.2em">{{ $deliveryCode }}</strong><p class="muted">O código confirma a entrega. O pagamento combinado continua sendo necessário.</p></section>
 <p class="muted compact" data-tracking-connection role="status">Consultando andamento…</p>
 </div>
+<section class="card" data-feedback-form @if(!$canEvaluate) hidden @endif>
+    <h2>Como foi seu pedido?</h2>
+    <p>Sua avaliação é privada e ajuda a loja a melhorar. Envie uma vez por pedido.</p>
+    <form method="post" action="{{ route('feedback.submit',$order->public_id) }}">
+        @csrf
+        <label>Nota do pedido<select name="rating" required><option value="">Escolha uma nota</option>@foreach([5=>'Excelente',4=>'Bom',3=>'Regular',2=>'Ruim',1=>'Muito ruim'] as $score=>$label)<option value="{{ $score }}" @selected((int)old('rating')===$score)>{{ $score }} ★ · {{ $label }}</option>@endforeach</select></label>
+        <label>Quer contar mais? (opcional)<textarea name="comment" maxlength="1000" rows="3" placeholder="Conte o que gostou ou o que podemos melhorar.">{{ old('comment') }}</textarea></label>
+        <button>Enviar avaliação</button>
+    </form>
+</section>
+<section class="card" data-feedback-sent @if(!$feedback) hidden @endif role="status"><h2>Obrigado pela avaliação!</h2><p>Sua opinião foi enviada à loja.</p>@if($feedback)<strong>{{ $feedback->rating }} de 5 ★</strong><p>{{ $feedback->comment }}</p>@endif</section>
 </div>
 @endsection

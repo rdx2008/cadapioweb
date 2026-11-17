@@ -7,6 +7,7 @@ use App\Services\DeliveryConfirmation;
 use App\Services\DeliveryCoverage;
 use App\Services\MenuCatalog;
 use App\Services\OnlinePayment;
+use App\Services\OrderFeedback;
 use App\Services\PostcodeLookup;
 use App\Services\Referrals;
 use App\Services\StoreAvailability;
@@ -223,15 +224,18 @@ class MenuController extends Controller
     public function tracking(string $id): Response
     {
         $order = DB::table('orders')->where('public_id', $id)->firstOrFail();
+        $feedback = DB::table('order_feedback')->where('order_id', $order->id)->select('rating', 'comment')->first();
+        $canEvaluate = ! $feedback && app(OrderFeedback::class)->eligible($order);
 
-        return response()->view('tracking', ['store' => DB::table('stores')->find($order->store_id), 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $order->id)->get(), 'ride' => DB::table('rides')->where('order_id', $order->id)->first()])->header('Cache-Control', 'private, no-store')->header('Referrer-Policy', 'no-referrer');
+        return response()->view('tracking', ['store' => DB::table('stores')->find($order->store_id), 'order' => $order, 'items' => DB::table('order_items')->where('order_id', $order->id)->get(), 'ride' => DB::table('rides')->where('order_id', $order->id)->first(), 'feedback' => $feedback, 'canEvaluate' => $canEvaluate])->header('Cache-Control', 'private, no-store')->header('Referrer-Policy', 'no-referrer');
     }
 
     public function status(string $id): JsonResponse
     {
         $order = DB::table('orders')->where('public_id', $id)->firstOrFail();
         $ride = DB::table('rides')->where('order_id', $order->id)->first();
+        $submitted = DB::table('order_feedback')->where('order_id', $order->id)->exists();
 
-        return response()->json(['status' => $order->status, 'payment_status' => $order->payment_status, 'payment_online' => app(OnlinePayment::class)->isOnline($order), 'ride_status' => $ride->status ?? null, 'delivery_code' => app(DeliveryConfirmation::class)->forCustomer($order->status === 'ready' ? $ride : null), 'cancellation_reason' => $order->cancellation_reason])->header('Cache-Control', 'no-store');
+        return response()->json(['status' => $order->status, 'payment_status' => $order->payment_status, 'payment_online' => app(OnlinePayment::class)->isOnline($order), 'ride_status' => $ride->status ?? null, 'delivery_code' => app(DeliveryConfirmation::class)->forCustomer($order->status === 'ready' ? $ride : null), 'cancellation_reason' => $order->cancellation_reason, 'feedback_submitted' => $submitted, 'can_evaluate' => ! $submitted && app(OrderFeedback::class)->eligible($order)])->header('Cache-Control', 'no-store');
     }
 }

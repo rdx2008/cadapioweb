@@ -368,6 +368,10 @@ document.querySelectorAll("[data-tracking-url]").forEach((panel) => {
                 "Aguardando despacho ou retirada";
             panel.querySelector("[data-cancel-reason]").textContent =
                 data.cancellation_reason || "";
+            const feedbackForm = panel.querySelector('[data-feedback-form]');
+            const feedbackSent = panel.querySelector('[data-feedback-sent]');
+            if (feedbackForm) feedbackForm.hidden = !data.can_evaluate;
+            if (feedbackSent) feedbackSent.hidden = !data.feedback_submitted;
             panel.querySelector("[data-tracking-connection]").textContent =
                 "Atualizado às " + new Date().toLocaleTimeString("pt-BR");
         } catch {

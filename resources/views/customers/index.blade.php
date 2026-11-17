@@ -6,7 +6,7 @@
 @section('content')
 <div class="inventory-page">
     <div class="heading">
-        <h1>Clientes e recorrência</h1>
+        <h1>Clientes e recorrência</h1><p><a href="{{ route('feedback.index',['store_id'=>$store?->id]) }}">Avaliações dos clientes →</a></p>
         <p>Veja quem voltou a comprar, quando foi o último pedido e quanto cada cliente gastou na loja.</p>
         @if($store)
             <a href="{{ route('referrals.index', ['store_id' => $store->id]) }}">Indicações e recompensas →</a>

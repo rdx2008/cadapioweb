@@ -27,6 +27,7 @@ use App\Http\Controllers\KitchenPrinterController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OperationsBoardController;
 use App\Http\Controllers\OrderBoardController;
+use App\Http\Controllers\OrderFeedbackController;
 use App\Http\Controllers\OrderPrintController;
 use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PaymentController;
@@ -59,7 +60,8 @@ Route::post('/cardapio/{slug}/postcode', [MenuController::class, 'postcode'])->m
 Route::post('/cardapio/{slug}/review', [MenuController::class, 'review'])->middleware('throttle:30,1,cardapio-slug-review:');
 Route::get('/cardapio/{slug}/review/{draftId}', [MenuController::class, 'reviewPage']);
 Route::post('/cardapio/{slug}', [MenuController::class, 'checkout'])->middleware('throttle:20,1,cardapio-slug:');
-Route::get('/pedido/{id}', [MenuController::class, 'tracking']);
+Route::get('/pedido/{id}', [MenuController::class, 'tracking'])->name('orders.tracking');
+Route::post('/pedido/{id}/avaliacao', [OrderFeedbackController::class, 'submit'])->whereUuid('id')->middleware('throttle:10,1,order-feedback:')->name('feedback.submit');
 Route::get('/pr/{reference}', [PaymentController::class, 'returned'])->middleware('throttle:20,1,pr-reference:');
 Route::post('/wp/{provider}/{secret?}', [PaymentController::class, 'webhook'])->whereIn('provider', ['i', 'p'])->middleware('throttle:120,1,wp-provider-secret:');
 Route::post('/pedido/{id}/pagar', [PaymentController::class, 'pay'])->middleware('throttle:8,1,pedido-id-pagar:');
@@ -188,6 +190,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/referrals/orders/{orderId}', [ReferralController::class, 'invite'])->whereNumber('orderId')->name('referrals.invite');
         Route::post('/referrals/{id}/deliver', [ReferralController::class, 'deliver'])->whereNumber('id')->name('referrals.deliver');
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('/feedback', [OrderFeedbackController::class, 'index'])->name('feedback.index');
+        Route::post('/feedback/{id}/treat', [OrderFeedbackController::class, 'treat'])->whereNumber('id')->name('feedback.treat');
         Route::get('/customers/{storeId}', [CustomerController::class, 'show'])->whereNumber('storeId')->name('customers.show');
         Route::get('/finance', [StoreFinanceController::class, 'index'])->name('finance.index');
         Route::get('/finance/export', [StoreFinanceController::class, 'export'])->name('finance.export');
