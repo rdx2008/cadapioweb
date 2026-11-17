@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\OnlinePayment;
 use App\Services\OperationsBoard;
 use App\Services\TenantState;
 use Illuminate\Database\Query\Builder;
@@ -43,7 +44,7 @@ class KitchenController extends Controller
         $counts = (clone $query)->whereIn('status', ['accepted', 'preparing', 'ready'])->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status');
         $stage = $filters['stage'] ?? 'accepted';
         $orders = $query->where('status', $stage)->orderByRaw('COALESCE(prepare_at, accepted_at, created_at) ASC')->orderBy('id')->paginate(30)->withQueryString();
-        $items = DB::table('order_items')->whereIn('order_id', $orders->pluck('id'))->select('id', 'order_id', 'quantity', 'name', 'options')->orderBy('id')->get()->groupBy('order_id');
+        $items = DB::table('order_items')->whereIn('order_id', $orders->pluck('id'))->select('id', 'order_id', 'quantity', 'name', 'options', 'kitchen_station')->orderBy('id')->get()->groupBy('order_id');
 
         $kanban = ($filters['view'] ?? (isset($filters['stage']) ? 'list' : 'kanban')) === 'kanban';
         $store = isset($filters['store_id']) ? $stores->firstWhere('id', (int) $filters['store_id']) : ($stores->count() === 1 ? $stores->first() : null);
@@ -67,15 +68,40 @@ class KitchenController extends Controller
 
     public function status(Request $request, int $id): RedirectResponse|JsonResponse
     {
-        $request->validate(['status' => 'required|in:preparing,ready']);
+        $request->validate(['status' => 'required|in:preparing,ready,station_finished', 'item_id' => 'required_if:status,station_finished|nullable|integer|min:1']);
 
         return DB::transaction(function () use ($request, $id) {
             $user = $this->member($request, true);
-            DB::table('orders')->where('tenant_id', $user->tenant_id)->whereIn('store_id', $this->stores($user)->select('id'))->where('id', $id)->firstOrFail();
+            $order = DB::table('orders')->where('tenant_id', $user->tenant_id)->whereIn('store_id', $this->stores($user)->select('id'))->where('id', $id)->lockForUpdate()->firstOrFail();
+
+            if ($request->input('status') === 'station_finished') {
+                abort_unless($order->status === 'preparing', 409, 'O pedido precisa estar em preparo.');
+                app(OnlinePayment::class)->requirePaid($order);
+                $items = DB::table('order_items')->where('order_id', $id);
+                abort_unless((clone $items)->whereNotNull('kitchen_station')->exists(), 409);
+                $item = (clone $items)->where('id', $request->integer('item_id'))->firstOrFail();
+                (clone $items)->where('kitchen_station', $item->kitchen_station)->whereNull('station_finished_at')->update(['station_finished_at' => now()]);
+                if ($items->whereNull('station_finished_at')->exists()) {
+                    return $request->expectsJson() ? response()->json(['message' => 'Estação concluída.']) : back()->with('success', 'Estação concluída.');
+                }
+                $request->merge(['status' => 'ready']);
+            }
 
             $response = app(PlatformController::class)->orderStatus($request, $id);
 
             return $request->expectsJson() ? response()->json(['message' => 'Pedido atualizado na cozinha.']) : $response;
         });
+    }
+
+    public function stationPrint(Request $request, int $id, int $itemId): Response
+    {
+        $user = $this->member($request);
+        $order = DB::table('orders')->where('tenant_id', $user->tenant_id)
+            ->whereIn('store_id', $this->stores($user)->select('id'))->where('id', $id)->firstOrFail();
+        abort_unless(in_array($order->status, ['preparing', 'ready'], true), 409);
+        $item = DB::table('order_items')->where('order_id', $id)->where('id', $itemId)->firstOrFail();
+        $items = DB::table('order_items')->where('order_id', $id)->where('kitchen_station', $item->kitchen_station)->orderBy('id')->get();
+
+        return response()->view('kitchen.station-print', compact('order', 'item', 'items'))->header('Cache-Control', 'private, no-store');
     }
 }

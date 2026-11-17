@@ -533,10 +533,12 @@ class CatalogController extends Controller
 
     public function updateProduct(Request $request, int $id): RedirectResponse
     {
+        $station = $request->validate(['kitchen_station' => 'sometimes|nullable|string|max:60']);
         $product = $this->product($id);
         MoneyInput::normalize($request, ['price' => 'price_cents']);
         $data = $request->validate(['name' => 'required|string|max:120', 'product_type' => 'sometimes|in:common,pizza,combo', 'category' => 'nullable|string|max:80', 'category_id' => 'nullable|integer|min:1', 'featured' => 'sometimes|boolean', 'sort_order' => 'sometimes|integer|min:0|max:9999', 'description' => 'nullable|string|max:1000', 'price_cents' => 'required|integer|min:1|max:1000000', 'available' => 'required|boolean', 'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048']);
         unset($data['photo']);
+        $data += $station;
         $path = null;
         if ($request->hasFile('photo')) {
             $path = $request->file('photo')->store('tenants/'.$product->tenant_id.'/products', 'local');

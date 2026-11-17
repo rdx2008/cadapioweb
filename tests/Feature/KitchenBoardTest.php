@@ -12,6 +12,26 @@ class KitchenBoardTest extends TestCase
 {
     use BuildsPlatform, RefreshDatabase;
 
+    public function test_station_completion_releases_order_only_after_all_groups_finish(): void
+    {
+        $tenant = $this->tenant();
+        $store = $this->store($tenant);
+        $this->actingAs($this->owner($tenant));
+        $order = $this->order($tenant, $store);
+        DB::table('orders')->where('id', $order)->update(['status' => 'preparing']);
+        $pizza = DB::table('order_items')->insertGetId(['order_id' => $order, 'name' => 'Margherita', 'quantity' => 1, 'unit_cents' => 2500, 'kitchen_station' => 'Pizza']);
+        $drink = DB::table('order_items')->insertGetId(['order_id' => $order, 'name' => 'Suco de laranja', 'quantity' => 1, 'unit_cents' => 500]);
+
+        $this->get('/kitchen')->assertOk()->assertSee('Concluir Pizza');
+        $this->get(route('kitchen.station-print', [$order, $pizza]))->assertOk()->assertSee('Margherita')->assertDontSee('Suco de laranja');
+        $this->post('/orders/'.$order.'/status', ['status' => 'ready'])->assertConflict();
+        $path = '/kitchen/orders/'.$order.'/status';
+        $this->postJson($path, ['status' => 'station_finished', 'item_id' => $pizza])->assertOk();
+        $this->assertDatabaseHas('orders', ['id' => $order, 'status' => 'preparing']);
+        $this->postJson($path, ['status' => 'station_finished', 'item_id' => $drink])->assertOk();
+        $this->assertDatabaseHas('orders', ['id' => $order, 'status' => 'ready']);
+    }
+
     public function test_queue_uses_preparation_time_then_acceptance_and_keeps_pagination_on_board(): void
     {
         $tenant = $this->tenant();

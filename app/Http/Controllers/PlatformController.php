@@ -151,6 +151,10 @@ class PlatformController extends Controller
             }
             abort_if($r->status === 'preparing' && ! app(OrderScheduling::class)->canPrepare($o), 409, 'Aguarde o horário previsto para iniciar o preparo deste pedido agendado.');
             abort_unless(in_array($r->status, $allowed[$o->status] ?? []), 409, 'Transição inválida.');
+            if ($r->status === 'ready') {
+                $items = DB::table('order_items')->where('order_id', $id);
+                abort_if((clone $items)->whereNotNull('kitchen_station')->exists() && $items->whereNull('station_finished_at')->exists(), 409, 'Conclua todas as estações antes de liberar o pedido.');
+            }
             abort_if(DB::table('rides')->where('order_id', $id)->whereIn('status', ['assigned', 'collected', 'returning'])->exists(), 409, 'Trate a corrida atribuída antes de alterar o pedido.');
             if ($r->status === 'preparing') {
                 app(OrderInventory::class)->consume($o, auth()->id());

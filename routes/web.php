@@ -140,6 +140,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/kitchen', [KitchenController::class, 'index'])->name('kitchen.index');
     Route::get('/kitchen/live', [KitchenController::class, 'live'])->middleware('throttle:60,1,kitchen-live:')->name('kitchen.live');
     Route::post('/kitchen/orders/{id}/status', [KitchenController::class, 'status'])->whereNumber('id')->middleware('throttle:30,1,kitchen-orders-id-status:')->name('kitchen.status');
+    Route::get('/kitchen/orders/{id}/stations/{itemId}/print', [KitchenController::class, 'stationPrint'])->whereNumber(['id', 'itemId'])->name('kitchen.station-print');
     Route::post('/orders/{id}/print-jobs', [OrderPrintController::class, 'prepare'])->whereNumber('id')->name('order-prints.prepare');
     Route::get('/order-prints/{reference}', [OrderPrintController::class, 'show'])->whereUuid('reference')->name('order-prints.show');
     Route::post('/logout', [AuthController::class, 'logout']);

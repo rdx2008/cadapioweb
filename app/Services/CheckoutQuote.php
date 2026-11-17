@@ -77,7 +77,7 @@ class CheckoutQuote
                     $options[] = ['group' => $group->name, 'name' => $option->name, 'price_cents' => (int) $option->price_cents];
                 }
             }
-            $lines[] = ['name' => $product->name, 'quantity' => (int) $quantity, 'unit_cents' => $unit, 'options' => $options];
+            $lines[] = ['name' => $product->name, 'quantity' => (int) $quantity, 'unit_cents' => $unit, 'options' => $options, 'kitchen_station' => $product->kitchen_station ?? null];
             $stockLines[] = compact('product', 'entry');
             $subtotal += $unit * $quantity;
             $this->require(count($lines) <= 50 && $subtotal <= 100000000, 'O pedido excede o limite de 50 itens ou o valor máximo permitido.');

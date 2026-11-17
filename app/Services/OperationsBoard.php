@@ -45,7 +45,7 @@ class OperationsBoard
             $lanes[$stage] = $compact ? $q->limit(4)->get() : $q->paginate(24, ['*'], $stage.'_page')->withPath(route('kitchen.index'))->appends(request()->except($stage.'_page'));
             $ids = array_merge($ids, $lanes[$stage]->pluck('id')->all());
         }
-        $items = $compact ? collect() : $db::table('order_items')->whereIn('order_id', $ids)->select('id', 'order_id', 'quantity', 'name', 'options')->orderBy('id')->get()->groupBy('order_id');
+        $items = $compact ? collect() : $db::table('order_items')->whereIn('order_id', $ids)->select('id', 'order_id', 'quantity', 'name', 'options', 'kitchen_station', 'station_finished_at')->orderBy('id')->get()->groupBy('order_id');
 
         return compact('lanes', 'counts', 'items');
     }

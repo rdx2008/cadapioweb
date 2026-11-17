@@ -29,11 +29,14 @@ class CheckoutPaymentTest extends TestCase
     {
         $f = $this->fixture();
         $cart = $f['cart'] + ['change_for' => '50,00', 'payment_status' => 'paid'];
+        DB::table('products')->where('store_id', $f['store'])->update(['kitchen_station' => 'Chapa']);
         $review = $this->post('/cardapio/loja/review', $cart)->assertRedirect();
         $this->get($review->headers->get('Location'))->assertOk()->assertSee('Troco para R$ 50,00')->assertSee('devolver R$ 20,00');
         $this->post('/cardapio/loja', ['draft_id' => $cart['idempotency_key']])->assertRedirect();
         $this->post('/cardapio/loja', ['draft_id' => $cart['idempotency_key']])->assertRedirect();
         $this->assertDatabaseCount('orders', 1);
+        DB::table('products')->where('store_id', $f['store'])->update(['kitchen_station' => 'Outro setor']);
+        $this->assertDatabaseHas('order_items', ['kitchen_station' => 'Chapa', 'station_finished_at' => null]);
         $this->assertDatabaseHas('orders', ['payment_method' => 'cash', 'change_for_cents' => 5000, 'total_cents' => 3000, 'payment_status' => 'pending']);
         $this->get('/pedido/'.DB::table('orders')->value('public_id'))->assertOk()->assertSee('devolver R$ 20,00');
     }

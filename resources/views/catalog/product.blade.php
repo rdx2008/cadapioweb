@@ -27,6 +27,7 @@
 <label>Foto (JPG, PNG ou WebP; até 2 MB)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp">
 </label>@if($product->photo_path)<img src="/media/products/{{ $product->id }}?v={{ urlencode($product->updated_at) }}" alt="Foto de {{ $product->name }}" class="product-photo">@endif</div>
 <div class="actions">
+<label>Estação da cozinha<input name="kitchen_station" maxlength="60" value="{{ old('kitchen_station', $product->kitchen_station) }}" placeholder="Ex.: Pizza, Chapa ou Bebidas"></label>
 <button>Salvar produto</button>
 </div>
 </form>
