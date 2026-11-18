@@ -1,0 +1,3 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cardápio · {{ $store->name }}</title><link rel="stylesheet" href="/dining-qr.css?v=1"></head>
+<body><nav><button type="button" data-catalog-print>Imprimir cartão</button><p>Confira o QR Code pelo celular antes de divulgar. Se mudar o endereço do cardápio, gere um novo cartão.</p></nav><main class="qr-card"><p>Bem-vindo à</p><h1>{{ $store->name }}</h1><img src="{{ $qr }}" width="400" height="400" alt="QR Code do cardápio"><h2>Seu próximo favorito está aqui.</h2><p>Aponte a câmera do celular para ver o cardápio e fazer seu pedido.</p><small>{{ $url }}</small></main><script src="/catalog-tools.js?v=1" defer></script></body></html>

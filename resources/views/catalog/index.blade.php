@@ -3,6 +3,7 @@
 @section('content')
 <link rel="stylesheet" href="/catalog.css?v=1">
 @if($selectedStore)
+    <p><a class="button secondary" href="{{ route('catalog.tools', $selectedStore->id) }}">Compartilhar, QR Code e exportar Excel</a></p>
     <p><a class="button secondary" href="{{ route('catalog.batch', $selectedStore->id) }}">Editar e publicar em lote</a></p>
     <p><a class="button secondary" href="{{ route('coupons.index', $selectedStore->id) }}">Cupons do cardápio</a></p>
 @endif

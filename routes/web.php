@@ -6,6 +6,7 @@ use App\Http\Controllers\CashRegisterController;
 use App\Http\Controllers\CatalogBatchController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogImportController;
+use App\Http\Controllers\CatalogToolsController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\CourierController;
@@ -226,6 +227,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/bi', [BusinessIntelligenceController::class, 'index']);
         Route::get('/bi/export', [BusinessIntelligenceController::class, 'export']);
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
+        Route::get('/catalog/tools/{storeId}', [CatalogToolsController::class, 'index'])->whereNumber('storeId')->name('catalog.tools');
+        Route::get('/catalog/tools/{storeId}/print', [CatalogToolsController::class, 'print'])->whereNumber('storeId')->name('catalog.tools.print');
+        Route::get('/catalog/tools/{storeId}/qr', [CatalogToolsController::class, 'qr'])->whereNumber('storeId')->name('catalog.tools.qr');
+        Route::get('/catalog/tools/{storeId}/export', [CatalogToolsController::class, 'export'])->whereNumber('storeId')->middleware('throttle:3,1,catalog-export:')->name('catalog.tools.export');
         Route::get('/catalog/batch/{storeId}', [CatalogBatchController::class, 'index'])->whereNumber('storeId')->name('catalog.batch');
         Route::post('/catalog/batch/{storeId}/review', [CatalogBatchController::class, 'review'])->whereNumber('storeId')->name('catalog.batch.review');
         Route::post('/catalog/batch/{storeId}/publish', [CatalogBatchController::class, 'publish'])->whereNumber('storeId')->name('catalog.batch.publish');
