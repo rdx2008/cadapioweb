@@ -89,7 +89,7 @@ class PosController extends Controller
         }
         $diningPeople = $tab ? DB::table('orders')->where('tenant_id', $store->tenant_id)->where('store_id', $id)->where('dining_tab_id', $tab->id)->whereNotNull('dining_person')->distinct()->orderBy('dining_person')->limit(100)->pluck('dining_person') : collect();
 
-        return response()->view($waiter ? 'pos.waiter-sale' : 'pos.sale', app(MenuCatalog::class)->data($store) + ['waiter' => $waiter, 'tab' => $tab, 'diningPeople' => $diningPeople, 'cashSession' => $waiter ? null : app(CashRegister::class)->current($id), 'store' => $store, 'methods' => $methods, 'drivers' => $waiter ? collect() : $this->drivers($id), 'stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
+        return response()->view($waiter ? 'pos.waiter-sale' : 'pos.sale', app(MenuCatalog::class)->data($store, false) + ['waiter' => $waiter, 'tab' => $tab, 'diningPeople' => $diningPeople, 'cashSession' => $waiter ? null : app(CashRegister::class)->current($id), 'store' => $store, 'methods' => $methods, 'drivers' => $waiter ? collect() : $this->drivers($id), 'stores' => $this->stores($this->member($request))->orderBy('name')->get()])->header('Cache-Control', 'private, no-store');
     }
 
     private function drivers(int $storeId): Collection

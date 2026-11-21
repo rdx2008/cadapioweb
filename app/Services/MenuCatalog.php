@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 
 class MenuCatalog
 {
-    public function data(object $store): array
+    public function data(object $store, bool $promotions = true): array
     {
         $products = DB::table('products')->leftJoin('catalog_categories', function ($join) {
             $join->on('catalog_categories.id', '=', 'products.category_id')->on('catalog_categories.store_id', '=', 'products.store_id');
@@ -35,6 +35,11 @@ class MenuCatalog
 
             return true;
         });
+        $offers = $promotions ? app(ProductPromotions::class)->active($store) : collect();
+        foreach ($products as $product) {
+            $product->promotion_bps = $offers->get($product->id)?->basis_points ?? 0;
+            $product->display_price_cents = ProductPromotions::price($product->price_cents, $product->promotion_bps);
+        }
         $groups = DB::table('option_groups')->whereIn('product_id', $products->pluck('id'))->orderBy('id')->get();
         $groups = $groups->filter(fn ($group) => $group->kind !== 'border' || $products->firstWhere('id', $group->product_id)?->product_type === 'pizza');
         $options = DB::table('product_options')->whereIn('option_group_id', $groups->pluck('id'))->where('available', true)->orderBy('id')->get()->groupBy('option_group_id');

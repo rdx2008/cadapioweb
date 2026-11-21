@@ -3,6 +3,13 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const MenuCart=vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../public/menu-cart.js'),'utf8')+';MenuCart',{structuredClone});
 const line=(variant,quantity=1)=>({productId:1,quantity,variantId:variant,choices:{7:[variant+10]},unit:variant*1000,name:'Pizza',optionNames:['Borda']});
+test('promotion rounds the base in cents, preserves one cent and leaves extras outside discount',()=>{
+    assert.equal(MenuCart.discountedBase(3090,1250),2704);
+    assert.equal(MenuCart.discountedBase(5001,1000)+300,4801);
+    assert.equal(MenuCart.discountedBase(1,9000),1);
+    assert.equal(MenuCart.discountedBase(0,9000),0);
+    assert.equal(MenuCart.discountedBase(5000,0),5000);
+});
 test('combo choices remain independent across lines and payload edits',()=>{
     const cart=new MenuCart();
     const first=cart.save({...line(1),comboChoices:{4:[10],5:[20]}});

@@ -18,6 +18,8 @@ class CheckoutQuote
         $lines = [];
         $stockLines = [];
         $subtotal = 0;
+        $promotions = $pointOfSale ? collect() : app(ProductPromotions::class)->active($store);
+        $hasPromotion = false;
         $entries = $draft['cart_lines'] ?? collect($draft['items'])->map(fn ($quantity, $id) => ['product_id' => $id, 'quantity' => $quantity, 'variant_id' => $draft['variants'][$id] ?? null, 'choices' => $draft['choices'][$id] ?? []])->values()->all();
         $quantities = [];
         foreach ($entries as $entry) {
@@ -56,6 +58,14 @@ class CheckoutQuote
             }
             if (! $product->pizza_enabled) {
                 $this->require(empty($entry['flavors']), 'O modo pizza mudou. Revise as escolhas deste produto.');
+            }
+            if ($promotion = $promotions->get($product->id)) {
+                $original = $unit;
+                $unit = ProductPromotions::price($unit, $promotion->basis_points);
+                if ($unit < $original) {
+                    $hasPromotion = true;
+                    $options[] = ['group' => 'Promoção', 'name' => $promotion->name.' · '.number_format($promotion->basis_points / 100, 2, ',', '').'% no preço do produto, antes dos adicionais', 'price_cents' => 0, 'kind' => 'promotion', 'promotion_id' => $promotion->id, 'original_base_cents' => $original, 'discount_cents' => $original - $unit];
+                }
             }
             if ($product->product_type === 'combo') {
                 $this->require(! $product->uses_variants && ! $product->pizza_enabled, 'O combo está com configuração incompatível.');
@@ -98,6 +108,9 @@ class CheckoutQuote
             }
         }
 
+        if ($hasPromotion && ! empty($draft['coupon_code'])) {
+            throw ValidationException::withMessages(['coupon_code' => 'Promoções de produtos não acumulam com cupons. Remova o cupom ou os produtos promocionais.']);
+        }
         $coupon = app(Coupons::class)->quote($store, $pointOfSale ? null : ($draft['coupon_code'] ?? null), $draft['phone'] ?? null, $subtotal, $fee);
         $total = $subtotal + $fee - $coupon['discount_cents'];
 

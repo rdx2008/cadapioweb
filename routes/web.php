@@ -36,6 +36,7 @@ use App\Http\Controllers\PasswordRecoveryController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\ProductPromotionController;
 use App\Http\Controllers\ProductRecipeController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\StaffOperationController;
@@ -237,6 +238,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/bi', [BusinessIntelligenceController::class, 'index']);
         Route::get('/bi/export', [BusinessIntelligenceController::class, 'export']);
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
+        Route::get('/catalog/promotions/{storeId}', [ProductPromotionController::class, 'index'])->whereNumber('storeId')->name('promotions.index');
+        Route::post('/catalog/promotions/{storeId}', [ProductPromotionController::class, 'create'])->whereNumber('storeId')->name('promotions.create');
+        Route::post('/catalog/promotions/{storeId}/{id}', [ProductPromotionController::class, 'availability'])->whereNumber(['storeId', 'id'])->name('promotions.availability');
         Route::get('/catalog/tools/{storeId}', [CatalogToolsController::class, 'index'])->whereNumber('storeId')->name('catalog.tools');
         Route::get('/catalog/tools/{storeId}/print', [CatalogToolsController::class, 'print'])->whereNumber('storeId')->name('catalog.tools.print');
         Route::get('/catalog/tools/{storeId}/qr', [CatalogToolsController::class, 'qr'])->whereNumber('storeId')->name('catalog.tools.qr');

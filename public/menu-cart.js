@@ -1,4 +1,8 @@
 class MenuCart {
+    static discountedBase(base, basisPoints) {
+        if (!Number.isInteger(basisPoints) || basisPoints < 1 || basisPoints > 9000 || base < 1) return base;
+        return base - Math.min(base - 1, Math.floor((base * basisPoints + 5000) / 10000));
+    }
     static pizzaPrice(prices, rule) {
         if(!prices.length)return null;
         return rule==='average'?Math.round(prices.reduce((sum,price)=>sum+price,0)/prices.length):Math.max(...prices);

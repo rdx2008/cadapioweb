@@ -42,7 +42,7 @@ class InventoryCostController extends Controller
     {
         $product = DB::table('products')->where('tenant_id', $user->tenant_id)->where('id', $id)->firstOrFail();
         $store = DB::table('stores')->where('tenant_id', $user->tenant_id)->where('id', $product->store_id)->firstOrFail();
-        $catalog = app(MenuCatalog::class)->data($store);
+        $catalog = app(MenuCatalog::class)->data($store, false);
 
         return compact('product', 'store') + ['available' => $catalog['products']->contains('id', $id), 'variants' => $catalog['variants']->get($id, collect()), 'flavors' => $catalog['flavors']->get($id, collect()),
             'groups' => $catalog['groups']->get($id, collect()), 'options' => $catalog['options'], 'combo' => $catalog['combos'][$id] ?? ['groups' => collect(), 'options' => collect()]];
