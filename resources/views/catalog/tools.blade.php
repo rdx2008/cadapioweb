@@ -1,0 +1,11 @@
+@extends('layout')
+@section('page-label','Compartilhar e exportar cardápio')
+@section('content')
+<div class="page-heading"><div><h1>Seu cardápio em mais lugares</h1><p>{{ $store->name }} · Compartilhe com os clientes e confira seu catálogo em Excel.</p></div><a class="button secondary" href="{{ route('catalog.index',['store_id'=>$store->id]) }}">← Voltar ao cardápio</a></div>
+<div class="grid">
+    <section class="card"><h2>Link para fazer pedidos</h2><p>Use na bio das redes sociais, nas conversas com clientes e nas suas divulgações.</p><label>Endereço do cardápio<input type="text" value="{{ $url }}" readonly data-catalog-share-link></label><div class="actions"><button type="button" data-catalog-copy>Copiar link</button><a class="button secondary" href="{{ $url }}" target="_blank" rel="noopener noreferrer">Abrir como cliente ↗</a></div><p role="status" aria-live="polite" data-catalog-copy-status></p><p class="muted">Se alterar o endereço do cardápio ou o domínio da plataforma, atualize os links e QR Codes divulgados.</p></section>
+    <section class="card"><h2>QR Code da loja</h2><img src="{{ $qr }}" width="320" height="320" style="max-width:100%;height:auto" alt="QR Code para abrir o cardápio de {{ $store->name }}"><p>Aponte a câmera do celular para abrir o cardápio. Este código divulga a loja; não identifica uma mesa ou comanda.</p><div class="actions"><a class="button" href="{{ route('catalog.tools.print',$store->id) }}" target="_blank" rel="noopener">Imprimir cartão</a><a class="button secondary" href="{{ route('catalog.tools.qr',$store->id) }}">Baixar QR Code (SVG)</a></div></section>
+</div>
+<section class="card"><h2>Exportar catálogo completo</h2><p>Baixe um Excel com produtos, categorias, variações, adicionais, sabores e composição dos combos. Inclui itens pausados e todas as páginas do catálogo desta loja, independentemente dos filtros da tela anterior.</p><p>Os preços ficam em reais e as fotos são representadas por links. O arquivo serve para consulta e conferência; não restaura automaticamente o catálogo pela importação.</p><a class="button" href="{{ route('catalog.tools.export',$store->id) }}">Baixar catálogo em Excel</a><p class="muted">Até 2.000 produtos, 5.000 linhas por aba e 60.000 células por arquivo.</p></section>
+<script src="/catalog-tools.js?v=1" defer></script>
+@endsection

@@ -1,0 +1,4 @@
+@php($opsKitchenOnly=auth()->user()->role==='staff'&&auth()->user()->staff_profile==='kitchen')
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>@yield('page-label') · CadapioWeb</title><link rel="stylesheet" href="/app.css?v=7"><link rel="stylesheet" href="/operations.css?v=1"><link rel="stylesheet" href="/production.css?v=1"><script src="/production.js?v=1" defer></script><script src="/operations.js?v=1" defer></script>@stack('styles')</head><body class="ops-terminal">
+@include('operations.header')
+<main class="ops-main">@if(session('success'))<p class="notice" role="status">{{ session('success') }}</p>@endif @if($errors->any())<div class="notice error" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif @yield('content')</main>@stack('scripts')</body></html>

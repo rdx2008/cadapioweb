@@ -1,0 +1,6 @@
+.delivery-statement-summary .stat { min-width:0; }
+.delivery-statement-summary .value { font-size:clamp(20px,2.2vw,28px); overflow-wrap:anywhere; margin-bottom:9px; }
+.delivery-statement-summary small { display:block; line-height:1.5; }
+.delivery-statement-records td { vertical-align:top; }
+.delivery-statement-records small { display:block; max-width:210px; margin-top:5px; line-height:1.5; }
+@media(max-width:520px) { .delivery-statement-summary { grid-template-columns:minmax(0,1fr); } }

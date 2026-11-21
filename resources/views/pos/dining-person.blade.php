@@ -1,0 +1,2 @@
+<label>Consumo de quem? (opcional)<input name="dining_person" list="dining-people" maxlength="80" value="{{ old('dining_person') }}" placeholder="Ex.: Ana ou João 1"><small>Escolha uma identificação já usada ou digite outra. Deixe vazio para consumo compartilhado. Todo este pedido ficará nesta identificação; para outra pessoa, lance outro pedido. Use identificações diferentes para pessoas com o mesmo nome.</small></label>
+<datalist id="dining-people">@foreach($diningPeople as $name)<option value="{{ $name }}"></option>@endforeach</datalist>

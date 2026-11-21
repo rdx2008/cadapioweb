@@ -1,0 +1,1 @@
+@if($order->source==='pos'&&(auth()->user()->role==='owner'||auth()->user()->staff_profile==='operator'))<p><a class="button secondary" href="{{ route('pos.result',$order->id) }}">Abrir PDV · links do cliente e entrega</a></p>@endif
