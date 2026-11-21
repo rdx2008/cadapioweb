@@ -30,6 +30,7 @@ use App\Http\Controllers\KitchenPrinterController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OperationsBoardController;
 use App\Http\Controllers\OrderBoardController;
+use App\Http\Controllers\OrderCostReportController;
 use App\Http\Controllers\OrderFeedbackController;
 use App\Http\Controllers\OrderPrintController;
 use App\Http\Controllers\PasswordRecoveryController;
@@ -240,6 +241,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/bi/export', [BusinessIntelligenceController::class, 'export']);
         Route::get('/bi/products', [ProductSalesController::class, 'index'])->name('product-sales.index');
         Route::get('/bi/products/export', [ProductSalesController::class, 'export'])->name('product-sales.export');
+        Route::get('/bi/order-costs', [OrderCostReportController::class, 'index'])->name('order-costs.index');
+        Route::get('/bi/order-costs/export', [OrderCostReportController::class, 'export'])->name('order-costs.export');
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
         Route::get('/catalog/promotions/{storeId}', [ProductPromotionController::class, 'index'])->whereNumber('storeId')->name('promotions.index');
         Route::post('/catalog/promotions/{storeId}', [ProductPromotionController::class, 'create'])->whereNumber('storeId')->name('promotions.create');
