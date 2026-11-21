@@ -16,6 +16,7 @@ $bestDate=collect($daysList)->sortByDesc('paid_cents')->first();
 $paymentNames=App\Services\CheckoutPayment::LABELS+App\Services\OnlinePayment::LABELS;
 @endphp
 <div class="bi-page"><div class="bi-heading"><div><span class="dashboard-eyebrow">{{ $platform?'INTELIGÊNCIA DA PLATAFORMA':'INTELIGÊNCIA DO SEU NEGÓCIO' }}</span><h1>BI e crescimento</h1><p>Entenda o movimento, encontre oportunidades e acompanhe a evolução.</p></div><a class="button secondary" href="{{ $biUrl.'/export?'.http_build_query($filters) }}">Exportar CSV</a></div>
+@unless($platform)<p><a class="button secondary" href="{{ route('product-sales.index', ['store_id'=>$filters['store_id']??null,'start'=>$filters['start'],'end'=>$filters['end']]) }}">Produtos e curva ABC por loja</a></p>@endunless
 <form class="card" action="{{ $biUrl }}" method="get"><div class="bi-filter-grid">
 <label>De<input name="start" type="date" value="{{ $filters['start'] }}" required></label><label>Até<input name="end" type="date" value="{{ $filters['end'] }}" required></label>
 @if($platform)<label>Empresa<select name="tenant_id" data-bi-tenant><option value="">Todas as empresas</option>@foreach($companies as $company)<option value="{{ $company->id }}" @selected($filters['tenant_id']==$company->id)>{{ $company->name }}{{ $company->deleted_at?' (excluída)':'' }}</option>@endforeach</select></label>@endif

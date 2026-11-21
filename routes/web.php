@@ -38,6 +38,7 @@ use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProductPromotionController;
 use App\Http\Controllers\ProductRecipeController;
+use App\Http\Controllers\ProductSalesController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\StaffOperationController;
 use App\Http\Controllers\StoreAddressController;
@@ -237,6 +238,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/stores/address/locate', [StoreAddressController::class, 'locate'])->middleware('throttle:10,1,stores-address-locate:')->name('stores.address.locate');
         Route::get('/bi', [BusinessIntelligenceController::class, 'index']);
         Route::get('/bi/export', [BusinessIntelligenceController::class, 'export']);
+        Route::get('/bi/products', [ProductSalesController::class, 'index'])->name('product-sales.index');
+        Route::get('/bi/products/export', [ProductSalesController::class, 'export'])->name('product-sales.export');
         Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
         Route::get('/catalog/promotions/{storeId}', [ProductPromotionController::class, 'index'])->whereNumber('storeId')->name('promotions.index');
         Route::post('/catalog/promotions/{storeId}', [ProductPromotionController::class, 'create'])->whereNumber('storeId')->name('promotions.create');
